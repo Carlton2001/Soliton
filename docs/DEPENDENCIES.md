@@ -11,6 +11,7 @@ les documentations officielles. Pas de dépendance directe à Oxyde.
 | Base | rusqlite 0.36, bundled | MIT | SQLite C compilé et embarqué, sans DLL SQLite à installer |
 | Parcours | dua-core 5.0.0 | MIT | Successeur recommandé de jwalk ; workers et résultats bornés, liens non suivis |
 | Canaux | crossbeam-channel 0.5 | MIT / Apache-2.0 | Files bornées entre services |
+| Surveillance | notify 8.2 | CC0-1.0 | ReadDirectoryChangesW sous Windows, inotify sous Linux ; 9.0 encore en RC. Regroupement des événements propre à RAP, sans crate debouncer |
 | Décodage | symphonia 0.5.5 | MPL-2.0 | Rust pur, MP3/FLAC/AAC-LC/ALAC/Vorbis/PCM/AIFF ; pas Opus/WMA/APE |
 | Sortie | cpal 0.16 | Apache-2.0 | WASAPI Windows ; ALSA requiert bibliothèques de développement sous Linux |
 | Conversion | rubato 0.16.2 | MIT | Conversion sinc hors callback, compensation du délai et de la longueur finale |

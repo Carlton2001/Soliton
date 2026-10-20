@@ -34,9 +34,8 @@ Le backend est isolé dans `discovery.rs`. Les métadonnées natives retournées
 par dua-core sont réutilisées sans second stat de chaque fichier sous Windows.
 La comparaison de performances SSD/NAS reste à faire sur collection réelle.
 
-Les éditions restent distinctes par dossier source ; le rapprochement entre
-éditions relève de la phase 4. L'artiste d'album est distinct de l'artiste de piste.
-La surveillance notify relève également de la phase 4.
+L'artiste d'album est distinct de l'artiste de piste. Éditions et surveillance :
+voir la phase 4.
 
 ## Phases 1 et 2
 
@@ -130,3 +129,66 @@ des exécutables et 20 tests réussis sans avertissement. Les trois fermetures n
 retournent 0 sans erreur dans les journaux. Les essais natifs ont été exécutés hors
 bac à sable après un échec STATUS_INVALID_HANDLE de ce dernier, également observé
 dans le test CPAL inchangé.
+
+## Phase 4 — Robustesse de la bibliothèque — 20 octobre 2026
+
+Arbitrages validés avant implémentation (décisions ouvertes 4 et 5 du cahier
+des charges) : regroupement artiste + titre + année, retrait des fichiers disparus
+après confirmation, analyse périodique de 30 minutes, « Artistes divers » pour
+les compilations sans artiste d'album.
+
+**Schéma v2.** Migrations séquentielles dans `schema.rs` (v1 SQL, v2 Rust), chacune
+dans une transaction, contrôles de clés étrangères désactivés pendant la migration
+(SQLite embarqué les active par défaut) puis `foreign_key_check`. Une édition a une
+identité stable (source, dossier d'album, titre et artiste d'album taggé normalisés) ;
+plusieurs éditions par album. Les pistes existantes sont regroupées sans accès aux
+fichiers ; `files.extractor` provoque une relecture unique des tags à l'analyse
+suivante. Les identifiants de pistes sont conservés.
+
+**Regroupement** (`grouping.rs`, fonctions pures). Dossier d'album = dossier parent,
+en sautant un niveau `CD1`/`Disc 2`/`Disque 3`, sans sortir de la source. L'album
+d'une édition est recalculé à chaque lot validé à partir de ses pistes : artiste
+d'album taggé, sinon compilation si drapeau de compilation ou artistes de piste
+différents, sinon artiste de piste ou dossier. Fusion entre dossiers seulement si
+artiste, titre normalisé (casse, espaces), statut de compilation et année la plus
+fréquente sont identiques ; un titre déduit du dossier ou une année absente ne
+fusionne jamais. Les éditions sont classées disponibles d'abord, puis par résolution.
+
+**Disparitions.** Les erreurs de lecture d'un fichier n'empêchent plus de conclure ;
+seules les erreurs de parcours, l'annulation ou une source devenue inaccessible
+pendant l'analyse l'empêchent. La source est vérifiée avant et après le parcours.
+Un parcours complet de la racine sans aucun fichier audio est traité comme un volume
+non monté : entrées conservées et marquées indisponibles. Les échecs d'extraction
+sont mémorisés par taille, date et version pour ne pas relire un fichier corrompu
+inchangé.
+
+**Surveillance et sondes.** Le worker unique d'écriture (`indexing.rs`) attend à la
+fois les commandes, les événements notify et ses échéances. Le gestionnaire notify
+ne bloque jamais : file bornée à 256 événements, perte signalée par un drapeau et
+traitée comme une analyse complète. Les événements sont regroupés (2 s de calme,
+15 s au plus, 4 096 chemins au plus) puis convertis en dossiers à analyser ; un
+dossier supprimé est remplacé par son plus proche ancêtre existant et la disparition
+n'est conclue que dans ce périmètre. Une source n'est surveillée qu'après avoir
+répondu. La sonde `read_dir` s'exécute sur un thread dédié avec un délai de 5 s,
+au plus une sonde en attente par chemin. Les analyses d'arrière-plan n'affichent
+pas de progression ; l'interface actualise sa vue sur événement. Elles sont annulées
+à la fermeture.
+
+**Pochettes.** Cache adressé par contenu, donc invalidé de fait quand l'image intégrée
+change. Une entrée de cache manquante provoque la relecture du fichier. Après chaque
+analyse de toutes les sources, les miniatures qu'aucune piste ne référence (sources
+hors ligne comprises) et les fichiers temporaires de plus d'une heure sont supprimés,
+uniquement dans le dossier de cache de RAP.
+
+**Recherche.** Le lecteur WAL garde sa connexion ouverte et ne reconstruit instantané,
+facettes et textes en minuscules que lorsque `PRAGMA data_version` change ; une frappe
+ne fait plus que comparer des chaînes préparées. Les filtres portent sur toutes les
+éditions.
+
+Validation : `cargo fmt --check`, `cargo check --workspace --locked` sans avertissement,
+37 tests réussis avec `--include-ignored`, tests audio matériels compris. Smoke test natif réussi, avec
+migration d'une base v1 existante. Collection FLAC générée : éditions 16/44,1 et 24/96
+réunies avec sélecteur, compilation sous « Artistes divers ». Application en cours
+d'exécution : un album ajouté et une édition supprimée sont pris en compte sans
+action manuelle. Non validé : NAS/SMB réel, grandes collections, déconnexion
+physique d'un disque, Linux.
