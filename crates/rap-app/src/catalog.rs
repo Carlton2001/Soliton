@@ -1,6 +1,9 @@
 use crate::i18n::{Text, text};
-use rap_core::{config::Language, model::LibrarySnapshot};
-use std::sync::Arc;
+use rap_core::{config::Language, model::LibrarySnapshot, text::fold};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 #[derive(Clone, Default)]
 pub struct Facets {
@@ -11,23 +14,16 @@ pub struct Facets {
 }
 impl Facets {
     pub fn collect(snapshot: &LibrarySnapshot) -> Self {
-        use std::collections::BTreeSet;
-        let mut artists = BTreeSet::new();
-        let mut genres = BTreeSet::new();
+        let mut artists = Variants::default();
+        let mut genres = Variants::default();
         let mut years = BTreeSet::new();
         let mut formats = BTreeSet::new();
         for album in &snapshot.albums {
-            if !album.artist.is_empty() {
-                artists.insert(album.artist.clone());
-            }
+            artists.add(&album.artist);
             for track in album.tracks() {
                 let m = &track.metadata;
-                if !m.artist.is_empty() {
-                    artists.insert(m.artist.clone());
-                }
-                if !m.genre.is_empty() {
-                    genres.insert(m.genre.clone());
-                }
+                artists.add(&m.artist);
+                genres.add(&m.genre);
                 if let Some(year) = m.year {
                     years.insert(year.to_string());
                 }
@@ -35,11 +31,44 @@ impl Facets {
             }
         }
         Self {
-            artists: artists.into_iter().collect(),
-            genres: genres.into_iter().collect(),
+            artists: artists.into_values(),
+            genres: genres.into_values(),
             years: years.into_iter().collect(),
             formats: formats.into_iter().collect(),
         }
+    }
+}
+
+/// Spellings of tag values that differ only by case or spacing, grouped under
+/// one entry sorted by its folded form.
+#[derive(Default)]
+struct Variants<'a> {
+    groups: BTreeMap<String, Vec<(&'a str, usize)>>,
+}
+impl<'a> Variants<'a> {
+    fn add(&mut self, value: &'a str) {
+        if value.is_empty() {
+            return;
+        }
+        let spellings = self.groups.entry(fold(value)).or_default();
+        match spellings
+            .iter_mut()
+            .find(|(spelling, _)| *spelling == value)
+        {
+            Some((_, count)) => *count += 1,
+            None => spellings.push((value, 1)),
+        }
+    }
+    /// Displays the most frequent spelling, the first met on ties.
+    fn into_values(self) -> Vec<String> {
+        self.groups
+            .into_values()
+            .filter_map(|spellings| {
+                let best = spellings.iter().map(|(_, count)| *count).max()?;
+                let (spelling, _) = spellings.into_iter().find(|(_, count)| *count == best)?;
+                Some(spelling.to_owned())
+            })
+            .collect()
     }
 }
 
@@ -52,8 +81,9 @@ pub struct Filter {
     pub format: Option<String>,
 }
 
-/// A snapshot with its facets and lowercase search text, built once per library
-/// change so that each keystroke only compares prepared strings.
+/// A snapshot with its facets and folded search keys, built once per library
+/// change so that each keystroke only compares prepared strings. Case and spacing
+/// differences between tags never hide an album.
 pub struct Catalog {
     pub snapshot: Arc<LibrarySnapshot>,
     pub facets: Arc<Facets>,
@@ -63,8 +93,16 @@ pub struct Catalog {
 struct AlbumText {
     /// Title and artist, one per line.
     album: String,
-    /// Title, artist and genre of every track of every edition, in snapshot order.
-    tracks: Vec<String>,
+    artist: String,
+    /// Every track of every edition, in snapshot order.
+    tracks: Vec<TrackText>,
+}
+
+struct TrackText {
+    /// Title, artist and genre, one per line.
+    text: String,
+    artist: String,
+    genre: String,
 }
 
 impl Catalog {
@@ -73,21 +111,27 @@ impl Catalog {
             .albums
             .iter()
             .map(|album| {
-                let mut haystack = format!("{}\n{}", album.title, album.artist);
+                let mut haystack = format!("{}\n{}", fold(&album.title), fold(&album.artist));
                 if album.compilation && album.artist.is_empty() {
                     // Compilations are found under their displayed label in both languages.
                     for language in [Language::French, Language::English] {
                         haystack.push('\n');
-                        haystack.push_str(text(language, Text::VariousArtists));
+                        haystack.push_str(&fold(text(language, Text::VariousArtists)));
                     }
                 }
                 AlbumText {
-                    album: haystack.to_lowercase(),
+                    album: haystack,
+                    artist: fold(&album.artist),
                     tracks: album
                         .tracks()
                         .map(|track| {
                             let m = &track.metadata;
-                            format!("{}\n{}\n{}", m.title, m.artist, m.genre).to_lowercase()
+                            let (artist, genre) = (fold(&m.artist), fold(&m.genre));
+                            TrackText {
+                                text: format!("{}\n{artist}\n{genre}", fold(&m.title)),
+                                artist,
+                                genre,
+                            }
                         })
                         .collect(),
                 }
@@ -101,7 +145,9 @@ impl Catalog {
     }
 
     pub fn matches(&self, filter: &Filter) -> Vec<usize> {
-        let query = filter.query.to_lowercase();
+        let query = fold(&filter.query);
+        let artist = filter.artist.as_deref().map(fold);
+        let genre = filter.genre.as_deref().map(fold);
         self.snapshot
             .albums
             .iter()
@@ -111,12 +157,11 @@ impl Catalog {
                 let album_match = query.is_empty() || text.album.contains(&query);
                 let any = album.tracks().zip(&text.tracks).any(|(track, track_text)| {
                     let m = &track.metadata;
-                    (album_match || track_text.contains(&query))
-                        && filter
-                            .artist
+                    (album_match || track_text.text.contains(&query))
+                        && artist
                             .as_ref()
-                            .is_none_or(|artist| &album.artist == artist || &m.artist == artist)
-                        && filter.genre.as_ref().is_none_or(|genre| &m.genre == genre)
+                            .is_none_or(|a| &text.artist == a || &track_text.artist == a)
+                        && genre.as_ref().is_none_or(|g| &track_text.genre == g)
                         && filter
                             .year
                             .as_ref()

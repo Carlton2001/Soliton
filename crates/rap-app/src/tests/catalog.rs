@@ -99,3 +99,55 @@ fn searches_every_edition_and_labels_compilations() {
     }
     assert_eq!(catalog.facets.artists, ["Alpha", "Miles Davis"]);
 }
+
+#[test]
+fn case_and_spacing_variants_share_one_facet_and_filter() {
+    let mut first = album(
+        "Back in Black",
+        "AC/DC",
+        vec![vec![
+            track("Hells Bells", "AC/DC", "Rock", 1980, "FLAC"),
+            track("Shoot to Thrill", "AC/DC", "rock", 1980, "FLAC"),
+        ]],
+    );
+    first.id = 1;
+    let second = album(
+        "Highway to Hell",
+        "Ac/Dc",
+        vec![vec![track(
+            "Touch Too Much",
+            "ac/dc",
+            "ROCK ",
+            1979,
+            "FLAC",
+        )]],
+    );
+    let third = album(
+        "Arrival",
+        "abba",
+        vec![vec![track("Dancing Queen", "abba", "Pop", 1976, "FLAC")]],
+    );
+    let fourth = album(
+        "Stripes",
+        "Zebra",
+        vec![vec![track("Stripes", "Zebra", "Pop", 1990, "FLAC")]],
+    );
+    let catalog = Catalog::new(LibrarySnapshot {
+        sources: vec![],
+        albums: vec![first, second, third, fourth],
+    });
+    // The most frequent spelling is shown, the first met on ties; order ignores case.
+    assert_eq!(catalog.facets.artists, ["abba", "AC/DC", "Zebra"]);
+    assert_eq!(catalog.facets.genres, ["Pop", "Rock"]);
+    let filter = Filter {
+        artist: Some("AC/DC".into()),
+        genre: Some("Rock".into()),
+        ..Default::default()
+    };
+    assert_eq!(catalog.matches(&filter), vec![0, 1]);
+    let filter = Filter {
+        query: "  HIGHWAY   to ".into(),
+        ..Default::default()
+    };
+    assert_eq!(catalog.matches(&filter), vec![1]);
+}

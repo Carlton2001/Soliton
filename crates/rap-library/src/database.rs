@@ -1,6 +1,9 @@
 use crate::schema;
 use anyhow::{Context, Result, bail};
-use rap_core::model::{Album, Edition, LibrarySnapshot, Metadata, Source, Track};
+use rap_core::{
+    model::{Album, Edition, LibrarySnapshot, Metadata, Source, Track},
+    text::fold,
+};
 use rusqlite::{Connection, params};
 use std::{
     cmp::Reverse,
@@ -193,7 +196,7 @@ impl Library {
                 album
             })
             .collect();
-        albums.sort_by_cached_key(|a| (a.artist.to_lowercase(), a.title.to_lowercase(), a.id));
+        albums.sort_by_cached_key(|a| (fold(&a.artist), fold(&a.title), a.id));
         Ok(LibrarySnapshot {
             sources: self.sources()?,
             albums,

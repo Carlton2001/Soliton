@@ -5,18 +5,11 @@
 //! title, compilation status and year are identical, the year being present.
 //! Titles inferred from folder names never merge. Ambiguity keeps albums apart.
 use rap_core::model::Metadata;
+pub(crate) use rap_core::text::fold;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
-
-/// Case and whitespace insensitive form used only for identities, never displayed.
-pub(crate) fn fold(text: &str) -> String {
-    text.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
 
 /// Disc number of folders such as `CD1`, `Disc 2`, `disque_3` or `CD 2 - Bonus`.
 pub(crate) fn disc_folder(name: &str) -> Option<u32> {

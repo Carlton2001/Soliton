@@ -185,6 +185,12 @@ facettes et textes en minuscules que lorsque `PRAGMA data_version` change ; une 
 ne fait plus que comparer des chaînes préparées. Les filtres portent sur toutes les
 éditions.
 
+**Casse.** Une seule clé de comparaison (`rap_core::text::fold` : minuscules, espaces
+normalisés) sert au regroupement, aux tris, à la recherche et aux filtres. Les facettes
+Artistes et Genres réunissent les graphies d'une même valeur et affichent la plus
+fréquente (la première rencontrée en cas d'égalité) ; filtrer sur l'une trouve toutes
+les autres. Les accents restent distingués.
+
 Validation : `cargo fmt --check`, `cargo check --workspace --locked` sans avertissement,
 37 tests réussis avec `--include-ignored`, tests audio matériels compris. Smoke test natif réussi, avec
 migration d'une base v1 existante. Collection FLAC générée : éditions 16/44,1 et 24/96
