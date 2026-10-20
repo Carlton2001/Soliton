@@ -9,7 +9,7 @@ use rap_core::model::Metadata;
 use rusqlite::{Connection, TransactionBehavior, params};
 use std::{collections::BTreeSet, path::Path};
 
-pub(crate) const VERSION: i64 = 3;
+pub(crate) const VERSION: i64 = 4;
 
 pub(crate) fn version(connection: &Connection) -> Result<i64> {
     Ok(connection.query_row("PRAGMA user_version", [], |row| row.get(0))?)
@@ -29,6 +29,17 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
     }
     if version < 3 {
         refold_identities(connection)?;
+    }
+    if version < 4 {
+        // Arrival dates for sorting by recent additions; modification times are
+        // the best estimate available for files indexed earlier.
+        connection.execute_batch(
+            "BEGIN IMMEDIATE;
+             ALTER TABLE files ADD COLUMN added INTEGER NOT NULL DEFAULT 0;
+             UPDATE files SET added=CAST(modified AS INTEGER)/1000000000;
+             PRAGMA user_version=4;
+             COMMIT;",
+        )?;
     }
     let violations: i64 =
         connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {

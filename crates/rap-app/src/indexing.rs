@@ -156,7 +156,7 @@ impl Worker {
                 Ok(report) => {
                     self.send(Event::Progress(report.progress));
                     for detail in report.diagnostics {
-                        self.send(Event::Error(detail));
+                        self.send(Event::Warning(detail));
                     }
                 }
                 Err(error) => self.error(format_args!("{error:#}")),
@@ -199,8 +199,8 @@ impl Worker {
                 return;
             }
         };
-        for detail in &report.diagnostics {
-            self.error(detail);
+        for detail in report.diagnostics.iter().cloned() {
+            self.send(Event::Warning(detail));
         }
         if report.progress.indexed > 0 || report.removed > 0 || !was_available {
             self.send(Event::Changed);

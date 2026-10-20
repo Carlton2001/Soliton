@@ -7,9 +7,15 @@ mod filters;
 mod i18n;
 mod indexing;
 mod input;
+mod keys;
+mod notices;
+mod now_playing;
 mod playback;
+mod player;
+mod preferences;
 mod scrollbar;
 mod service;
+mod slider;
 mod theme;
 mod views;
 mod widgets;
@@ -30,6 +36,8 @@ fn main() -> anyhow::Result<()> {
     let settings = Settings::load(&paths.settings)?;
     // Migrations and initial configuration run before the UI event loop exists.
     drop(rap_library::Library::open(&paths.root)?);
+    // Covers of files played without indexing only live for one session.
+    let _ = std::fs::remove_dir_all(paths.covers.join("loose"));
     tracing::info!("RAP starting");
     Application::new()
         .with_assets(assets::Assets)
@@ -53,7 +61,7 @@ fn main() -> anyhow::Result<()> {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let app = cx.new(|cx| app::Rap::new(settings, paths, cx));
+                    let app = cx.new(|cx| app::Rap::new(settings, paths, window, cx));
                     app.read(cx).focus.focus(window);
                     app
                 },

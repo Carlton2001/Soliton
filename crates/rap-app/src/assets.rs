@@ -31,7 +31,18 @@ impl AssetSource for Assets {
             "shuffle",
             "repeat",
             "volume-2",
-            "x"
+            "x",
+            "maximize-2",
+            "minimize-2",
+            "chevron-down",
+            "volume-x",
+            "volume-1",
+            "repeat-1",
+            "sliders-horizontal",
+            "arrow-up-down",
+            "check",
+            "circle-alert",
+            "triangle-alert"
         ))
     }
     fn list(&self, _: &str) -> anyhow::Result<Vec<SharedString>> {

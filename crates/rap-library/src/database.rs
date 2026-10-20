@@ -136,7 +136,7 @@ impl Library {
         let mut albums = BTreeMap::<i64, Group>::new();
         let mut query = self.connection.prepare_cached(
             "SELECT t.id,f.source_id,f.path,t.metadata,t.cover,(f.available AND s.available),
-                    e.id,e.folder,a.id,a.title,r.name,a.compilation
+                    e.id,e.folder,a.id,a.title,r.name,a.compilation,f.added
              FROM tracks t JOIN files f ON f.track_id=t.id JOIN sources s ON s.id=f.source_id
              JOIN editions e ON e.id=t.edition_id JOIN albums a ON a.id=e.album_id
              JOIN artists r ON r.id=a.artist_id",
@@ -155,11 +155,13 @@ impl Library {
                         title: row.get(9)?,
                         artist: row.get(10)?,
                         compilation: row.get(11)?,
+                        added: 0,
                         editions: Vec::new(),
                     },
                     editions: BTreeMap::new(),
                 }),
             };
+            group.album.added = group.album.added.max(row.get(12)?);
             let edition = match group.editions.entry(edition_id) {
                 std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::btree_map::Entry::Vacant(entry) => entry.insert(Edition {

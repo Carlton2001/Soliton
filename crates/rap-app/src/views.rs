@@ -1,12 +1,22 @@
 use crate::{
     app::{Rap, Section},
+    catalog::Period,
     i18n::Text,
     scrollbar::Scrollbar,
     theme::Theme,
-    widgets::{button, cover, time},
+    widgets::{button, choice, cover, time},
 };
 use gpui::{prelude::*, *};
-use rap_core::config::Language;
+use rap_core::config::CoverSize;
+
+/// Side of album covers in the grid.
+pub fn cover_side(size: CoverSize) -> f32 {
+    match size {
+        CoverSize::Small => 120.,
+        CoverSize::Medium => 149.,
+        CoverSize::Large => 196.,
+    }
+}
 
 impl Rap {
     pub fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -43,12 +53,19 @@ impl Rap {
                     .into_iter()
                     .enumerate()
                     .map(|(index, (section, icon, label))| {
-                        button(("nav", index), icon, self.t(label), theme)
-                            .when(self.section == section, |v| v.bg(theme.card))
-                            .on_click(cx.listener(move |this, _, window, cx| {
+                        choice(
+                            ("nav", index),
+                            icon,
+                            self.t(label),
+                            self.section == section,
+                            theme,
+                        )
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 this.focus.focus(window);
                                 this.navigate(section, cx);
-                            }))
+                            },
+                        ))
                     }),
             )
             .child(div().flex_1())
@@ -59,6 +76,7 @@ impl Rap {
             )
             .child(
                 button("rescan", "refresh-cw", self.t(Text::Rescan), theme)
+                    .opacity(if self.scanning { 0.5 } else { 1. })
                     .on_click(cx.listener(|this, _, _, cx| this.scan(Vec::new(), cx))),
             )
             .child(
@@ -80,6 +98,7 @@ impl Rap {
 
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
+        let albums = self.section == Section::Albums && self.selected.is_none();
         div()
             .p_5()
             .flex()
@@ -91,122 +110,96 @@ impl Rap {
                 div()
                     .flex()
                     .items_center()
-                    .gap_4()
+                    .gap_2()
                     .child(
                         div()
                             .flex_1()
                             .min_w_0()
+                            .mr_2()
                             .bg(theme.panel)
                             .rounded_md()
                             .px_3()
                             .child(self.search.clone()),
                     )
-                    .child(
-                        button("grid", "layout-grid", self.t(Text::Grid), theme)
-                            .when(self.settings.album_grid, |v| v.bg(theme.card))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.settings.album_grid = true;
-                                this.save();
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        button("list", "list", self.t(Text::List), theme)
-                            .when(!self.settings.album_grid, |v| v.bg(theme.card))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.settings.album_grid = false;
-                                this.save();
-                                cx.notify();
-                            })),
-                    ),
+                    .when(albums, |row| {
+                        row.child(self.sort_button(cx))
+                            .child(
+                                choice(
+                                    "grid",
+                                    "layout-grid",
+                                    self.t(Text::Grid),
+                                    self.settings.album_grid,
+                                    theme,
+                                )
+                                .on_click(cx.listener(|this, _, _, cx| this.set_grid(true, cx))),
+                            )
+                            .child(
+                                choice(
+                                    "list",
+                                    "list",
+                                    self.t(Text::List),
+                                    !self.settings.album_grid,
+                                    theme,
+                                )
+                                .on_click(cx.listener(|this, _, _, cx| this.set_grid(false, cx))),
+                            )
+                    }),
             )
-            .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .items_center()
-                    .child(self.filter_chip(
-                        "genre",
-                        Text::Genre,
-                        &self.filter.genre,
-                        &self.facets.genres,
-                        cx,
-                    ))
-                    .child(self.filter_chip(
-                        "year",
-                        Text::Year,
-                        &self.filter.year,
-                        &self.facets.years,
-                        cx,
-                    ))
-                    .child(self.filter_chip(
-                        "format",
-                        Text::Format,
-                        &self.filter.format,
-                        &self.facets.formats,
-                        cx,
-                    ))
-                    .child(
-                        button("clear", "x", self.t(Text::Clear), theme)
-                            .on_click(cx.listener(|this, _, _, cx| this.clear(cx))),
-                    ),
-            )
+            .when(self.section != Section::Settings, |header| {
+                header.child(self.filter_bar(cx))
+            })
     }
 
-    fn filter_chip(
+    fn empty_state(
         &self,
-        id: &'static str,
-        key: Text,
-        selected: &Option<String>,
-        _values: &[String],
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        button(
-            id,
-            "tag",
-            format!(
-                "{} : {}",
-                self.t(key),
-                selected.as_deref().unwrap_or(self.t(Text::All))
-            ),
-            self.theme(),
-        )
-        .on_click(cx.listener(move |this, _, _, cx| {
-            this.filter_menu = Some(id);
-            cx.notify();
-        }))
+        title: &'static str,
+        hint: &'static str,
+        action: Option<AnyElement>,
+    ) -> AnyElement {
+        let theme = self.theme();
+        div()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .gap_4()
+            .p_8()
+            .child(cover(None, 120., theme))
+            .child(div().text_xl().child(title))
+            .child(div().text_color(theme.muted).child(hint))
+            .children(action)
+            .into_any_element()
     }
 
     pub fn albums_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         if self.snapshot.albums.is_empty() {
-            return div()
-                .flex_1()
-                .flex()
-                .flex_col()
-                .items_center()
-                .justify_center()
-                .gap_4()
-                .child(cover(None, 160., theme))
-                .child(div().text_2xl().child(self.t(Text::Empty)))
-                .child(div().text_color(theme.muted).child(self.t(Text::EmptyHint)))
-                .child(
-                    button("empty-add", "folder-plus", self.t(Text::AddSource), theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.choose_source(cx))),
-                )
-                .into_any_element();
+            let add = button("empty-add", "folder-plus", self.t(Text::AddSource), theme)
+                .bg(theme.card)
+                .on_click(cx.listener(|this, _, _, cx| this.choose_source(cx)));
+            return self.empty_state(
+                self.t(Text::Empty),
+                self.t(Text::EmptyHint),
+                Some(add.into_any_element()),
+            );
         }
         if self.visible.is_empty() {
-            return div()
-                .p_8()
-                .child(self.t(Text::NoResults))
-                .into_any_element();
+            let clear = button("empty-clear", "x", self.t(Text::Clear), theme)
+                .bg(theme.card)
+                .on_click(cx.listener(|this, _, _, cx| this.clear(cx)));
+            return self.empty_state(
+                self.t(Text::NoResults),
+                self.t(Text::NoResultsHint),
+                Some(clear.into_any_element()),
+            );
         }
         let columns = if self.settings.album_grid {
             self.columns
         } else {
             1
         };
+        let side = cover_side(self.settings.cover_size);
         let rows = self.visible.len().div_ceil(columns);
         let list = uniform_list(
             "albums",
@@ -222,89 +215,8 @@ impl Rap {
                             .gap_4()
                             .py_3()
                             .children(
-                                (row * columns..((row + 1) * columns).min(this.visible.len())).map(
-                                    |index| {
-                                        let album = &this.snapshot.albums[this.visible[index]];
-                                        let id = album.id;
-                                        let frame = div()
-                                            .id(("album", id as usize))
-                                            .rounded_md()
-                                            .when(index == this.keyboard_index, |view| {
-                                                view.bg(theme.panel)
-                                            })
-                                            .p_2()
-                                            .min_w_0()
-                                            .hover(move |s| s.bg(theme.panel))
-                                            .on_click(cx.listener(
-                                                move |this, _: &ClickEvent, window, cx| {
-                                                    this.focus.focus(window);
-                                                    this.open_album(id, cx);
-                                                },
-                                            ));
-                                        if this.settings.album_grid {
-                                            frame
-                                                .w(px(165.))
-                                                .flex()
-                                                .flex_col()
-                                                .gap_2()
-                                                .child(cover(album.cover(), 149., theme))
-                                                .child(
-                                                    div()
-                                                        .truncate()
-                                                        .font_weight(FontWeight::SEMIBOLD)
-                                                        .child(album.title.clone()),
-                                                )
-                                                .child(
-                                                    div()
-                                                        .truncate()
-                                                        .text_color(theme.muted)
-                                                        .child(this.album_artist(album)),
-                                                )
-                                                .into_any_element()
-                                        } else {
-                                            let edition = album.primary();
-                                            let first = &edition.tracks[0].metadata;
-                                            frame
-                                                .w_full()
-                                                .flex_1()
-                                                .flex()
-                                                .gap_4()
-                                                .items_center()
-                                                .child(cover(album.cover(), 48., theme))
-                                                .child(
-                                                    div()
-                                                        .w(px(220.))
-                                                        .truncate()
-                                                        .child(album.title.clone()),
-                                                )
-                                                .child(
-                                                    div()
-                                                        .flex_1()
-                                                        .truncate()
-                                                        .text_color(theme.muted)
-                                                        .child(this.album_artist(album)),
-                                                )
-                                                .child(
-                                                    first
-                                                        .year
-                                                        .map(|y| y.to_string())
-                                                        .unwrap_or_default(),
-                                                )
-                                                .child(
-                                                    div()
-                                                        .w(px(110.))
-                                                        .truncate()
-                                                        .child(first.genre.clone()),
-                                                )
-                                                .child(div().w(px(100.)).child(format!(
-                                                    "{} {}",
-                                                    first.format,
-                                                    time(edition.duration_ms())
-                                                )))
-                                                .into_any_element()
-                                        }
-                                    },
-                                ),
+                                (row * columns..((row + 1) * columns).min(this.visible.len()))
+                                    .map(|index| this.album_tile(index, side, cx)),
                             )
                     })
                     .collect()
@@ -316,12 +228,92 @@ impl Rap {
         scroll_area(list, &self.album_bar, theme)
     }
 
+    fn album_tile(&self, index: usize, side: f32, cx: &mut Context<Self>) -> AnyElement {
+        let theme = self.theme();
+        let album = &self.snapshot.albums[self.visible[index]];
+        let id = album.id;
+        let available = album.editions.iter().any(|e| e.available());
+        let frame = div()
+            .id(("album", id as usize))
+            .rounded_md()
+            .when(index == self.keyboard_index, |view| view.bg(theme.panel))
+            .when(!available, |view| view.opacity(0.55))
+            .p_2()
+            .min_w_0()
+            .hover(move |s| s.bg(theme.panel))
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                this.focus.focus(window);
+                this.keyboard_index = index;
+                this.open_album(id, cx);
+            }));
+        if self.settings.album_grid {
+            return frame
+                .w(px(side + 16.))
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(cover(album.cover(), side, theme))
+                .child(
+                    div()
+                        .truncate()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(album.title.clone()),
+                )
+                .child(
+                    div()
+                        .truncate()
+                        .text_color(theme.muted)
+                        .child(self.album_artist(album)),
+                )
+                .into_any_element();
+        }
+        let edition = album.primary();
+        let first = &edition.tracks[0].metadata;
+        frame
+            .w_full()
+            .flex_1()
+            .flex()
+            .gap_4()
+            .items_center()
+            .child(cover(album.cover(), 48., theme))
+            .child(div().w(px(220.)).truncate().child(album.title.clone()))
+            .child(
+                div()
+                    .flex_1()
+                    .truncate()
+                    .text_color(theme.muted)
+                    .child(self.album_artist(album)),
+            )
+            .child(
+                div()
+                    .w(px(48.))
+                    .child(first.year.map(|y| y.to_string()).unwrap_or_default()),
+            )
+            .child(div().w(px(110.)).truncate().child(first.genre.clone()))
+            .child(div().w(px(110.)).child(format!(
+                "{} {}",
+                first.format,
+                time(edition.duration_ms())
+            )))
+            .when(!available, |row| {
+                row.child(
+                    div()
+                        .text_color(theme.muted)
+                        .child(self.t(Text::Unavailable)),
+                )
+            })
+            .into_any_element()
+    }
+
     pub fn facets_view(&self, cx: &mut Context<Self>) -> AnyElement {
-        let values = match self.section {
+        let values: Vec<String> = match self.section {
             Section::Artists => self.facets.artists.clone(),
             Section::Genres => self.facets.genres.clone(),
-            _ => self.facets.years.clone(),
+            _ => self.facets.years.iter().map(u32::to_string).collect(),
         };
+        if values.is_empty() {
+            return self.empty_state(self.t(Text::EmptyFacet), "", None);
+        }
         let section = self.section;
         let theme = self.theme();
         let list = uniform_list(
@@ -336,9 +328,9 @@ impl Rap {
                             .py_4()
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 match section {
-                                    Section::Artists => this.filter.artist = Some(value.clone()),
+                                    Section::Artists => return this.show_artist(value.clone(), cx),
                                     Section::Genres => this.filter.genre = Some(value.clone()),
-                                    _ => this.filter.year = Some(value.clone()),
+                                    _ => this.filter.period = value.parse().ok().map(Period::Year),
                                 }
                                 this.section = Section::Albums;
                                 this.refresh(cx);
@@ -351,131 +343,6 @@ impl Rap {
         .flex_1()
         .min_h_0();
         scroll_area(list, &self.facet_bar, theme)
-    }
-
-    pub fn settings_view(&self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = self.theme();
-        let content = div()
-            .id("settings-scroll")
-            .size_full()
-            .overflow_y_scroll()
-            .track_scroll(&self.settings_bar.handle)
-            .p_6()
-            .flex()
-            .flex_col()
-            .gap_5()
-            .child(div().text_2xl().child(self.t(Text::Settings)))
-            .child(
-                div()
-                    .child(self.t(Text::Language))
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .child(button("fr", "users", self.t(Text::French), theme).on_click(
-                        cx.listener(|this, _, _, cx| this.set_language(Language::French, cx)),
-                    ))
-                    .child(
-                        button("en", "users", self.t(Text::English), theme).on_click(
-                            cx.listener(|this, _, _, cx| this.set_language(Language::English, cx)),
-                        ),
-                    ),
-            )
-            .child(
-                div()
-                    .child(self.t(Text::Theme))
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .child(
-                        button("dark", "disc-3", self.t(Text::Dark), theme)
-                            .on_click(cx.listener(|this, _, _, cx| this.set_dark(true, cx))),
-                    )
-                    .child(
-                        button("light", "disc-3", self.t(Text::Light), theme)
-                            .on_click(cx.listener(|this, _, _, cx| this.set_dark(false, cx))),
-                    ),
-            )
-            .child(div().text_lg().child(self.t(Text::Sources)))
-            .children(self.snapshot.sources.iter().map(|source| {
-                let id = source.id;
-                let confirming = self.pending_removal == Some(id);
-                div()
-                    .py_2()
-                    .border_b_1()
-                    .border_color(theme.border)
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .child(source.path.display().to_string())
-                            .when(!source.available, |v| {
-                                v.child(format!(" — {}", self.t(Text::Unavailable)))
-                            }),
-                    )
-                    .when(confirming, |row| {
-                        row.child(
-                            div()
-                                .text_color(theme.muted)
-                                .child(self.t(Text::ConfirmRemove)),
-                        )
-                        .child(
-                            button(
-                                ("confirm-remove", id as usize),
-                                "folder-minus",
-                                self.t(Text::RemoveSource),
-                                theme,
-                            )
-                            .on_click(
-                                cx.listener(move |this, _, _, cx| this.remove_source(id, cx)),
-                            ),
-                        )
-                        .child(
-                            button(
-                                ("cancel-remove", id as usize),
-                                "x",
-                                self.t(Text::Cancel),
-                                theme,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.pending_removal = None;
-                                cx.notify();
-                            })),
-                        )
-                    })
-                    .when(!confirming, |row| {
-                        row.child(
-                            button(
-                                ("remove-source", id as usize),
-                                "folder-minus",
-                                self.t(Text::RemoveSource),
-                                theme,
-                            )
-                            .opacity(if self.scanning { 0.5 } else { 1. })
-                            .on_click(cx.listener(
-                                move |this, _, _, cx| {
-                                    if !this.scanning {
-                                        this.pending_removal = Some(id);
-                                        cx.notify();
-                                    }
-                                },
-                            )),
-                        )
-                    })
-            }))
-            .child(
-                button(
-                    "settings-add",
-                    "folder-plus",
-                    self.t(Text::AddSource),
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| this.choose_source(cx))),
-            );
-        scroll_area(content, &self.settings_bar, theme)
     }
 
     pub fn footer(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -509,7 +376,42 @@ impl Rap {
                         )),
                 )
             })
+            .when(self.preparing.is_some(), |view| {
+                view.child(
+                    div()
+                        .px_5()
+                        .py_1()
+                        .bg(theme.card)
+                        .child(self.t(Text::Preparing)),
+                )
+            })
             .child(self.player(cx))
+    }
+
+    /// Visible only while files are dragged over the window.
+    pub fn drop_overlay(&self) -> impl IntoElement {
+        let theme = self.theme();
+        div()
+            .id("drop-overlay")
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .gap_3()
+            .opacity(0.)
+            .drag_over::<ExternalPaths>(move |style, _, _, _| style.opacity(1.).bg(theme.scrim))
+            .child(
+                div()
+                    .text_2xl()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(theme.accent)
+                    .child(self.t(Text::DropToPlay)),
+            )
+            .child(div().text_color(theme.muted).child(self.t(Text::DropHint)))
     }
 }
 

@@ -77,6 +77,8 @@ pub struct Album {
     /// Album artist; empty for a compilation without an album artist tag.
     pub artist: String,
     pub compilation: bool,
+    /// Latest arrival of one of its files, in seconds since the epoch.
+    pub added: i64,
     /// Never empty. Ordered best first: available, then highest resolution.
     pub editions: Vec<Edition>,
 }

@@ -11,6 +11,9 @@ pub(crate) struct Candidate {
     pub path: PathBuf,
     pub size: u64,
     pub modified: String,
+    /// Modification time in seconds; estimates the arrival of the file when the
+    /// system records no creation time.
+    pub added: i64,
 }
 
 pub(crate) enum Discovered {
@@ -50,15 +53,12 @@ pub(crate) fn walk(root: &Path, cancel: &Cancellation, sender: &Sender<Discovere
             let metadata = entry
                 .metadata
                 .ok_or_else(|| anyhow::anyhow!("Missing file metadata"))??;
-            let modified = metadata
-                .modified()?
-                .duration_since(UNIX_EPOCH)?
-                .as_nanos()
-                .to_string();
+            let modified = metadata.modified()?.duration_since(UNIX_EPOCH)?;
             Ok(Some(Candidate {
                 path,
                 size: metadata.len(),
-                modified,
+                modified: modified.as_nanos().to_string(),
+                added: modified.as_secs() as i64,
             }))
         });
         let message = match result {

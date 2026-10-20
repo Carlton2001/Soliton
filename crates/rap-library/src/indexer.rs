@@ -190,7 +190,7 @@ impl Library {
                                 self.seen(source_id, &file.path, generation)?;
                                 match value {
                                     Ok(value) => {
-                                        let editions = self.store(source_id, &root, &file.path, file.size, &file.modified, generation, &value.metadata, value.cover.as_deref())?;
+                                        let editions = self.store(source_id, &root, &file, generation, &value)?;
                                         dirty.extend(editions.into_iter().flatten());
                                         report.progress.indexed += 1;
                                         for warning in value.warnings { report.error(warning); }

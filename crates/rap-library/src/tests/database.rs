@@ -85,7 +85,9 @@ fn indexes_incrementally_persists_and_preserves_disconnected_sources() {
     assert_eq!(std::fs::read(&audio).unwrap(), before);
     drop(library);
     let mut library = Library::open(&storage).unwrap();
-    assert_eq!(library.snapshot().unwrap().albums.len(), 1);
+    let snapshot = library.snapshot().unwrap();
+    assert_eq!(snapshot.albums.len(), 1);
+    assert!(snapshot.albums[0].added > 0);
     std::fs::rename(&source, dir.path().join("offline")).unwrap();
     assert!(library.scan(id, &Cancellation::default(), |_| {}).is_err());
     let snapshot = library.snapshot().unwrap();
@@ -424,6 +426,7 @@ fn accent_variants_merge_and_older_identities_are_rekeyed() {
         .execute_batch(
             "UPDATE editions SET identity=identity||'-v2'||id;
              UPDATE albums SET identity='v2';
+             ALTER TABLE files DROP COLUMN added;
              PRAGMA user_version=2;",
         )
         .unwrap();

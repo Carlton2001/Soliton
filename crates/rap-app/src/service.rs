@@ -25,6 +25,8 @@ pub enum Event {
     Changed,
     /// A source stopped answering; its entries are kept.
     SourceUnavailable(PathBuf),
+    /// A file could not be read; the rest of the work went on.
+    Warning(String),
     Error(String),
 }
 pub struct Services {

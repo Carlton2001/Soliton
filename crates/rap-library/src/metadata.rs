@@ -17,6 +17,8 @@ pub(crate) struct Extracted {
     pub metadata: Metadata,
     pub cover: Option<PathBuf>,
     pub warnings: Vec<String>,
+    /// Creation time in seconds since the epoch, when the system records it.
+    pub created: Option<i64>,
 }
 
 pub(crate) fn read(path: &Path, covers: &Path) -> Result<Extracted> {
@@ -85,10 +87,16 @@ pub(crate) fn read(path: &Path, covers: &Path) -> Result<Extracted> {
             Err(error) => warnings.push(format!("{}: {error:#}", path.display())),
         }
     }
+    let created = std::fs::metadata(path)
+        .and_then(|m| m.created())
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|time| time.as_secs() as i64);
     Ok(Extracted {
         metadata,
         cover,
         warnings,
+        created,
     })
 }
 
@@ -159,4 +167,4 @@ fn infer(metadata: &mut Metadata, path: &Path) {
 
 #[cfg(test)]
 #[path = "tests/metadata.rs"]
-mod tests;
+pub(crate) mod tests;

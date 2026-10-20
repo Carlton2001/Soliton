@@ -51,21 +51,37 @@ impl Rap {
             .p_5()
             .gap_4()
             .child(
-                button("back", "arrow-left", self.t(Text::Back), theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.selected = None;
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                button("play-album", "play", self.t(Text::Play), theme)
-                    .opacity(if first_available.is_some() { 1. } else { 0.4 })
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        if let Some(start) = first_available {
-                            this.play_album(album_id, edition_index, start, cx);
-                        }
-                    })),
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        button("back", "arrow-left", self.t(Text::Back), theme).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.selected = None;
+                                cx.notify();
+                            }),
+                        ),
+                    )
+                    .child(
+                        button(
+                            "play-album",
+                            "play",
+                            self.t(if first_available.is_some() {
+                                Text::Play
+                            } else {
+                                Text::AlbumUnavailable
+                            }),
+                            theme,
+                        )
+                        .bg(theme.card)
+                        .opacity(if first_available.is_some() { 1. } else { 0.5 })
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            if let Some(start) = first_available {
+                                this.play_album(album_id, edition_index, start, cx);
+                            }
+                        })),
+                    ),
             )
             .child(
                 div()
@@ -85,12 +101,22 @@ impl Rap {
                                     .font_weight(FontWeight::BOLD)
                                     .child(album.title.clone()),
                             )
-                            .child(
+                            .child({
+                                let artist = album.artist.clone();
                                 div()
+                                    .id("album-artist")
                                     .text_lg()
                                     .text_color(theme.accent)
-                                    .child(self.album_artist(album)),
-                            )
+                                    .rounded_md()
+                                    .when(!artist.is_empty(), |link| {
+                                        link.hover(move |s| s.bg(theme.card)).on_click(cx.listener(
+                                            move |this, _, _, cx| {
+                                                this.show_artist(artist.clone(), cx)
+                                            },
+                                        ))
+                                    })
+                                    .child(self.album_artist(album))
+                            })
                             .child(summary)
                             .child(quality(first)),
                     ),

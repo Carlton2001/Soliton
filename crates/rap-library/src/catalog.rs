@@ -2,8 +2,9 @@
 use crate::{
     Library, covers,
     database::path_text,
+    discovery::Candidate,
     grouping::{self, edition_folder, edition_identity},
-    metadata::EXTRACTOR,
+    metadata::{EXTRACTOR, Extracted},
 };
 use anyhow::Result;
 use rap_core::model::Metadata;
@@ -136,19 +137,17 @@ impl Library {
     }
 
     /// Stores a track and returns the editions whose album must be recomputed.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn store(
         &self,
         source: i64,
         root: &Path,
-        path: &Path,
-        size: u64,
-        modified: &str,
+        candidate: &Candidate,
         generation: i64,
-        metadata: &Metadata,
-        cover: Option<&Path>,
+        extracted: &Extracted,
     ) -> Result<[Option<i64>; 2]> {
+        let (metadata, cover) = (&extracted.metadata, extracted.cover.as_deref());
         let connection = &self.connection;
+        let path = candidate.path.as_path();
         let folder = path_text(edition_folder(path, root))?;
         let identity = edition_identity(source, folder, metadata);
         connection
@@ -183,14 +182,21 @@ impl Library {
         };
         connection
             .prepare_cached(
-                "INSERT INTO files(source_id,path,track_id,size,modified,seen,available,extractor)
-                 VALUES(?1,?2,?3,?4,?5,?6,1,?7)
+                "INSERT INTO files(source_id,path,track_id,size,modified,seen,available,extractor,added)
+                 VALUES(?1,?2,?3,?4,?5,?6,1,?7,?8)
                  ON CONFLICT(source_id,path) DO UPDATE SET size=excluded.size,
                  modified=excluded.modified,seen=excluded.seen,available=1,
                  extractor=excluded.extractor",
             )?
             .execute(params![
-                source, file, track, size, modified, generation, EXTRACTOR
+                source,
+                file,
+                track,
+                candidate.size,
+                candidate.modified,
+                generation,
+                EXTRACTOR,
+                extracted.created.unwrap_or(candidate.added)
             ])?;
         connection
             .prepare_cached("DELETE FROM failures WHERE source_id=?1 AND path=?2")?

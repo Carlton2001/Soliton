@@ -25,6 +25,7 @@ fn album(title: &str, artist: &str, editions: Vec<Vec<Track>>) -> Album {
         title: title.into(),
         artist: artist.into(),
         compilation: artist.is_empty(),
+        added: 0,
         editions: editions
             .into_iter()
             .enumerate()
@@ -59,9 +60,9 @@ fn searches_track_artists_and_combines_filters_on_the_same_track() {
     filter.genre = Some("Rock".into());
     assert!(catalog.matches(&filter).is_empty());
     filter.query.clear();
-    filter.year = Some("2020".into());
+    filter.period = Some(Period::Year(2020));
     assert!(catalog.matches(&filter).is_empty());
-    filter.year = Some("2022".into());
+    filter.period = Some(Period::Year(2022));
     assert_eq!(catalog.matches(&filter), vec![0]);
 }
 
@@ -150,4 +151,56 @@ fn case_and_spacing_variants_share_one_facet_and_filter() {
         ..Default::default()
     };
     assert_eq!(catalog.matches(&filter), vec![1]);
+}
+
+#[test]
+fn periods_qualities_sorting_and_unavailable_albums() {
+    let hires = |title: &str, year: u32, bits: u8, rate: u32| {
+        let mut track = track(title, "Artist", "Jazz", year, "FLAC");
+        track.metadata.bit_depth = Some(bits);
+        track.metadata.sample_rate = Some(rate);
+        track
+    };
+    let mut first = album("Zeta", "Artist", vec![vec![hires("a", 1975, 24, 96_000)]]);
+    first.added = 10;
+    let mut second = album("Alpha", "Artist", vec![vec![hires("b", 1979, 16, 44_100)]]);
+    second.added = 30;
+    let mut third = album(
+        "Mid",
+        "Artist",
+        vec![vec![track("c", "Artist", "Jazz", 1981, "MP3")]],
+    );
+    third.added = 20;
+    third.editions[0].tracks[0].available = false;
+    let catalog = Catalog::new(LibrarySnapshot {
+        sources: vec![],
+        albums: vec![first, second, third],
+    });
+    assert_eq!(catalog.facets.decades, [1970, 1980]);
+    let mut filter = Filter {
+        period: Some(Period::Decade(1970)),
+        ..Default::default()
+    };
+    assert_eq!(catalog.matches(&filter), vec![0, 1]);
+    filter.quality = Some(Quality::HiRes);
+    assert_eq!(catalog.matches(&filter), vec![0]);
+    filter.quality = Some(Quality::Cd);
+    assert_eq!(catalog.matches(&filter), vec![1]);
+    let mut filter = Filter {
+        quality: Some(Quality::Lossy),
+        ..Default::default()
+    };
+    assert_eq!(catalog.matches(&filter), vec![2]);
+    filter.hide_unavailable = true;
+    assert!(catalog.matches(&filter).is_empty());
+    let mut filter = Filter::default();
+    for (sort, order) in [
+        (AlbumSort::Artist, vec![0, 1, 2]),
+        (AlbumSort::Title, vec![1, 2, 0]),
+        (AlbumSort::Year, vec![0, 1, 2]),
+        (AlbumSort::Added, vec![1, 2, 0]),
+    ] {
+        filter.sort = sort;
+        assert_eq!(catalog.matches(&filter), order, "{sort:?}");
+    }
 }
