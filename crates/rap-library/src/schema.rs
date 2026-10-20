@@ -9,7 +9,7 @@ use rap_core::model::Metadata;
 use rusqlite::{Connection, TransactionBehavior, params};
 use std::{collections::BTreeSet, path::Path};
 
-pub(crate) const VERSION: i64 = 2;
+pub(crate) const VERSION: i64 = 3;
 
 pub(crate) fn version(connection: &Connection) -> Result<i64> {
     Ok(connection.query_row("PRAGMA user_version", [], |row| row.get(0))?)
@@ -26,6 +26,9 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
     }
     if version < 2 {
         editions_per_album(connection)?;
+    }
+    if version < 3 {
+        refold_identities(connection)?;
     }
     let violations: i64 =
         connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
@@ -52,6 +55,37 @@ fn editions_per_album(connection: &mut Connection) -> Result<()> {
             album_id INTEGER REFERENCES albums);
          DELETE FROM tracks WHERE id NOT IN (SELECT track_id FROM files);",
     )?;
+    let editions = assign_editions(&transaction, "editions_v2")?;
+    // Documented SQLite procedure for changing constraints of a referenced table.
+    transaction.execute_batch(
+        "DROP TABLE editions;
+         ALTER TABLE editions_v2 RENAME TO editions;
+         CREATE INDEX editions_album ON editions(album_id);
+         DELETE FROM albums;
+         DELETE FROM artists;",
+    )?;
+    catalog::regroup(&transaction, &editions)?;
+    transaction.pragma_update(None, "user_version", 2)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+/// v3: identities ignore accents and ligatures. Editions and albums are re-keyed
+/// from stored metadata; tracks keep their identifiers.
+fn refold_identities(connection: &mut Connection) -> Result<()> {
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let editions = assign_editions(&transaction, "editions")?;
+    transaction
+        .execute_batch("DELETE FROM editions WHERE id NOT IN (SELECT edition_id FROM tracks);")?;
+    catalog::regroup(&transaction, &editions)?;
+    transaction.pragma_update(None, "user_version", 3)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+/// Moves every track to the edition of its current identity in `table`, creating
+/// editions as needed, and returns the editions now holding tracks.
+fn assign_editions(transaction: &Connection, table: &str) -> Result<BTreeSet<i64>> {
     let rows = {
         let mut query = transaction.prepare(
             "SELECT t.id,t.metadata,f.path,f.source_id,s.path FROM tracks t
@@ -75,12 +109,14 @@ fn editions_per_album(connection: &mut Connection) -> Result<()> {
         let folder = path_text(edition_folder(Path::new(&path), Path::new(&root)))?;
         let identity = edition_identity(source, folder, &metadata);
         transaction.execute(
-            "INSERT INTO editions_v2(identity,source_id,folder) VALUES(?1,?2,?3)
-             ON CONFLICT(identity) DO NOTHING",
+            &format!(
+                "INSERT INTO {table}(identity,source_id,folder) VALUES(?1,?2,?3)
+                 ON CONFLICT(identity) DO NOTHING"
+            ),
             params![identity, source, folder],
         )?;
         let edition: i64 = transaction.query_row(
-            "SELECT id FROM editions_v2 WHERE identity=?1",
+            &format!("SELECT id FROM {table} WHERE identity=?1"),
             [&identity],
             |row| row.get(0),
         )?;
@@ -90,16 +126,5 @@ fn editions_per_album(connection: &mut Connection) -> Result<()> {
         )?;
         editions.insert(edition);
     }
-    // Documented SQLite procedure for changing constraints of a referenced table.
-    transaction.execute_batch(
-        "DROP TABLE editions;
-         ALTER TABLE editions_v2 RENAME TO editions;
-         CREATE INDEX editions_album ON editions(album_id);
-         DELETE FROM albums;
-         DELETE FROM artists;",
-    )?;
-    catalog::regroup(&transaction, &editions)?;
-    transaction.pragma_update(None, "user_version", 2)?;
-    transaction.commit()?;
-    Ok(())
+    Ok(editions)
 }

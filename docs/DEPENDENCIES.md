@@ -10,6 +10,7 @@ les documentations officielles. Pas de dépendance directe à Oxyde.
 | Tags | lofty 0.25.4 | MIT / Apache-2.0 | Rust pur, tags et images intégrées, propriétés audio activées |
 | Base | rusqlite 0.36, bundled | MIT | SQLite C compilé et embarqué, sans DLL SQLite à installer |
 | Parcours | dua-core 5.0.0 | MIT | Successeur recommandé de jwalk ; workers et résultats bornés, liens non suivis |
+| Texte | unicode-normalization 0.1 | MIT / Apache-2.0 | Rust pur, déjà présent dans l'arbre ; clé de comparaison sans accents |
 | Canaux | crossbeam-channel 0.5 | MIT / Apache-2.0 | Files bornées entre services |
 | Surveillance | notify 8.2 | CC0-1.0 | ReadDirectoryChangesW sous Windows, inotify sous Linux ; 9.0 encore en RC. Regroupement des événements propre à RAP, sans crate debouncer |
 | Décodage | symphonia 0.5.5 | MPL-2.0 | Rust pur, MP3/FLAC/AAC-LC/ALAC/Vorbis/PCM/AIFF ; pas Opus/WMA/APE |
