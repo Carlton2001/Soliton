@@ -201,3 +201,54 @@ réunies avec sélecteur, compilation sous « Artistes divers ». Application en
 d'exécution : un album ajouté et une édition supprimée sont pris en compte sans
 action manuelle. Non validé : NAS/SMB réel, grandes collections, déconnexion
 physique d'un disque, Linux.
+
+## Phase 5 — Interface finalisée — 20 octobre 2026
+
+Arbitrages validés avant implémentation : filtres derrière un bouton avec puces
+pour les filtres actifs (une valeur par filtre), palette de huit accents, préférences
+de taille des pochettes, thème système, tri et masquage des albums indisponibles.
+
+**Écart aux spécifications (§8.10).** Le cahier des charges prévoit que le
+glisser-déposer distingue lecture ponctuelle et ajout d'un dossier à la bibliothèque.
+Sur décision de l'utilisateur, le dépôt sert uniquement à la lecture ponctuelle ;
+les sources s'ajoutent seulement par « Ajouter un dossier ». Le cahier des charges
+reste à mettre à jour sur ce point.
+
+**Lecture ponctuelle.** `rap_library::read_loose_files` parcourt fichiers et dossiers
+déposés ou ouverts (liens non suivis, 2 000 fichiers au plus), lit tags et pochettes
+sur l'exécuteur d'arrière-plan de GPUI, sans base de données. Les identifiants sont
+négatifs pour ne jamais correspondre à une piste indexée. Les pochettes vont dans
+`covers/loose`, sous-dossier ignoré par le nettoyage du cache et vidé au démarrage.
+Une nouvelle demande annule la précédente.
+
+**Réglages.** Apparence (système, clair, sombre ; l'ancien booléen `dark` est relu),
+accent, taille des pochettes, tri et masquage persistent dans `settings.json`.
+Le thème système suit `observe_window_appearance`. Chaque accent a une variante par
+thème ; un test vérifie un contraste d'au moins 4,5:1 sur tous les fonds, et le gris
+secondaire du thème clair a été foncé pour respecter ce seuil.
+
+**Tri et filtres.** Le tri par ajout récent utilise `files.added` (schéma v4) :
+date de création du fichier lue par les lecteurs de tags, sinon date de modification ;
+les fichiers indexés auparavant reçoivent leur date de modification. Période et
+qualité (plus de 16 bits ou de 48 kHz, CD, avec perte faute de profondeur) sont des
+critères du catalogue, comme le masquage des albums sans édition accessible ; les
+tris sont stables et gardent l'ordre artiste puis titre en cas d'égalité.
+
+**Interface.** Barre de lecture en trois zones ; curseurs de position et de volume
+dessinés sur un canevas comme la barre de défilement, la position n'étant envoyée
+au moteur qu'au relâchement. Les boutons Arrêt et ±10 s sont remplacés par la pause
+et `Ctrl+←/→`. Vue « lecture en cours » et plein écran Windows (`toggle_fullscreen`).
+Menus fermés par un clic extérieur (fond occultant) ou `Échap`. Erreurs et
+avertissements sont conservés (50 au plus, doublons consécutifs ignorés) et affichés
+dans un bandeau dépliable ; les diagnostics de fichiers sont des avertissements.
+États vides : bibliothèque vide, aucun résultat avec bouton d'effacement, facette
+vide, sortie audio indisponible, album sans édition accessible. Chemins affichés
+sans préfixe `\\?\`. Douze icônes Lucide officielles ajoutées sans modification.
+
+Validation : formatage, `cargo check --workspace --locked` sans avertissement,
+45 tests réussis avec `--include-ignored`. Quatre scénarios du smoke test natif réussis.
+Pilotage réel de la fenêtre (clics et touches envoyés à la seule fenêtre RAP, son
+coupé) : menus de filtres et de tri, puce de période, paramètres, thème clair,
+anglais, accent bleu, lecture d'un album, vue en cours de lecture, entrée et sortie
+du plein écran. Non validés : dépôt réel de fichiers depuis l'Explorateur, curseurs
+glissés à la souris, thème système lors d'un changement Windows, Linux.

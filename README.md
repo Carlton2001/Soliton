@@ -1,6 +1,6 @@
 # RAP — Rust Audio Player
 
-Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 4 implémentées dans
+Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 5 implémentées dans
 l'ordre et validées sous Windows avec Rust 1.98.1 MSVC.
 
 ## Lancer
@@ -20,17 +20,26 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   la meilleure disponible en premier. Les sous-dossiers `CD1`, `Disc 2`… forment
   un seul album, et une compilation sans artiste d'album apparaît sous « Artistes divers ».
 - Double-cliquer une piste lance la lecture à partir de celle-ci.
-- **Artistes**, **Genres**, **Années** : accès aux albums correspondants.
-- Recherche par album, titre, artiste ou genre ; filtres combinables genre/année/format.
-- Barre permanente : lecture/pause/arrêt, précédente/suivante, position cliquable,
-  déplacements de 10 s, volume, aléatoire, répétition de piste ou d'album.
-- **Ouvrir un fichier** : lecture ponctuelle d'un fichier ou d'une sélection, sans indexation.
-- **Paramètres** : français/anglais et thème clair/sombre. Langue, thème, mode
-  grille/liste et volume sont conservés.
+- **Artistes**, **Genres**, **Années** : accès aux albums correspondants ; cliquer
+  l'artiste d'une fiche ou de la lecture en cours affiche ses albums.
+- Recherche par album, titre, artiste ou genre, sans tenir compte de la casse ni des accents.
+- **Filtres** : genre, période (décennie ou année), artiste, format et qualité
+  (haute résolution, CD, avec perte), combinables ; seuls les filtres actifs
+  apparaissent, en puces retirables. **Tri** par artiste, titre, année ou ajout récent.
+- Barre permanente : pochette, titre, artiste et album, lecture/pause,
+  précédente/suivante, aléatoire, répétition, position et volume glissables, sourdine.
+- **Lecture en cours** : grande pochette et commandes essentielles, plein écran
+  Windows avec `F11`.
+- **Glisser-déposer** de fichiers ou de dossiers sur la fenêtre, et **Ouvrir un
+  fichier** : lecture ponctuelle avec tags et pochettes, sans ajout à la bibliothèque.
+- **Paramètres** : français/anglais, apparence système/clair/sombre, huit couleurs
+  d'accent, taille des pochettes, masquage des albums indisponibles. Tout est conservé.
+- Erreurs et avertissements regroupés dans un bandeau consultable.
 
 Clavier : `Ctrl+F` recherche, `Ctrl+O` ouverture ponctuelle, flèches pour les albums,
-`Entrée` pour ouvrir une fiche, `Espace` lecture/pause, `Échap` retour à la bibliothèque.
-Le champ de recherche prend en charge sélection, copier/coller et saisie IME.
+`Entrée` pour ouvrir une fiche, `Espace` lecture/pause, `Ctrl+←/→` ±10 s, `F11`
+plein écran, `Échap` ou bouton Précédent de la souris pour revenir. Le champ de
+recherche prend en charge sélection, copier/coller et saisie IME.
 
 ## Données et fichiers sources
 
@@ -86,7 +95,7 @@ Outil de diagnostic sans interface :
 cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
 ```
 
-## Limites du premier jalon
+## Limites
 
 - Lecture mono/stéréo, sortie partagée par défaut. Pas de garantie bit-perfect,
   de mode exclusif, de sélection de sortie ou d'égaliseur à ce stade.
@@ -99,8 +108,11 @@ cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
   les complète. Pas de réglage de l'intervalle à ce stade.
 - L'annulation attend la fin d'une E/S système en cours. Les performances sur
   grandes collections/NAS et l'écoute prolongée restent à valider sur des données réelles.
-- Glisser-déposer, plein écran, filtres de qualité audio, intégrations système et
-  distribution installable restent dans les phases suivantes. Linux n'a pas été validé.
+- Le glisser-déposer lit au plus 2 000 fichiers et n'ajoute jamais de dossier à la
+  bibliothèque (choix validé, voir l'architecture). Il n'a pas été testé par un dépôt
+  réel automatisé ; la lecture des fichiers déposés est couverte par un test unitaire.
+- Intégrations système et distribution installable restent dans les phases suivantes.
+  Linux n'a pas été validé.
 - GPUI 0.2.2 et `proc-macro-error2` utilisent des correctifs locaux documentés
   dans [vendor/README.md](vendor/README.md) pour la fermeture Windows, la sonde
   DXGI Debug facultative et les incompatibilités futures de Rust.
