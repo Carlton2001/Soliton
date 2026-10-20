@@ -1,0 +1,22 @@
+[package]
+name = "rap-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+default-run = "rap"
+
+[[bin]]
+name = "rap"
+path = "src/main.rs"
+
+[dependencies]
+rap-core.workspace = true
+rap-platform.workspace = true
+rap-library.workspace = true
+rap-audio.workspace = true
+anyhow.workspace = true
+gpui = "=0.2.2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+crossbeam-channel = "0.5"
+unicode-segmentation = "1"
