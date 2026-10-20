@@ -20,7 +20,6 @@ rap-audio = { path = "crates/rap-audio" }
 
 [profile.dev]
 opt-level = 1
-incremental = false
 
 [profile.dev.package."*"]
 opt-level = 2
