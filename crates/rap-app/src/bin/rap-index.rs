@@ -19,10 +19,11 @@ fn main() -> anyhow::Result<()> {
     let snapshot = library.snapshot()?;
     for album in &snapshot.albums {
         println!(
-            "{} / {} — {}",
+            "{} / {} — {} tracks, {} editions",
             album.artist,
             album.title,
-            album.tracks.len()
+            album.tracks().count(),
+            album.editions.len()
         );
     }
     println!(

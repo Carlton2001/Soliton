@@ -1,14 +1,10 @@
 //! Fixed background workers own all filesystem, SQLite and filtering work.
-use crate::catalog::{self, Filter};
+use crate::catalog::{self, Catalog, Filter};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rap_core::{config::Settings, model::LibrarySnapshot};
 use rap_library::{Cancellation, Library, ScanProgress};
 use rap_platform::AppPaths;
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, sync::Arc};
 
 pub enum Work {
     Scan(Vec<PathBuf>, Cancellation),
@@ -19,12 +15,16 @@ pub struct View {
     pub snapshot: Arc<LibrarySnapshot>,
     pub visible: Vec<usize>,
     pub filter: Filter,
-    pub facets: catalog::Facets,
+    pub facets: Arc<catalog::Facets>,
 }
 pub enum Event {
     Progress(ScanProgress),
     Finished(bool),
     Removed,
+    /// Background work changed the library; the view should be queried again.
+    Changed,
+    /// A source stopped answering; its entries are kept.
+    SourceUnavailable(PathBuf),
     Error(String),
 }
 pub struct Services {
@@ -32,6 +32,7 @@ pub struct Services {
     pub events: Receiver<Event>,
     pub query: Sender<Filter>,
     pub views: Receiver<anyhow::Result<View>>,
+    background: Cancellation,
 }
 
 impl Services {
@@ -40,101 +41,60 @@ impl Services {
         let (events_tx, events_rx) = bounded(32);
         let (query_tx, query_rx) = bounded::<Filter>(32);
         let (views_tx, views_rx) = bounded(2);
-        let reader_paths = paths.clone();
-        std::thread::spawn(move || {
-            let run = || -> anyhow::Result<()> {
-                let mut library = Library::open(&paths.root)?;
-                while let Ok(work) = work_rx.recv() {
-                    match work {
-                        Work::Save(settings) => {
-                            if let Err(error) = settings.save(&paths.settings) {
-                                let _ = events_tx.send(Event::Error(format!("{error:#}")));
-                            }
+        let background = Cancellation::default();
+        let reader_root = paths.root.clone();
+        let worker_background = background.clone();
+        std::thread::Builder::new()
+            .name("rap-library".into())
+            .spawn(move || crate::indexing::run(paths, work_rx, events_tx, worker_background))
+            .expect("Cannot start the library worker");
+        // The WAL reader stays usable while indexing commits batches. Typing is
+        // coalesced to the newest filter; the catalogue is rebuilt only after commits.
+        std::thread::Builder::new()
+            .name("rap-query".into())
+            .spawn(move || {
+                let mut library = None;
+                let mut cached: Option<(i64, Catalog)> = None;
+                while let Ok(next) = query_rx.recv() {
+                    let filter = query_rx.try_iter().last().unwrap_or(next);
+                    let result = (|| {
+                        if library.is_none() {
+                            library = Some(Library::open_reader(&reader_root)?);
                         }
-                        Work::RemoveSource(id) => {
-                            if let Err(error) = library.remove_source(id) {
-                                let _ = events_tx.send(Event::Error(format!("{error:#}")));
-                            }
-                            let _ = events_tx.send(Event::Removed);
+                        let library = library.as_ref().unwrap();
+                        let version = library.data_version()?;
+                        if cached.as_ref().is_none_or(|(known, _)| *known != version) {
+                            cached = Some((version, Catalog::new(library.snapshot()?)));
                         }
-                        Work::Scan(paths, cancellation) => {
-                            let ids = if paths.is_empty() {
-                                library.sources()?.iter().map(|s| s.id).collect()
-                            } else {
-                                let mut ids = Vec::new();
-                                for path in paths {
-                                    match library.add_source(&path) {
-                                        Ok(id) => ids.push(id),
-                                        Err(error) => {
-                                            let _ = events_tx.send(Event::Error(format!(
-                                                "{}: {error:#}",
-                                                path.display()
-                                            )));
-                                        }
-                                    }
-                                }
-                                ids
-                            };
-                            for id in ids {
-                                if cancellation.is_cancelled() {
-                                    break;
-                                }
-                                let mut last = Instant::now() - Duration::from_secs(1);
-                                match library.scan(id, &cancellation, |progress| {
-                                    if last.elapsed() > Duration::from_millis(100) {
-                                        let _ =
-                                            events_tx.try_send(Event::Progress(progress.clone()));
-                                        last = Instant::now();
-                                    }
-                                }) {
-                                    Ok(report) => {
-                                        let _ = events_tx.send(Event::Progress(report.progress));
-                                        for detail in report.diagnostics {
-                                            let _ = events_tx.send(Event::Error(detail));
-                                        }
-                                    }
-                                    Err(error) => {
-                                        let _ = events_tx.send(Event::Error(format!("{error:#}")));
-                                    }
-                                }
-                            }
-                            let _ = events_tx.send(Event::Finished(cancellation.is_cancelled()));
-                        }
+                        let catalog = &cached.as_ref().unwrap().1;
+                        Ok(View {
+                            snapshot: catalog.snapshot.clone(),
+                            visible: catalog.matches(&filter),
+                            filter,
+                            facets: catalog.facets.clone(),
+                        })
+                    })();
+                    if result.is_err() {
+                        library = None;
+                    }
+                    if views_tx.send(result).is_err() {
+                        break;
                     }
                 }
-                Ok(())
-            };
-            if let Err(error) = run() {
-                let _ = events_tx.send(Event::Error(format!("{error:#}")));
-                let _ = events_tx.send(Event::Finished(false));
-            }
-        });
-        // WAL reader stays usable while indexing commits batches. Poll only while UI
-        // requests refreshes; coalesce typing to the newest filter before querying.
-        std::thread::spawn(move || {
-            while let Ok(next) = query_rx.recv() {
-                let filter = query_rx.try_iter().last().unwrap_or(next);
-                let result = Library::open(&reader_paths.root).and_then(|library| {
-                    let snapshot = Arc::new(library.snapshot()?);
-                    let visible = catalog::matches(&snapshot, &filter);
-                    let facets = catalog::Facets::collect(&snapshot);
-                    Ok(View {
-                        snapshot,
-                        visible,
-                        filter,
-                        facets,
-                    })
-                });
-                if views_tx.send(result).is_err() {
-                    break;
-                }
-            }
-        });
+            })
+            .expect("Cannot start the query worker");
         Self {
             work: work_tx,
             events: events_rx,
             query: query_tx,
             views: views_rx,
+            background,
         }
+    }
+}
+
+impl Drop for Services {
+    fn drop(&mut self) {
+        self.background.cancel();
     }
 }

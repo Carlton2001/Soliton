@@ -1,7 +1,9 @@
+use crate::schema;
 use anyhow::{Context, Result, bail};
-use rap_core::model::{Album, LibrarySnapshot, Metadata, Source, Track};
-use rusqlite::{Connection, OptionalExtension, params};
+use rap_core::model::{Album, Edition, LibrarySnapshot, Metadata, Source, Track};
+use rusqlite::{Connection, params};
 use std::{
+    cmp::Reverse,
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
@@ -13,24 +15,47 @@ pub struct Library {
 }
 
 impl Library {
+    /// Opens the writer connection, applying migrations first.
     pub fn open(storage: &Path) -> Result<Self> {
+        let mut library = Self::connect(storage)?;
+        // Bundled SQLite enables enforcement by default; v2 rebuilds a referenced table.
+        library
+            .connection
+            .execute_batch("PRAGMA foreign_keys=OFF;")?;
+        schema::migrate(&mut library.connection)?;
+        library
+            .connection
+            .execute_batch("PRAGMA foreign_keys=ON;")?;
+        Ok(library)
+    }
+
+    /// Opens a connection for snapshots only. The writer must have migrated first.
+    pub fn open_reader(storage: &Path) -> Result<Self> {
+        let library = Self::connect(storage)?;
+        if schema::version(&library.connection)? != schema::VERSION {
+            bail!("Library database is not at the expected version");
+        }
+        Ok(library)
+    }
+
+    fn connect(storage: &Path) -> Result<Self> {
         std::fs::create_dir_all(storage.join("covers"))?;
         let storage = storage.canonicalize()?;
         let connection = Connection::open(storage.join("library.sqlite3"))?;
         connection.busy_timeout(std::time::Duration::from_secs(3))?;
-        connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")?;
-        let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        if version > 1 {
-            bail!("Library created by a newer RAP version");
-        }
-        if version == 0 {
-            connection.execute_batch(include_str!("schema.sql"))?;
-        }
+        connection.execute_batch("PRAGMA journal_mode=WAL;")?;
         Ok(Self {
             covers: storage.join("covers"),
             storage,
             connection,
         })
+    }
+
+    /// Changes whenever another connection commits; cheap enough to poll per query.
+    pub fn data_version(&self) -> Result<i64> {
+        Ok(self
+            .connection
+            .query_row("PRAGMA data_version", [], |row| row.get(0))?)
     }
 
     pub fn add_source(&mut self, path: &Path) -> Result<i64> {
@@ -64,10 +89,11 @@ impl Library {
         transaction.execute_batch(&format!(
             "CREATE TEMP TABLE removed_tracks AS SELECT track_id AS id FROM files WHERE source_id={id};
              DELETE FROM files WHERE source_id={id};
+             DELETE FROM failures WHERE source_id={id};
              DELETE FROM tracks WHERE id IN (SELECT id FROM removed_tracks);
              DROP TABLE removed_tracks;
              DELETE FROM editions WHERE id NOT IN (SELECT edition_id FROM tracks);
-             DELETE FROM albums WHERE id NOT IN (SELECT album_id FROM editions);
+             DELETE FROM albums WHERE id NOT IN (SELECT album_id FROM editions WHERE album_id IS NOT NULL);
              DELETE FROM artists WHERE id NOT IN (SELECT artist_id FROM albums);
              DELETE FROM sources WHERE id={id};"
         ))?;
@@ -78,7 +104,7 @@ impl Library {
     pub fn sources(&self) -> Result<Vec<Source>> {
         let mut query = self
             .connection
-            .prepare("SELECT id,path,available FROM sources ORDER BY id")?;
+            .prepare_cached("SELECT id,path,available FROM sources ORDER BY id")?;
         Ok(query
             .query_map([], |row| {
                 Ok(Source {
@@ -90,132 +116,108 @@ impl Library {
             .collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Records the outcome of an availability probe. Entries are never removed here.
+    /// Returns whether the state changed.
+    pub fn set_source_available(&mut self, id: i64, available: bool) -> Result<bool> {
+        Ok(self.connection.execute(
+            "UPDATE sources SET available=?1 WHERE id=?2 AND available<>?1",
+            params![available, id],
+        )? > 0)
+    }
+
     pub fn snapshot(&self) -> Result<LibrarySnapshot> {
-        let mut albums = BTreeMap::<i64, Album>::new();
-        let mut query = self.connection.prepare(
-            "SELECT t.id,f.source_id,f.path,t.metadata,t.cover,(f.available AND s.available),a.id,a.title,r.name
+        struct Group {
+            album: Album,
+            editions: BTreeMap<i64, Edition>,
+        }
+        let mut albums = BTreeMap::<i64, Group>::new();
+        let mut query = self.connection.prepare_cached(
+            "SELECT t.id,f.source_id,f.path,t.metadata,t.cover,(f.available AND s.available),
+                    e.id,e.folder,a.id,a.title,r.name,a.compilation
              FROM tracks t JOIN files f ON f.track_id=t.id JOIN sources s ON s.id=f.source_id
              JOIN editions e ON e.id=t.edition_id JOIN albums a ON a.id=e.album_id
-             JOIN artists r ON r.id=a.artist_id ORDER BY a.id,t.id")?;
-        let rows = query.query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, Option<String>>(4)?,
-                row.get::<_, bool>(5)?,
-                row.get::<_, i64>(6)?,
-                row.get::<_, String>(7)?,
-                row.get::<_, String>(8)?,
-            ))
-        })?;
-        for row in rows {
-            let (id, source_id, path, metadata, cover, available, album_id, title, artist) = row?;
-            let metadata: Metadata = serde_json::from_str(&metadata)?;
-            let album = albums.entry(album_id).or_insert_with(|| Album {
-                id: album_id,
-                title,
-                artist,
-                tracks: Vec::new(),
-            });
-            album.tracks.push(Track {
-                id,
+             JOIN artists r ON r.id=a.artist_id",
+        )?;
+        let mut rows = query.query([])?;
+        while let Some(row) = rows.next()? {
+            let metadata: Metadata = serde_json::from_str(&row.get::<_, String>(3)?)?;
+            let source_id = row.get(1)?;
+            let edition_id = row.get(6)?;
+            let album_id = row.get(8)?;
+            let group = match albums.entry(album_id) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => entry.insert(Group {
+                    album: Album {
+                        id: album_id,
+                        title: row.get(9)?,
+                        artist: row.get(10)?,
+                        compilation: row.get(11)?,
+                        editions: Vec::new(),
+                    },
+                    editions: BTreeMap::new(),
+                }),
+            };
+            let edition = match group.editions.entry(edition_id) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => entry.insert(Edition {
+                    id: edition_id,
+                    source_id,
+                    folder: PathBuf::from(row.get::<_, String>(7)?),
+                    tracks: Vec::new(),
+                }),
+            };
+            edition.tracks.push(Track {
+                id: row.get(0)?,
                 source_id,
-                path: path.into(),
+                path: PathBuf::from(row.get::<_, String>(2)?),
                 metadata,
-                cover: cover.map(PathBuf::from),
-                available,
+                cover: row.get::<_, Option<String>>(4)?.map(PathBuf::from),
+                available: row.get(5)?,
             });
         }
-        let mut albums: Vec<_> = albums.into_values().collect();
-        for album in &mut albums {
-            album.tracks.sort_by_key(|t| {
-                (
-                    t.metadata.disc.unwrap_or(1),
-                    t.metadata.track.unwrap_or(u32::MAX),
-                    t.path.clone(),
-                )
-            });
-        }
+        let mut albums: Vec<_> = albums
+            .into_values()
+            .map(|group| {
+                let mut album = group.album;
+                album.editions = group.editions.into_values().collect();
+                for edition in &mut album.editions {
+                    edition.tracks.sort_by_cached_key(|t| {
+                        (
+                            t.metadata.disc.unwrap_or(1),
+                            t.metadata.track.unwrap_or(u32::MAX),
+                            t.path.clone(),
+                        )
+                    });
+                }
+                album.editions.sort_by_key(edition_rank);
+                album
+            })
+            .collect();
         albums.sort_by_cached_key(|a| (a.artist.to_lowercase(), a.title.to_lowercase(), a.id));
         Ok(LibrarySnapshot {
             sources: self.sources()?,
             albums,
         })
     }
+}
 
-    pub(crate) fn fingerprint(&self, source: i64, path: &Path) -> Result<Option<(u64, String)>> {
-        Ok(self
-            .connection
-            .query_row(
-                "SELECT size,modified FROM files WHERE source_id=?1 AND path=?2",
-                params![source, path_text(path)?],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()?)
-    }
-
-    pub(crate) fn seen(&self, source: i64, path: &Path, generation: i64) -> Result<()> {
-        self.connection.execute(
-            "UPDATE files SET seen=?1,available=1 WHERE source_id=?2 AND path=?3",
-            params![generation, source, path_text(path)?],
-        )?;
-        Ok(())
-    }
-
-    pub(crate) fn store(
-        &self,
-        source: i64,
-        path: &Path,
-        size: u64,
-        modified: &str,
-        generation: i64,
-        metadata: &Metadata,
-        cover: Option<&Path>,
-    ) -> Result<()> {
-        let folder = path.parent().context("Missing parent")?;
-        // Deliberately conservative: different folders remain different editions/albums.
-        let key =
-            serde_json::to_string(&(source, folder, &metadata.album_artist, &metadata.album))?;
-        self.connection.execute(
-            "INSERT OR IGNORE INTO artists(name) VALUES(?1)",
-            [&metadata.album_artist],
-        )?;
-        self.connection.execute("INSERT OR IGNORE INTO albums(identity,title,artist_id) SELECT ?1,?2,id FROM artists WHERE name=?3", params![key, metadata.album, metadata.album_artist])?;
-        self.connection.execute("INSERT OR IGNORE INTO editions(album_id,folder) SELECT id,?1 FROM albums WHERE identity=?2", params![path_text(folder)?,key])?;
-        let edition: i64 = self.connection.query_row(
-            "SELECT e.id FROM editions e JOIN albums a ON a.id=e.album_id WHERE a.identity=?1",
-            [&key],
-            |r| r.get(0),
-        )?;
-        let old: Option<i64> = self
-            .connection
-            .query_row(
-                "SELECT track_id FROM files WHERE source_id=?1 AND path=?2",
-                params![source, path_text(path)?],
-                |r| r.get(0),
-            )
-            .optional()?;
-        let cover = cover.map(path_text).transpose()?;
-        let json = serde_json::to_string(metadata)?;
-        let track = if let Some(id) = old {
-            self.connection.execute(
-                "UPDATE tracks SET edition_id=?1,metadata=?2,cover=?3 WHERE id=?4",
-                params![edition, json, cover, id],
-            )?;
-            id
-        } else {
-            self.connection.execute(
-                "INSERT INTO tracks(edition_id,metadata,cover) VALUES(?1,?2,?3)",
-                params![edition, json, cover],
-            )?;
-            self.connection.last_insert_rowid()
-        };
-        self.connection.execute("INSERT INTO files(source_id,path,track_id,size,modified,seen,available) VALUES(?1,?2,?3,?4,?5,?6,1)
-            ON CONFLICT(source_id,path) DO UPDATE SET size=excluded.size,modified=excluded.modified,seen=excluded.seen,available=1", params![source,path_text(path)?,track,size,modified,generation])?;
-        Ok(())
-    }
+/// Available editions first, then the highest resolution; lossy formats carry no
+/// bit depth. Ties keep indexing order.
+fn edition_rank(edition: &Edition) -> (bool, Reverse<u8>, Reverse<u32>, i64) {
+    let best = |value: fn(&Metadata) -> Option<u32>| {
+        edition
+            .tracks
+            .iter()
+            .filter_map(|t| value(&t.metadata))
+            .max()
+            .unwrap_or(0)
+    };
+    (
+        !edition.available(),
+        Reverse(best(|m| m.bit_depth.map(u32::from)) as u8),
+        Reverse(best(|m| m.sample_rate)),
+        edition.id,
+    )
 }
 
 pub(crate) fn path_text(path: &Path) -> Result<&str> {

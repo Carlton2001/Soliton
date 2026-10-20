@@ -9,7 +9,7 @@ use crate::{
 use gpui::{prelude::*, *};
 use rap_core::{
     config::{Language, Settings},
-    model::LibrarySnapshot,
+    model::{Album, LibrarySnapshot},
 };
 use rap_library::{Cancellation, ScanProgress};
 use rap_platform::AppPaths;
@@ -46,6 +46,8 @@ pub struct Rap {
     pub filter: Filter,
     pub section: Section,
     pub selected: Option<i64>,
+    /// Index into the selected album's editions.
+    pub selected_edition: usize,
     pub search: Entity<TextInput>,
     pub services: Services,
     pub scanning: bool,
@@ -54,7 +56,7 @@ pub struct Rap {
     pub status: String,
     pub error: Option<String>,
     pub columns: usize,
-    pub facets: crate::catalog::Facets,
+    pub facets: Arc<crate::catalog::Facets>,
     pub filter_menu: Option<&'static str>,
     query_pending: bool,
     _subscriptions: Vec<Subscription>,
@@ -101,6 +103,7 @@ impl Rap {
             filter: Filter::default(),
             section: Section::Albums,
             selected: None,
+            selected_edition: 0,
             search,
             services: Services::start(paths),
             scanning: false,
@@ -153,7 +156,15 @@ impl Rap {
                                         .into();
                                     this.query_pending = true;
                                 }
-                                Event::Removed => this.query_pending = true,
+                                Event::Removed | Event::Changed => this.query_pending = true,
+                                Event::SourceUnavailable(path) => {
+                                    this.error = Some(format!(
+                                        "{} : {}",
+                                        path.display(),
+                                        this.t(Text::SourceUnavailable)
+                                    ));
+                                    this.query_pending = true;
+                                }
                                 Event::Error(error) => this.error = Some(error),
                             }
                             changed = true;
@@ -267,6 +278,21 @@ impl Rap {
         }
         cx.notify();
     }
+    /// Shows an album sheet on its best edition.
+    pub fn open_album(&mut self, id: i64, cx: &mut Context<Self>) {
+        self.selected = Some(id);
+        self.selected_edition = 0;
+        self.track_scroll.scroll_to_item(0, ScrollStrategy::Top);
+        cx.notify();
+    }
+    /// Displayed album artist, with a translated label for compilations.
+    pub fn album_artist(&self, album: &Album) -> String {
+        if album.artist.is_empty() && album.compilation {
+            self.t(Text::VariousArtists).into()
+        } else {
+            album.artist.clone()
+        }
+    }
     pub fn navigate(&mut self, section: Section, cx: &mut Context<Self>) {
         self.section = section;
         self.selected = None;
@@ -319,12 +345,10 @@ impl Rap {
             "up" => self.keyboard_index.saturating_sub(step),
             "down" => (self.keyboard_index + step).min(self.visible.len() - 1),
             "enter" => {
-                self.selected = Some(
-                    self.snapshot.albums
-                        [self.visible[self.keyboard_index.min(self.visible.len() - 1)]]
-                    .id,
-                );
-                cx.notify();
+                let id = self.snapshot.albums
+                    [self.visible[self.keyboard_index.min(self.visible.len() - 1)]]
+                .id;
+                self.open_album(id, cx);
                 return;
             }
             _ => return,

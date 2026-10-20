@@ -53,6 +53,9 @@ pub enum Text {
     Errors,
     Cancelled,
     Ready,
+    VariousArtists,
+    Editions,
+    SourceUnavailable,
 }
 
 pub fn text(language: Language, key: Text) -> &'static str {
@@ -114,6 +117,12 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::Errors => ("erreurs", "errors"),
         Text::Cancelled => ("Analyse annulée", "Scan cancelled"),
         Text::Ready => ("Prêt", "Ready"),
+        Text::VariousArtists => ("Artistes divers", "Various artists"),
+        Text::Editions => ("Éditions", "Editions"),
+        Text::SourceUnavailable => (
+            "source indisponible, son contenu reste affiché",
+            "source unavailable, its content stays listed",
+        ),
     };
     match language {
         Language::French => fr,

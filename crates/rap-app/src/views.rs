@@ -3,7 +3,7 @@ use crate::{
     i18n::Text,
     scrollbar::Scrollbar,
     theme::Theme,
-    widgets::{button, cover, quality, time},
+    widgets::{button, cover, time},
 };
 use gpui::{prelude::*, *};
 use rap_core::config::Language;
@@ -238,8 +238,7 @@ impl Rap {
                                             .on_click(cx.listener(
                                                 move |this, _: &ClickEvent, window, cx| {
                                                     this.focus.focus(window);
-                                                    this.selected = Some(id);
-                                                    cx.notify();
+                                                    this.open_album(id, cx);
                                                 },
                                             ));
                                         if this.settings.album_grid {
@@ -259,11 +258,12 @@ impl Rap {
                                                     div()
                                                         .truncate()
                                                         .text_color(theme.muted)
-                                                        .child(album.artist.clone()),
+                                                        .child(this.album_artist(album)),
                                                 )
                                                 .into_any_element()
                                         } else {
-                                            let first = &album.tracks[0].metadata;
+                                            let edition = album.primary();
+                                            let first = &edition.tracks[0].metadata;
                                             frame
                                                 .w_full()
                                                 .flex_1()
@@ -282,7 +282,7 @@ impl Rap {
                                                         .flex_1()
                                                         .truncate()
                                                         .text_color(theme.muted)
-                                                        .child(album.artist.clone()),
+                                                        .child(this.album_artist(album)),
                                                 )
                                                 .child(
                                                     first
@@ -299,7 +299,7 @@ impl Rap {
                                                 .child(div().w(px(100.)).child(format!(
                                                     "{} {}",
                                                     first.format,
-                                                    time(album.duration_ms())
+                                                    time(edition.duration_ms())
                                                 )))
                                                 .into_any_element()
                                         }
@@ -351,142 +351,6 @@ impl Rap {
         .flex_1()
         .min_h_0();
         scroll_area(list, &self.facet_bar, theme)
-    }
-
-    pub fn album_view(&self, cx: &mut Context<Self>) -> AnyElement {
-        let Some(album) = self
-            .snapshot
-            .albums
-            .iter()
-            .find(|a| Some(a.id) == self.selected)
-        else {
-            return div().into_any_element();
-        };
-        let theme = self.theme();
-        let first = &album.tracks[0].metadata;
-        let album_id = album.id;
-        let first_available = album.tracks.iter().position(|t| t.available);
-        let summary = [
-            first.year.map(|year| year.to_string()),
-            (!first.genre.is_empty()).then(|| first.genre.clone()),
-            Some(format!("{} {}", album.tracks.len(), self.t(Text::Tracks))),
-            Some(time(album.duration_ms())),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(" · ");
-        div()
-            .flex_1()
-            .min_h_0()
-            .flex()
-            .flex_col()
-            .p_5()
-            .gap_4()
-            .child(
-                button("back", "arrow-left", self.t(Text::Back), theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.selected = None;
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                button("play-album", "play", self.t(Text::Play), theme)
-                    .opacity(if first_available.is_some() { 1. } else { 0.4 })
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        if let Some(start) = first_available {
-                            this.play_album(album_id, start, cx);
-                        }
-                    })),
-            )
-            .child(
-                div()
-                    .flex()
-                    .gap_6()
-                    .items_center()
-                    .child(cover(album.cover(), 180., theme))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_3()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_2xl()
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(album.title.clone()),
-                            )
-                            .child(
-                                div()
-                                    .text_lg()
-                                    .text_color(theme.accent)
-                                    .child(album.artist.clone()),
-                            )
-                            .child(summary)
-                            .child(quality(first)),
-                    ),
-            )
-            .child(scroll_area(
-                uniform_list(
-                    "tracks",
-                    album.tracks.len(),
-                    cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
-                        let album = this
-                            .snapshot
-                            .albums
-                            .iter()
-                            .find(|a| Some(a.id) == this.selected)
-                            .unwrap();
-                        range
-                            .map(|index| {
-                                let track = &album.tracks[index];
-                                let m = &track.metadata;
-                                let available = track.available;
-                                div()
-                                    .id(("track", index))
-                                    .w_full()
-                                    .h(px(48.))
-                                    .flex()
-                                    .items_center()
-                                    .gap_4()
-                                    .px_3()
-                                    .border_b_1()
-                                    .border_color(theme.border)
-                                    .text_color(if track.available {
-                                        theme.text
-                                    } else {
-                                        theme.muted
-                                    })
-                                    .on_click(cx.listener(
-                                        move |this, event: &ClickEvent, _, cx| {
-                                            if available && event.click_count() == 2 {
-                                                this.play_album(album_id, index, cx);
-                                            }
-                                        },
-                                    ))
-                                    .child(div().w(px(40.)).child(format!(
-                                        "{}.{}",
-                                        m.disc.unwrap_or(1),
-                                        m.track.unwrap_or((index + 1) as u32)
-                                    )))
-                                    .child(div().flex_1().truncate().child(m.title.clone()))
-                                    .child(div().w(px(150.)).truncate().child(m.artist.clone()))
-                                    .child(quality(m))
-                                    .when(!track.available, |v| v.child(this.t(Text::Unavailable)))
-                                    .child(time(m.duration_ms))
-                            })
-                            .collect()
-                    }),
-                )
-                .track_scroll(self.track_scroll.clone())
-                .flex_1()
-                .min_h_0(),
-                &self.track_bar,
-                theme,
-            ))
-            .into_any_element()
     }
 
     pub fn settings_view(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -650,7 +514,7 @@ impl Rap {
 }
 
 /// Hosts a scrollable element with a draggable scrollbar on its right edge.
-fn scroll_area(content: impl IntoElement, bar: &Scrollbar, theme: Theme) -> AnyElement {
+pub fn scroll_area(content: impl IntoElement, bar: &Scrollbar, theme: Theme) -> AnyElement {
     div()
         .relative()
         .flex_1()

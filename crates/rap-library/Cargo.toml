@@ -12,6 +12,7 @@ rusqlite = { version = "0.36", features = ["bundled"] }
 lofty = "=0.25.4"
 dua-core = "=5.0.0"
 crossbeam-channel = "0.5"
+notify = "8.2"
 blake3 = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 

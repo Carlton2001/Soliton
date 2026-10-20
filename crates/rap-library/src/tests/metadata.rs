@@ -5,7 +5,7 @@ use lofty::{
     prelude::TagExt,
     tag::{Tag, TagType},
 };
-use std::io::Write;
+use std::io::{Cursor, Write};
 
 pub(crate) fn wav(path: &Path) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -23,6 +23,7 @@ fn embedded_tags_cover_and_source_remain_intact() {
     tag.insert_text(ItemKey::TrackArtist, "Invité".into());
     tag.insert_text(ItemKey::AlbumArtist, "Collectif".into());
     tag.insert_text(ItemKey::AlbumTitle, "Compilation".into());
+    tag.insert_text(ItemKey::FlagCompilation, "1".into());
     let pixels = image::RgbaImage::from_pixel(2, 1, image::Rgba([220, 20, 50, 255]));
     let mut png = Cursor::new(Vec::new());
     pixels.write_to(&mut png, image::ImageFormat::Png).unwrap();
@@ -40,6 +41,7 @@ fn embedded_tags_cover_and_source_remain_intact() {
     assert_eq!(value.metadata.title, "Été à Rome");
     assert_eq!(value.metadata.artist, "Invité");
     assert_eq!(value.metadata.album_artist, "Collectif");
+    assert!(value.metadata.compilation);
     assert!(!value.metadata.inferred.contains(&"title".into()));
     assert_eq!(value.metadata.sample_rate, Some(44100));
     assert!(value.cover.unwrap().exists());
@@ -57,6 +59,13 @@ fn fallback_marks_provenance_and_corruption_fails() {
     assert_eq!(value.metadata.artist, "Artiste");
     assert_eq!(value.metadata.track, Some(3));
     assert!(value.metadata.inferred.contains(&"title".into()));
+    let disc = dir.path().join("Artiste/Double/CD2/01.wav");
+    wav(&disc);
+    let value = read(&disc, dir.path()).unwrap();
+    assert_eq!(value.metadata.album, "Double");
+    assert_eq!(value.metadata.artist, "Artiste");
+    assert_eq!(value.metadata.disc, Some(2));
+    assert!(value.metadata.is_inferred("disc"));
     std::fs::write(&path, b"broken").unwrap();
     assert!(read(&path, dir.path()).is_err());
 }

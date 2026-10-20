@@ -15,13 +15,20 @@ impl Rap {
         }
         cx.notify();
     }
-    pub fn play_album(&mut self, id: i64, start: usize, cx: &mut Context<Self>) {
-        if let Some(album) = self.snapshot.albums.iter().find(|a| a.id == id) {
-            if album.tracks.get(start).is_none_or(|t| !t.available) {
+    /// Plays one edition of an album from `start`, skipping unavailable tracks.
+    pub fn play_album(&mut self, id: i64, edition: usize, start: usize, cx: &mut Context<Self>) {
+        if let Some(edition) = self
+            .snapshot
+            .albums
+            .iter()
+            .find(|a| a.id == id)
+            .and_then(|album| album.editions.get(edition))
+        {
+            if edition.tracks.get(start).is_none_or(|t| !t.available) {
                 return;
             }
-            let start_id = album.tracks[start].id;
-            let tracks: Vec<_> = album
+            let start_id = edition.tracks[start].id;
+            let tracks: Vec<_> = edition
                 .tracks
                 .iter()
                 .filter(|t| t.available)
@@ -40,7 +47,21 @@ impl Rap {
             .selected
             .or_else(|| self.visible.first().map(|&i| self.snapshot.albums[i].id))
         {
-            self.play_album(id, 0, cx);
+            let edition = if self.selected == Some(id) {
+                self.selected_edition
+            } else {
+                0
+            };
+            let start = self
+                .snapshot
+                .albums
+                .iter()
+                .find(|a| a.id == id)
+                .and_then(|a| a.editions.get(edition))
+                .and_then(|e| e.tracks.iter().position(|t| t.available));
+            if let Some(start) = start {
+                self.play_album(id, edition, start, cx);
+            }
         }
     }
     pub fn volume(&mut self, value: f32, cx: &mut Context<Self>) {

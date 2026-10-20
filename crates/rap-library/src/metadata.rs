@@ -1,3 +1,4 @@
+use crate::{covers::cache_cover, grouping};
 use anyhow::Result;
 use lofty::{
     file::{AudioFile, TaggedFileExt},
@@ -7,10 +8,10 @@ use lofty::{
     tag::ItemKey,
 };
 use rap_core::model::Metadata;
-use std::{
-    io::Cursor,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+
+/// Version of the extraction rules. Files read by an older version are re-read.
+pub(crate) const EXTRACTOR: i64 = 2;
 
 pub(crate) struct Extracted {
     pub metadata: Metadata,
@@ -50,6 +51,8 @@ pub(crate) fn read(path: &Path, covers: &Path) -> Result<Extracted> {
             .and_then(|date| date.get(..4)?.parse().ok()),
         track: tags.iter().find_map(|t| t.track()),
         disc: tags.iter().find_map(|t| t.disk()),
+        compilation: first(ItemKey::FlagCompilation)
+            .is_some_and(|flag| matches!(flag.to_ascii_lowercase().as_str(), "1" | "true" | "yes")),
         duration_ms: properties.duration().as_millis() as u64,
         sample_rate: properties.sample_rate(),
         bit_depth: properties.bit_depth(),
@@ -119,87 +122,39 @@ fn infer(metadata: &mut Metadata, path: &Path) {
         metadata.track = number;
         metadata.inferred.push("track".into());
     }
-    let parent = path.parent();
-    if metadata.album.is_empty() {
-        metadata.album = parent
+    let disc = path
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|name| grouping::disc_folder(&name.to_string_lossy()));
+    if metadata.disc.is_none() && disc.is_some() {
+        metadata.disc = disc;
+        metadata.inferred.push("disc".into());
+    }
+    // `Artist/Album/CD1/01.flac` reads like `Artist/Album/01.flac`.
+    let album = grouping::album_folder(path);
+    let folder_name = |folder: Option<&Path>| {
+        folder
             .and_then(Path::file_name)
             .map(|v| clean(&v.to_string_lossy()))
-            .unwrap_or_default();
+            .unwrap_or_default()
+    };
+    if metadata.album.is_empty() {
+        metadata.album = folder_name(album);
         metadata.inferred.push("album".into());
     }
     if metadata.artist.is_empty() {
-        metadata.artist = parent
-            .and_then(Path::parent)
-            .and_then(Path::file_name)
-            .map(|v| clean(&v.to_string_lossy()))
-            .unwrap_or_default();
+        metadata.artist = folder_name(album.and_then(Path::parent));
         metadata.inferred.push("artist".into());
     }
     if metadata.album_artist.is_empty() {
-        // Folder identity groups untagged compilations without conflating track artists.
-        metadata.album_artist = if !metadata.inferred.contains(&"artist".into()) {
+        // Inferred values never join editions; compilations are resolved per edition.
+        metadata.album_artist = if !metadata.is_inferred("artist") {
             metadata.artist.clone()
         } else {
-            parent
-                .and_then(Path::parent)
-                .and_then(Path::file_name)
-                .map(|v| clean(&v.to_string_lossy()))
-                .unwrap_or_default()
+            folder_name(album.and_then(Path::parent))
         };
         metadata.inferred.push("album_artist".into());
     }
-}
-
-const MAX_COVER_SIDE: u32 = 8192;
-const MAX_COVER_ALLOCATION: u64 = 288 * 1024 * 1024;
-const SMALL_COVER_ALLOCATION: u64 = 64 * 1024 * 1024;
-static LARGE_COVERS: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-fn cache_cover(bytes: &[u8], directory: &Path) -> Result<PathBuf> {
-    anyhow::ensure!(
-        bytes.len() <= 16 * 1024 * 1024,
-        "Embedded cover exceeds 16 MiB"
-    );
-    let hash = blake3::hash(bytes).to_hex().to_string();
-    let full = directory.join(format!("{hash}.png"));
-    let small = directory.join(format!("{hash}.small.png"));
-    if full.exists() && small.exists() {
-        return Ok(full);
-    }
-    let reader = || -> Result<_> {
-        let mut reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
-        let mut limits = image::Limits::default();
-        limits.max_image_width = Some(MAX_COVER_SIDE);
-        limits.max_image_height = Some(MAX_COVER_SIDE);
-        limits.max_alloc = Some(MAX_COVER_ALLOCATION);
-        reader.limits(limits);
-        Ok(reader)
-    };
-    // High-resolution scans (5000+ px) decode to ~100 MiB; decode them one at a time
-    // so parallel readers cannot multiply that peak.
-    let (width, height) = reader()?.into_dimensions()?;
-    let large = u64::from(width) * u64::from(height) * 4 > SMALL_COVER_ALLOCATION;
-    let _guard = large.then(|| LARGE_COVERS.lock().unwrap_or_else(|e| e.into_inner()));
-    let image = reader()?.decode()?;
-    for (path, side) in [(&full, 512), (&small, 160)] {
-        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        let temporary = path.with_extension(format!(
-            "{}.{}.tmp",
-            std::process::id(),
-            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        ));
-        image
-            .thumbnail(side, side)
-            .save_with_format(&temporary, image::ImageFormat::Png)?;
-        // Concurrent identical covers are harmless; the destination is content-addressed.
-        if let Err(error) = std::fs::rename(&temporary, path) {
-            let _ = std::fs::remove_file(&temporary);
-            if !path.exists() {
-                return Err(error.into());
-            }
-        }
-    }
-    Ok(full)
 }
 
 #[cfg(test)]

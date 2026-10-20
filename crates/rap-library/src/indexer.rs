@@ -1,12 +1,14 @@
 use crate::{
     Library,
+    catalog::{Known, Scope, regroup},
     discovery::{self, Candidate, Discovered},
     metadata,
 };
 use anyhow::{Result, bail};
 use crossbeam_channel::bounded;
 use std::{
-    path::Path,
+    collections::{BTreeSet, HashMap},
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -36,7 +38,10 @@ pub struct ScanProgress {
 pub struct ScanReport {
     pub progress: ScanProgress,
     pub cancelled: bool,
+    /// The whole scope was traversed without directory errors.
     pub complete: bool,
+    /// Entries forgotten because their file disappeared from an accessible source.
+    pub removed: usize,
     /// Bounded diagnostic sample; total errors are counted separately.
     pub diagnostics: Vec<String>,
 }
@@ -49,11 +54,26 @@ impl ScanReport {
     }
 }
 
+/// Number of stored files between commits; each commit makes progress visible.
+const BATCH: usize = 64;
+
 impl Library {
     /// Synchronous service API. Invoke from a background worker, never GPUI.
     pub fn scan(
         &mut self,
         source_id: i64,
+        cancel: &Cancellation,
+        progress: impl FnMut(&ScanProgress),
+    ) -> Result<ScanReport> {
+        self.scan_scope(source_id, &[], cancel, progress)
+    }
+
+    /// Scans directories of a source, or the whole source when `dirs` is empty.
+    /// Missing directories are replaced by their nearest existing ancestor.
+    pub fn scan_scope(
+        &mut self,
+        source_id: i64,
+        dirs: &[PathBuf],
         cancel: &Cancellation,
         mut progress: impl FnMut(&ScanProgress),
     ) -> Result<ScanReport> {
@@ -63,10 +83,10 @@ impl Library {
             .find(|s| s.id == source_id)
             .ok_or_else(|| anyhow::anyhow!("Unknown source"))?;
         if let Err(error) = std::fs::read_dir(&source.path) {
-            self.connection
-                .execute("UPDATE sources SET available=0 WHERE id=?1", [source_id])?;
+            self.set_source_available(source_id, false)?;
             bail!("{}: {error}", source.path.display());
         }
+        let dirs = resolve_scope(&source.path, dirs);
         self.connection.execute(
             "UPDATE sources SET available=1,generation=generation+1 WHERE id=?1",
             [source_id],
@@ -79,18 +99,22 @@ impl Library {
         let covers = self.covers.clone();
         let root = source.path.clone();
         let mut report = ScanReport::default();
+        let mut traversal_failed = false;
         std::thread::scope(|scope| -> Result<()> {
             let (found_tx, found_rx) = bounded(64);
             let (jobs_tx, jobs_rx) = bounded::<Candidate>(16);
             let (results_tx, results_rx) = bounded(16);
             let scan_cancel = cancel.clone();
+            let walked = &dirs;
             scope.spawn(move || {
-                if let Err(error) = discovery::walk(&root, &scan_cancel, &found_tx) {
-                    discovery::send(
-                        &found_tx,
-                        Discovered::Error(format!("{error:#}")),
-                        &scan_cancel,
-                    );
+                for dir in walked {
+                    if let Err(error) = discovery::walk(dir, &scan_cancel, &found_tx) {
+                        discovery::send(
+                            &found_tx,
+                            Discovered::Error(format!("{error:#}")),
+                            &scan_cancel,
+                        );
+                    }
                 }
             });
             let readers = std::thread::available_parallelism()
@@ -117,6 +141,8 @@ impl Library {
             let mut jobs = Some(jobs_tx);
             let mut found = Some(found_rx);
             let mut pending = None;
+            let mut dirty = BTreeSet::new();
+            let mut covers_present = HashMap::new();
             // One owner writes SQLite in bounded batches, also consuming results while
             // jobs are full. Blocking on a full jobs queue here would deadlock readers.
             self.connection.execute_batch("BEGIN IMMEDIATE")?;
@@ -145,12 +171,18 @@ impl Library {
                         recv(found_queue) -> message => match message {
                             Ok(Discovered::File(file)) => {
                                 report.progress.discovered += 1;
-                                if self.fingerprint(source_id, &file.path)?.is_some_and(|(size, modified)| size == file.size && modified == file.modified) {
-                                    self.seen(source_id, &file.path, generation)?;
-                                    report.progress.unchanged += 1;
-                                } else { pending = Some(file); }
+                                match self.known(source_id, &file.path, file.size, &file.modified, &mut covers_present)? {
+                                    Known::Unchanged | Known::Failed => {
+                                        self.seen(source_id, &file.path, generation)?;
+                                        report.progress.unchanged += 1;
+                                    }
+                                    Known::Changed => pending = Some(file),
+                                }
                             }
-                            Ok(Discovered::Error(error)) => report.error(error),
+                            Ok(Discovered::Error(error)) => {
+                                traversal_failed = true;
+                                report.error(error);
+                            }
                             Err(_) => { found = None; jobs.take(); }
                         },
                         recv(results_rx) -> message => match message {
@@ -158,11 +190,15 @@ impl Library {
                                 self.seen(source_id, &file.path, generation)?;
                                 match value {
                                     Ok(value) => {
-                                        self.store(source_id, &file.path, file.size, &file.modified, generation, &value.metadata, value.cover.as_deref())?;
+                                        let editions = self.store(source_id, &root, &file.path, file.size, &file.modified, generation, &value.metadata, value.cover.as_deref())?;
+                                        dirty.extend(editions.into_iter().flatten());
                                         report.progress.indexed += 1;
                                         for warning in value.warnings { report.error(warning); }
                                     }
-                                    Err(error) => report.error(format!("{}: {error:#}", file.path.display())),
+                                    Err(error) => {
+                                        self.record_failure(source_id, &file.path, file.size, &file.modified, generation)?;
+                                        report.error(format!("{}: {error:#}", file.path.display()));
+                                    }
                                 }
                                 batched += 1;
                             }
@@ -170,13 +206,15 @@ impl Library {
                         },
                         default(std::time::Duration::from_millis(30)) => {},
                     }
-                    if batched >= 64 {
+                    if batched >= BATCH {
+                        regroup(&self.connection, &std::mem::take(&mut dirty))?;
                         self.connection.execute_batch("COMMIT; BEGIN IMMEDIATE")?;
                         batched = 0;
                     }
                     progress(&report.progress);
                 }
-                Ok(())
+                // Albums stay consistent with stored tracks even after cancellation.
+                regroup(&self.connection, &dirty)
             })();
             // Drop receivers before joining workers, including after SQLite errors.
             drop(found);
@@ -192,15 +230,53 @@ impl Library {
             Ok(())
         })?;
         report.cancelled = cancel.is_cancelled();
-        report.complete = !report.cancelled && report.progress.errors == 0;
-        // A partial traversal can never establish disappearance. Never delete rows.
-        if report.complete && Path::new(&source.path).is_dir() {
-            self.connection.execute(
-                "UPDATE files SET available=0 WHERE source_id=?1 AND seen<>?2",
-                rusqlite::params![source_id, generation],
-            )?;
+        // A partial traversal or a source lost meanwhile never establishes disappearance.
+        report.complete =
+            !report.cancelled && !traversal_failed && std::fs::read_dir(&source.path).is_ok();
+        if report.complete {
+            let scope = Scope {
+                source: source_id,
+                root: &source.path,
+                dirs: &dirs,
+            };
+            // An empty root more likely means an unmounted volume than a deleted library.
+            if scope.whole() && report.progress.discovered == 0 && self.has_files(source_id)? {
+                self.mark_unseen_unavailable(&scope, generation)?;
+                report.diagnostics.push(format!(
+                    "{}: no audio file found; entries kept as unavailable",
+                    source.path.display()
+                ));
+            } else {
+                report.removed = self.purge(&scope, generation)?;
+            }
         }
         progress(&report.progress);
         Ok(report)
     }
+}
+
+/// Existing directories under `root` covering `dirs`, without nested duplicates.
+fn resolve_scope(root: &Path, dirs: &[PathBuf]) -> Vec<PathBuf> {
+    let mut resolved = BTreeSet::new();
+    for dir in dirs {
+        if !dir.starts_with(root) {
+            continue;
+        }
+        let mut dir = dir.as_path();
+        while dir != root && !dir.is_dir() {
+            dir = dir.parent().unwrap_or(root);
+        }
+        resolved.insert(dir.to_path_buf());
+    }
+    if resolved.is_empty() || resolved.contains(root) {
+        return vec![root.to_path_buf()];
+    }
+    let mut kept: Vec<PathBuf> = Vec::new();
+    // Sorted order places ancestors before their descendants.
+    for dir in resolved {
+        if !kept.iter().any(|ancestor| dir.starts_with(ancestor)) {
+            kept.push(dir);
+        }
+    }
+    kept
 }

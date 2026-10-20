@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod album;
 mod app;
 mod assets;
 mod catalog;
 mod filters;
 mod i18n;
+mod indexing;
 mod input;
 mod playback;
 mod scrollbar;
