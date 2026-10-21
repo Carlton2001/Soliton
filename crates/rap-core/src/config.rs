@@ -63,6 +63,14 @@ pub enum AlbumSort {
     Added,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CloseBehavior {
+    #[default]
+    Quit,
+    Hide,
+    Ask,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -74,6 +82,7 @@ pub struct Settings {
     pub album_sort: AlbumSort,
     pub hide_unavailable: bool,
     pub volume: f32,
+    pub close_behavior: CloseBehavior,
 }
 
 impl Default for Settings {
@@ -87,6 +96,7 @@ impl Default for Settings {
             album_sort: AlbumSort::Artist,
             hide_unavailable: false,
             volume: 0.7,
+            close_behavior: CloseBehavior::Quit,
         }
     }
 }

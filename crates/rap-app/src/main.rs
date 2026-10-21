@@ -16,6 +16,7 @@ mod preferences;
 mod scrollbar;
 mod service;
 mod slider;
+mod system;
 mod theme;
 mod views;
 mod widgets;
@@ -62,6 +63,11 @@ fn main() -> anyhow::Result<()> {
                 },
                 |window, cx| {
                     let app = cx.new(|cx| app::Rap::new(settings, paths, window, cx));
+                    let owner = app.downgrade();
+                    window.on_window_should_close(cx, move |window, cx| {
+                        let _ = owner.update(cx, |app, cx| app.request_close(window, cx));
+                        false
+                    });
                     app.read(cx).focus.focus(window);
                     app
                 },

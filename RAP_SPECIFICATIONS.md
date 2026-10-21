@@ -670,6 +670,9 @@ Prévoir :
 
 - Contrôles multimédias SMTC.
 - Affichage de la pochette dans les contrôles système.
+- Vignette personnalisée au survol de la barre des tâches : pochette, titre,
+  artiste, album et progression, avec boutons Précédent, Lecture/Pause,
+  Suivant et Arrêt. La progression affichée dans cette vignette est indicative.
 - Gestion des touches multimédias.
 - Icône de notification.
 - Démarrage automatique optionnel.
@@ -1179,6 +1182,7 @@ Objectifs :
 
 - SMTC.
 - Pochette dans les contrôles système.
+- Vignette de barre des tâches personnalisée et commandes de lecture natives.
 - Touches multimédias.
 - Icône de notification.
 - Comportement configurable à la fermeture.

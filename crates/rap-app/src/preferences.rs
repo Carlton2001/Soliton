@@ -116,6 +116,7 @@ impl Rap {
                     this.set_hide_unavailable(!this.settings.hide_unavailable, cx)
                 })),
             )
+            .child(self.system_preferences(cx))
             .child(div().text_lg().child(self.t(Text::Sources)))
             .children(self.sources_rows(theme, cx))
             .child(

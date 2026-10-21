@@ -9,6 +9,7 @@ use std::{path::PathBuf, sync::Arc};
 pub enum Work {
     Scan(Vec<PathBuf>, Cancellation),
     Save(Settings),
+    SaveAndFlush(Settings, Sender<anyhow::Result<()>>),
     RemoveSource(i64),
 }
 pub struct View {

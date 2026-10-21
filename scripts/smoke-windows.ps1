@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('French','English')][string]$Language='French',[switch]$Light,[switch]$List,[ValidateSet('Playing','Early','Minimized')][string]$CloseScenario='Playing')
+param([ValidateSet('French','English')][string]$Language='French',[switch]$Light,[switch]$List,[switch]$Taskbar,[ValidateSet('Playing','Early','Minimized','Hidden','Ask')][string]$CloseScenario='Playing')
 $ErrorActionPreference = 'Stop'
 # Native QA uses only generated fixtures and an isolated RAP data directory.
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -8,7 +8,8 @@ $fixtures = Join-Path $project 'target\codec-fixtures'
 New-Item -ItemType Directory -Force $data | Out-Null
 & cargo run -p rap-app --bin rap-index --offline -- $data $fixtures
 if ($LASTEXITCODE -ne 0) { throw 'Library smoke test failed' }
-@{language=$Language;dark=(-not $Light);album_grid=(-not $List);volume=0.0} | ConvertTo-Json | Set-Content -Encoding utf8NoBOM (Join-Path $data 'settings.json')
+$closeBehavior = switch ($CloseScenario) { 'Hidden' { 'Hide' } 'Ask' { 'Ask' } default { 'Quit' } }
+@{language=$Language;dark=(-not $Light);album_grid=(-not $List);volume=0.0;close_behavior=$closeBehavior} | ConvertTo-Json | Set-Content -Encoding utf8NoBOM (Join-Path $data 'settings.json')
 $previousData = $env:RAP_DATA_DIR
 $previousLog = $env:RUST_LOG
 $env:RAP_DATA_DIR = $data
@@ -23,6 +24,7 @@ public class RapNativeQa {
  [DllImport("user32.dll")] public static extern bool EnumWindows(Callback callback, IntPtr data);
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint process);
  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder text, int size);
+ [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect rect);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int height, uint flags);
@@ -36,11 +38,14 @@ public class RapNativeQa {
   finally { SetThreadDpiAwarenessContext(previous); }
  }
  public static IntPtr Find(uint process) {
+  return FindTitle(process, "RAP");
+ }
+ public static IntPtr FindTitle(uint process, string title) {
   IntPtr found = IntPtr.Zero;
   EnumWindows((h,p) => {
    uint id; GetWindowThreadProcessId(h, out id);
    var text = new StringBuilder(256); GetWindowText(h, text, 256);
-   if (id == process && text.ToString() == "RAP") { found=h; return false; }
+   if (id == process && text.ToString() == title) { found=h; return false; }
    return true;
   }, IntPtr.Zero);
   return found;
@@ -84,6 +89,17 @@ try {
     [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]32,[IntPtr]0) | Out-Null
     Start-Sleep -Milliseconds 500
     Save-RapFrame 'qa-playing'
+    if ($Taskbar) {
+        # THBN_CLICKED | button ID: only the isolated RAP window receives it.
+        [RapNativeQa]::PostMessage($handle,0x0111,[IntPtr]0x18005241,[IntPtr]0) | Out-Null
+        Start-Sleep -Milliseconds 300
+        Save-RapFrame 'qa-taskbar-pause'
+        foreach ($command in @(0x18005241,0x18005242,0x18005240,0x18005243)) {
+            [RapNativeQa]::PostMessage($handle,0x0111,[IntPtr]$command,[IntPtr]0) | Out-Null
+            Start-Sleep -Milliseconds 200
+        }
+        Save-RapFrame 'qa-taskbar-stop'
+    }
     [RapNativeQa]::SetWindowPos($handle,[IntPtr](-2),0,0,0,0,0x0013) | Out-Null
     }
     if ($CloseScenario -eq 'Minimized') {
@@ -91,6 +107,26 @@ try {
         Start-Sleep -Milliseconds 200
     }
     [RapNativeQa]::PostMessage($handle,0x0010,[IntPtr]0,[IntPtr]0) | Out-Null
+    if ($CloseScenario -in @('Hidden','Ask')) {
+        Start-Sleep -Milliseconds 600
+        $process.Refresh()
+        if ($process.HasExited) { throw 'RAP unexpectedly quit on close' }
+        $visible = [RapNativeQa]::IsWindowVisible($handle)
+        if ($CloseScenario -eq 'Hidden' -and $visible) { throw 'Close did not hide RAP' }
+        if ($CloseScenario -eq 'Ask' -and -not $visible) { throw 'Close confirmation hid RAP' }
+        if ($CloseScenario -eq 'Ask') {
+            Save-RapFrame 'qa-close-confirmation'
+            [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]27,[IntPtr]0) | Out-Null
+            [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]27,[IntPtr]0) | Out-Null
+        }
+        $owner = [RapNativeQa]::FindTitle($process.Id,'RAP notification owner')
+        if ($owner -eq [IntPtr]::Zero) { throw 'RAP tray owner missing' }
+        # Shell version 4 left-click selection, then its standard Quit menu command.
+        [RapNativeQa]::PostMessage($owner,0x8006,[IntPtr]0,[IntPtr]0x0400) | Out-Null
+        Start-Sleep -Milliseconds 600
+        if (-not [RapNativeQa]::IsWindowVisible($handle)) { throw 'Tray did not restore RAP' }
+        [RapNativeQa]::PostMessage($owner,0x0111,[IntPtr]5,[IntPtr]0) | Out-Null
+    }
     if (-not $process.WaitForExit(5000)) { throw 'RAP did not close cleanly' }
     if ($process.ExitCode -ne 0) { throw ('RAP exited with ' + $process.ExitCode) }
     Get-Content (Join-Path $project 'target\native-qa-error.log')
@@ -101,6 +137,8 @@ try {
     if ($process -and -not $process.HasExited) {
         [RapNativeQa]::SetWindowPos($handle,[IntPtr](-2),0,0,0,0,0x0013) | Out-Null
         [RapNativeQa]::PostMessage($handle,0x0010,[IntPtr]0,[IntPtr]0) | Out-Null
+        $owner = [RapNativeQa]::FindTitle($process.Id,'RAP notification owner')
+        if ($owner -ne [IntPtr]::Zero) { [RapNativeQa]::PostMessage($owner,0x0111,[IntPtr]5,[IntPtr]0) | Out-Null }
         if (-not $process.WaitForExit(3000)) { $process.Kill() }
     }
     $env:RAP_DATA_DIR=$previousData

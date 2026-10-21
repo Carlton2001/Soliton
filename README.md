@@ -1,6 +1,6 @@
 # RAP — Rust Audio Player
 
-Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 5 implémentées dans
+Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 6 implémentées dans
 l'ordre et validées sous Windows avec Rust 1.98.1 MSVC.
 
 ## Lancer
@@ -35,6 +35,21 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
 - **Paramètres** : français/anglais, apparence système/clair/sombre, huit couleurs
   d'accent, taille des pochettes, masquage des albums indisponibles. Tout est conservé.
 - Erreurs et avertissements regroupés dans un bandeau consultable.
+- **Windows** : contrôles multimédias système (SMTC), titre, artiste, album,
+  pochette et progression ; lecture/pause, arrêt, précédente/suivante et seek.
+  Les touches multimédias sont prises en charge via SMTC.
+- **Aperçu de barre des tâches** : au survol de l'icône RAP, vignette compacte
+  avec pochette, titre, artiste, album et progression ; boutons natifs Précédent,
+  Lecture/Pause, Suivant et Arrêt, disponibles aussi lorsque RAP est réduit.
+  La vignette suit le thème et l'accent. Sa barre de progression est indicative.
+- **Zone de notification** : clic gauche pour restaurer RAP ; menu au clic droit
+  avec Afficher, Lecture/Pause, Précédente, Suivante et Quitter.
+- **Fermeture** : quitter (par défaut), masquer en continuant la lecture ou demander.
+  Le bouton **Quitter RAP** des paramètres et le menu de notification quittent
+  toujours complètement. Si l'icône est indisponible, RAP reste visible.
+- **Démarrage automatique** : option Windows dans les paramètres, désactivée tant
+  qu'elle n'a pas été activée. Le réglage concerne l'utilisateur courant et le
+  chemin de l'exécutable ; réactiver l'option après avoir déplacé RAP.
 
 Clavier : `Ctrl+F` recherche, `Ctrl+O` ouverture ponctuelle, flèches pour les albums,
 `Entrée` pour ouvrir une fiche, `Espace` lecture/pause, `Ctrl+←/→` ±10 s, `F11`
@@ -82,12 +97,20 @@ cargo test -p rap-audio -- --include-ignored
 ./scripts/smoke-windows.ps1 -Language English -Light -List
 ./scripts/smoke-windows.ps1 -CloseScenario Early
 ./scripts/smoke-windows.ps1 -CloseScenario Minimized
+./scripts/smoke-windows.ps1 -CloseScenario Hidden
+./scripts/smoke-windows.ps1 -CloseScenario Ask
+./scripts/smoke-windows.ps1 -Taskbar
+cargo test -p rap-platform -- --include-ignored
 ```
 
 Le test de sortie native utilise un volume nul. Le smoke test ouvre puis ferme RAP
 sur une base et une collection synthétiques dans `target/`, et capture uniquement
 sa fenêtre. Il rejette un code de sortie non nul ou des erreurs dans les journaux.
 FFmpeg ne fait pas partie des dépendances de l'application.
+Les tests natifs de `rap-platform` nécessitent un bureau Windows interactif : ils
+interrogent réellement SMTC, lisent sa pochette et envoient des commandes. Le test
+du registre utilise une clé temporaire `HKCU\Software\RAP-Test-<pid>` supprimée
+ensuite ; il ne touche pas à l'option réelle de démarrage automatique.
 
 Outil de diagnostic sans interface :
 
@@ -111,8 +134,13 @@ cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
 - Le glisser-déposer lit au plus 2 000 fichiers et n'ajoute jamais de dossier à la
   bibliothèque (choix validé, voir l'architecture). Il n'a pas été testé par un dépôt
   réel automatisé ; la lecture des fichiers déposés est couverte par un test unitaire.
-- Intégrations système et distribution installable restent dans les phases suivantes.
-  Linux n'a pas été validé.
+- Les touches multimédias physiques, un vrai redémarrage d'Explorer et le lancement
+  après ouverture de session restent à vérifier manuellement. Windows peut aussi
+  désactiver le lancement via ses propres paramètres de démarrage.
+- L'aperçu de barre des tâches est validé par les API natives DWM et des commandes
+  de boutons simulées. Le survol et les clics physiques sur le panneau Windows
+  restent à vérifier manuellement, ainsi qu'un redémarrage réel d'Explorer.
+- La distribution installable reste dans une phase suivante. Linux n'a pas été validé.
 - GPUI 0.2.2 et `proc-macro-error2` utilisent des correctifs locaux documentés
   dans [vendor/README.md](vendor/README.md) pour la fermeture Windows, la sonde
   DXGI Debug facultative et les incompatibilités futures de Rust.

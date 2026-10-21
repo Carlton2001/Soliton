@@ -114,6 +114,9 @@ impl Worker {
                     self.error(format_args!("{error:#}"));
                 }
             }
+            Work::SaveAndFlush(settings, reply) => {
+                let _ = reply.try_send(settings.save(&self.paths.settings));
+            }
             Work::RemoveSource(id) => {
                 if let Err(error) = self.library.remove_source(id) {
                     self.error(format_args!("{error:#}"));

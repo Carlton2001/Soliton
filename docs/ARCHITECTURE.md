@@ -252,3 +252,143 @@ coupé) : menus de filtres et de tri, puce de période, paramètres, thème clai
 anglais, accent bleu, lecture d'un album, vue en cours de lecture, entrée et sortie
 du plein écran. Non validés : dépôt réel de fichiers depuis l'Explorateur, curseurs
 glissés à la souris, thème système lors d'un changement Windows, Linux.
+
+## Phase 6 — Intégration Windows — 20 octobre 2026
+
+**Frontière native.** `rap-platform::Desktop` emprunte l'identifiant portable de
+la fenêtre principale. Les types HWND, WinRT et Shell restent dans `windows/`,
+avec dépendances conditionnées par cible. Le moteur audio ne dépend toujours pas
+de l'intégration. Le code Oxyde de fermeture et d'assemblage GPUI a été examiné,
+sans copie ; compatibilité vérifiée sur les API de GPUI 0.2.2 conservées localement.
+
+**Worker.** Un thread possède l'appartement WinRT MTA, les abonnements SMTC et
+une fenêtre native cachée distincte de GPUI pour le menu et les messages Shell.
+Les états de lecture sont coalescés dans une file d'une entrée ; les commandes
+système empruntent une file bornée à 64 événements. Aucun callback natif ne
+décode d'audio ni ne lit de fichier. Les pochettes viennent uniquement du cache
+local RAP ; leur lecture Rust et leur transfert dans un flux mémoire WinRT
+s'effectuent sur le worker (voir le correctif ci-dessous). Les métadonnées
+ne sont renouvelées qu'au changement de piste/pochette ; `ClearAll` évite de
+conserver l'image de la piste précédente. Position et durée sont converties en
+ticks de 100 ns avec bornage. Les boutons Play et Pause sont explicites, tandis
+que le menu de notification bascule l'état. Les touches multimédias passent par
+SMTC, sans second raccourci global risquant de doubler la commande.
+
+**Notification et fenêtre.** Clic gauche : restaurer ; clic droit : menu natif
+FR/EN, piloté par les mêmes commandes que l'interface. L'icône est rastérisée
+depuis le SVG Lucide officiel existant sur un fond d'accent. `TaskbarCreated`
+réinstalle l'icône après un redémarrage d'Explorer. Un échec d'installation
+interdit le masquage et demande la restauration de la fenêtre. Le réglage de
+fermeture conserve Quitter par défaut ; Masquer et Demander sont persistants.
+La confirmation propose Quitter, Masquer si disponible, Annuler ; Échap annule.
+Quitter reste accessible dans les paramètres et dans le menu natif.
+
+La fermeture explicite annule les travaux utilisateur, arrête le moteur,
+attend le retrait des abonnements et de l'icône sur l'exécuteur d'arrière-plan,
+puis termine la sauvegarde sur le worker de bibliothèque avant `cx.quit()`.
+La fenêtre empruntée reste vivante pendant ce nettoyage. Une sauvegarde bloquée
+ou en erreur est journalisée ; elle n'empêche pas de quitter. Les E/S sources
+restent soumises aux délais du système, comme dans les phases précédentes.
+
+**Démarrage.** L'état est relu depuis la valeur RAP de
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, pas dupliqué dans JSON.
+La lecture du réglage au démarrage ne modifie jamais le registre. Seule une
+interaction avec l'option inscrit ou retire cette valeur. Le chemin de
+l'exécutable est entouré de guillemets, sans shell et dans la limite Windows
+de 260 caractères. Les valeurs des autres applications restent intactes.
+Les choix Windows n'introduisent pas de dépendance native dans le code commun ;
+sur une autre plateforme la fermeture quitte normalement. Linux reste non validé.
+
+**Validation.** Windows MSVC : `cargo fmt --check`, `cargo check --workspace --locked`
+et construction des exécutables réussis sans avertissement du projet ;
+`CARGO_INCREMENTAL=0` évite l'avertissement de hard links propre au bac à sable.
+Les 50 tests passent avec `--include-ignored`, dont sortie audio native, session
+SMTC réellement interrogée (texte Unicode, lecture de la pochette, pause, piste
+suivante, seek, changement de piste sans pochette), notification `TaskbarCreated`
+simulée et suppression de la fenêtre de notification au nettoyage. L'inscription
+au registre est testée sur une clé temporaire dédiée, sans modifier la clé Run.
+
+Les cinq scénarios du smoke test passent : fermeture pendant la lecture,
+immédiate, réduite, masquage/restauration et confirmation en anglais/clair/liste.
+La capture de la confirmation a été contrôlée visuellement. La restauration
+passe par le worker et `ShowWindowAsync`, sans appel de focus synchrone dans la
+mise à jour GPUI : les premiers essais avaient révélé des erreurs de réentrance,
+corrigées sans modifier GPUI. Les tests natifs ont été exécutés hors bac à sable,
+celui-ci reproduisant le `STATUS_INVALID_HANDLE` connu du test audio.
+
+Restent à vérifier manuellement : touches multimédias physiques, clics réels sur
+le menu de notification (les événements et commandes natifs sont simulés dans
+les tests), redémarrage réel d'Explorer et ouverture de session après activation
+du démarrage automatique. Aucune fermeture de session ni relance d'Explorer de
+l'utilisateur n'a été provoquée pour ces tests.
+
+### Correctif des pochettes SMTC — 21 octobre 2026
+
+`Library::connect` canonise les chemins du cache : sous Windows ils portent le
+préfixe `\\?\`. Le passage direct de ce chemin à `StorageFile::GetFileFromPathAsync`
+reproduit `0x800700A1 / UNABLE_TO_MASK_PATH`, y compris sur un chemin court ; le
+message Windows évoquant une longueur excessive est trompeur dans ce cas.
+Le test natif initial n'utilisait pas de chemin canonique et manquait cette erreur.
+
+Le worker lit désormais le cache avec `std::fs::File` (lecture seule, 8 MiB au
+maximum), puis crée un `InMemoryRandomAccessStream` pour SMTC. Aucun chemin n'est
+transmis au parseur `StorageFile` et aucune copie temporaire n'est créée. Les
+chemins longs restent acceptés ; on ne retire pas leur préfixe. Les fichiers
+musicaux et leur contenu ne sont pas touchés.
+
+Validation : reproduction de l'avertissement avant correction, puis test natif
+SMTC réussi sur chemin canonique et chemin Unicode de plus de 260 caractères,
+avec lecture effective du flux de pochette. Les cinq tests de `rap-platform`
+passent, dont la limite de taille et le fichier manquant ; formatage et
+`cargo check --workspace --locked` sans avertissement. La recherche des fenêtres
+du test est limitée à son PID pour coexister avec un RAP déjà ouvert.
+
+### Aperçu de barre des tâches — 21 octobre 2026
+
+À la demande de l'utilisateur, ajout d'un aperçu compact au survol du bouton
+RAP : pochette, titre, artiste, album, temps et progression ; quatre boutons
+natifs Précédent, Lecture/Pause, Suivant et Arrêt. Cette intégration utilise
+`ITaskbarList3` et DWM, séparément des contrôles SMTC des paramètres rapides.
+Elle ne nécessite pas d'installateur. Le périmètre est ajouté au §10.1 et à la
+phase 6 du cahier des charges.
+
+`windows/taskbar/` sépare la sous-classe de fenêtre, la barre native, le rendu
+compact, les DIB/GDI et les glyphes. Le modèle portable reçoit les quatre
+couleurs du thème central de RAP ; les SVG Lucide existants sont rastérisés
+sans changement de tracé. Les légendes et infobulles sont FR/EN. Une pochette
+absente ou illisible donne un emplacement neutre. Les métadonnées longues sont
+tronquées visuellement et le temps accepte les durées de plus d'une heure.
+
+Le worker prépare une image 640×360, rafraîchie une fois par seconde et dès
+qu'une piste, un état ou le thème change. Le cache PNG est lu et décodé sur ce
+worker, avec limites de dimensions et de mémoire, seulement au changement de
+chemin. La sous-classe du HWND principal est installée sur son thread UI, selon
+le mécanisme de `SetWindowSubclass` examiné dans Oxyde (`windows_hover_window.rs`),
+sans copie de code. Ses callbacks ne font qu'une copie/redimension GDI bornée
+de l'image déjà préparée et l'envoi des commandes dans la file existante.
+Ils ne lisent aucun fichier et n'attendent pas sur le verrou du cache d'image.
+Chaque bitmap, DC, police et icône possède un nettoyage explicite.
+
+Les boutons sont grisés sans piste ; Play devient Pause pendant la lecture.
+`TaskbarButtonCreated` provoque le rétablissement des boutons lorsque Windows
+recrée le bouton de barre des tâches. Un ajout prématuré avant l'affichage est
+retenté ; une erreur de rendu rétablit l'aperçu Windows normal, sans arrêter
+l'audio. La sous-classe conserve sa référence partagée jusqu'au détachement
+exécuté sur le thread propriétaire, ou jusqu'à `WM_NCDESTROY`. Le nettoyage
+normal termine avant la destruction de la fenêtre.
+
+Validation native : Windows accepte la barre de boutons et le bitmap DWM ;
+les quatre notifications `THBN_CLICKED` produisent les commandes attendues,
+les libellés changent avec l'état/langue, les boutons sans piste sont désactivés
+et la sous-classe libère sa référence au détachement. Les tests vérifient aussi
+la taille demandée par DWM, l'opacité des pixels, la progression bornée et
+l'effacement de la pochette au changement de piste. Une image PNG exportée a
+été contrôlée visuellement. Les interactions physiques au survol de la barre
+des tâches et le redémarrage réel d'Explorer restent à valider manuellement.
+
+Validation finale Windows MSVC : 56 tests réussis avec `--include-ignored`,
+construction des exécutables et `cargo check --workspace --locked` sans
+avertissement, formatage vérifié. Le smoke test `-Taskbar -CloseScenario Minimized`
+pilote les quatre commandes dans RAP à volume nul ; les captures de pause et
+d'arrêt ont été contrôlées. Les scénarios Hidden (anglais/clair/liste) et Early
+passent aussi, sans erreur dans les journaux.

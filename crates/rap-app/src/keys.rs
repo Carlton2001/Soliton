@@ -10,6 +10,13 @@ impl Rap {
     pub fn key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
         let control = event.keystroke.modifiers.control;
+        if self.confirm_close {
+            if key == "escape" {
+                self.confirm_close = false;
+                cx.notify();
+            }
+            return;
+        }
         match key {
             "f" if control => {
                 self.now_playing = false;

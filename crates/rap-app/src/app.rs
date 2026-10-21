@@ -32,6 +32,11 @@ pub enum Section {
 }
 
 pub struct Rap {
+    pub desktop: Option<rap_platform::Desktop>,
+    pub autostart: Option<bool>,
+    pub startup_pending: bool,
+    pub confirm_close: bool,
+    pub quitting: bool,
     pub audio: Option<rap_audio::Engine>,
     pub playback: rap_audio::Playback,
     pub focus: FocusHandle,
@@ -124,6 +129,11 @@ impl Rap {
             ..Default::default()
         };
         let mut this = Self {
+            desktop: None,
+            autostart: None,
+            startup_pending: false,
+            confirm_close: false,
+            quitting: false,
             audio,
             playback,
             focus: cx.focus_handle(),
@@ -169,15 +179,19 @@ impl Rap {
             let text = this.labelled(this.t(Text::AudioUnavailable), &error);
             this.report_error(text);
         }
+        this.start_desktop(window);
         this.scan(Vec::new(), cx);
-        cx.spawn(async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             let mut last_refresh = Instant::now();
             loop {
                 cx.background_executor()
                     .timer(Duration::from_millis(60))
                     .await;
                 if this
-                    .update(cx, |this, cx| this.poll(&mut last_refresh, cx))
+                    .update_in(cx, |this, window, cx| {
+                        this.poll(&mut last_refresh, cx);
+                        this.poll_desktop(window, cx);
+                    })
                     .is_err()
                 {
                     break;
@@ -510,5 +524,6 @@ impl Render for Rap {
             .when(!self.now_playing, |view| view.child(self.footer(cx)))
             .children(self.menu_view(cx))
             .child(self.drop_overlay())
+            .children(self.close_dialog(cx))
     }
 }

@@ -2,6 +2,15 @@ use rap_core::config::Language;
 
 #[derive(Clone, Copy)]
 pub enum Text {
+    WindowsIntegration,
+    DesktopError,
+    OnClose,
+    QuitApp,
+    HideToTray,
+    AskOnClose,
+    Autostart,
+    CloseQuestion,
+    CannotHide,
     Play,
     Pause,
     Previous,
@@ -103,6 +112,21 @@ pub enum Text {
 
 pub fn text(language: Language, key: Text) -> &'static str {
     let (fr, en) = match key {
+        Text::WindowsIntegration => ("Intégration Windows", "Windows integration"),
+        Text::DesktopError => ("Intégration système", "System integration"),
+        Text::OnClose => ("À la fermeture", "When closing"),
+        Text::QuitApp => ("Quitter RAP", "Quit RAP"),
+        Text::HideToTray => ("Masquer et continuer", "Hide and keep playing"),
+        Text::AskOnClose => ("Demander", "Ask"),
+        Text::Autostart => (
+            "Lancer RAP à l’ouverture de session",
+            "Start RAP when signing in",
+        ),
+        Text::CloseQuestion => ("Fermer RAP ?", "Close RAP?"),
+        Text::CannotHide => (
+            "La zone de notification est indisponible. RAP reste visible pour pouvoir être restauré.",
+            "The notification area is unavailable. RAP stays visible so it can be restored.",
+        ),
         Text::Play => ("Lire", "Play"),
         Text::Pause => ("Pause", "Pause"),
         Text::Previous => ("Précédente", "Previous"),

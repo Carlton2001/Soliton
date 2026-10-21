@@ -4615,6 +4615,7 @@ dependencies = [
  "rap-core",
  "rap-library",
  "rap-platform",
+ "raw-window-handle",
  "tracing",
  "tracing-subscriber",
  "unicode-segmentation",
@@ -4667,7 +4668,15 @@ name = "rap-platform"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "crossbeam-channel",
  "dirs 7.0.0",
+ "image",
+ "rap-core",
+ "raw-window-handle",
+ "resvg",
+ "tempfile",
+ "windows 0.61.3",
+ "windows-registry 0.5.3",
 ]
 
 [[package]]

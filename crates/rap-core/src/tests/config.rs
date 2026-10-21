@@ -24,6 +24,29 @@ fn invalid_settings_are_reported() {
 }
 
 #[test]
+fn closing_defaults_to_quit_and_all_choices_persist() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, br#"{"volume":0.4}"#).unwrap();
+    assert_eq!(
+        Settings::load(&path).unwrap().close_behavior,
+        CloseBehavior::Quit
+    );
+    for close_behavior in [CloseBehavior::Quit, CloseBehavior::Hide, CloseBehavior::Ask] {
+        Settings {
+            close_behavior,
+            ..Default::default()
+        }
+        .save(&path)
+        .unwrap();
+        assert_eq!(
+            Settings::load(&path).unwrap().close_behavior,
+            close_behavior
+        );
+    }
+}
+
+#[test]
 fn earlier_theme_choice_is_kept() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");

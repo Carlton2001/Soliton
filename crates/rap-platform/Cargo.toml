@@ -7,3 +7,19 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 dirs = "7"
+rap-core.workspace = true
+crossbeam-channel = "0.5"
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+resvg = { version = "=0.45.1", default-features = false }
+windows-registry = "=0.5.3"
+windows = { version = "=0.61.3", features = [
+    "Foundation", "Media", "Media_Control", "Storage", "Storage_Streams",
+    "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_Com", "Win32_System_LibraryLoader",
+    "Win32_System_WinRT", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+tempfile = "3"

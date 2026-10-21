@@ -2,6 +2,14 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+mod desktop;
+pub use desktop::{
+    Desktop, DesktopEvent, MediaCommand, MediaState, MediaTrack, PreviewColors, TransportState,
+};
+
+#[cfg(target_os = "windows")]
+mod windows;
+
 #[derive(Clone, Debug)]
 pub struct AppPaths {
     pub root: PathBuf,
