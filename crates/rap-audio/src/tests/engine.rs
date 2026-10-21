@@ -8,6 +8,7 @@ fn commands_without_a_device_preserve_stopped_state_and_validate_volume() {
         queue: Queue::default(),
         playback: Playback::default(),
         session: None,
+        ..Default::default()
     };
     worker.command(Command::Pause).unwrap();
     assert_eq!(worker.playback.state, PlaybackState::Stopped);
@@ -36,6 +37,7 @@ fn advancing_past_the_end_clears_output_details_but_keeps_preference() {
             ..Default::default()
         },
         session: None,
+        ..Default::default()
     };
     worker.command(Command::Next).unwrap();
     assert!(worker.playback.output.is_none());
@@ -54,6 +56,7 @@ fn missing_file_reports_failed_state_without_panicking() {
         queue: Queue::default(),
         playback: Playback::default(),
         session: None,
+        ..Default::default()
     };
     let track = rap_core::model::Track {
         id: 1,
@@ -172,6 +175,7 @@ fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered()
             ..Default::default()
         },
         session: None,
+        ..Default::default()
     };
     let error = worker
         .command(Command::Play {

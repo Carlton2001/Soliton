@@ -5,6 +5,8 @@ param(
     [switch]$List,
     [switch]$Taskbar,
     [switch]$AudioOutputs,
+    [switch]$NetworkOutputs,
+    [ValidateRange(1,16)][int]$LocalOutputCount=1,
     [ValidateRange(0,16)][int]$AudioOutputRow=0,
     [string]$Executable='rap.exe',
     [ValidateSet('Playing','Early','Minimized','Hidden','Ask')][string]$CloseScenario='Playing'
@@ -99,7 +101,7 @@ try {
     [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]32,[IntPtr]0) | Out-Null
     Start-Sleep -Milliseconds 500
     Save-RapFrame 'qa-playing'
-    if ($AudioOutputs) {
+    if ($AudioOutputs -or $NetworkOutputs) {
         # Targeted client clicks; the user's pointer is never moved.
         $scale = [RapNativeQa]::GetDpiForWindow($handle) / 96.0
         function Click-RapClient([double]$x, [double]$y) {
@@ -137,6 +139,11 @@ try {
         Click-RapClient 450 240
         Start-Sleep -Milliseconds 300
         Save-RapFrame 'qa-audio-default'
+        if ($NetworkOutputs) {
+            Click-RapClient 450 (394 + 46.4*($LocalOutputCount-1))
+            Start-Sleep -Seconds 4
+            Save-RapFrame 'qa-network-outputs'
+        }
         Click-RapClient 1150 738
         Start-Sleep -Milliseconds 300
         Save-RapFrame 'qa-audio-now-playing'

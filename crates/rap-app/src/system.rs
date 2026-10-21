@@ -169,11 +169,14 @@ impl Rap {
         if let Some(preparing) = &self.preparing {
             preparing.cancel();
         }
-        self.audio.take();
+        let audio = self.audio.take();
         let desktop = self.desktop.take();
         let work = self.services.work.clone();
         let settings = self.settings.clone();
         let task = cx.background_executor().spawn(async move {
+            if let Some(audio) = audio {
+                audio.shutdown();
+            }
             if let Some(desktop) = desktop {
                 desktop.shutdown();
             }

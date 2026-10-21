@@ -17,6 +17,7 @@ rap-core = { path = "crates/rap-core" }
 rap-platform = { path = "crates/rap-platform" }
 rap-library = { path = "crates/rap-library" }
 rap-audio = { path = "crates/rap-audio" }
+rap-network = { path = "crates/rap-network" }
 
 [profile.dev]
 opt-level = 1

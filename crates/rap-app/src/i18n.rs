@@ -2,6 +2,14 @@ use rap_core::config::Language;
 
 #[derive(Clone, Copy)]
 pub enum Text {
+    NetworkOutputs,
+    FindReceivers,
+    SearchingReceivers,
+    NoNetworkOutputs,
+    NetworkOutputMissing,
+    NetworkOutputHint,
+    RemotePlayback,
+    ConnectingOutput,
     AudioOutput,
     RefreshOutputs,
     SystemOutput,
@@ -123,6 +131,23 @@ pub enum Text {
 
 pub fn text(language: Language, key: Text) -> &'static str {
     let (fr, en) = match key {
+        Text::NetworkOutputs => ("Sorties réseau", "Network outputs"),
+        Text::FindReceivers => ("Rechercher les appareils", "Find devices"),
+        Text::SearchingReceivers => ("Recherche des appareils…", "Searching for devices…"),
+        Text::NoNetworkOutputs => (
+            "Aucun récepteur détecté. Vérifiez qu’il est allumé et connecté au même réseau local.",
+            "No receivers detected. Check that your device is on and connected to the same local network.",
+        ),
+        Text::NetworkOutputMissing => (
+            "Le récepteur sélectionné n’est plus détecté sur le réseau.",
+            "The selected receiver is no longer detected on the network.",
+        ),
+        Text::NetworkOutputHint => (
+            "DLNA / UPnP et Google Cast. Le PC reste allumé pendant la lecture. Le choix réseau s’applique à cette session ; la lecture dépend des formats acceptés par l’appareil.",
+            "DLNA / UPnP and Google Cast. Keep the PC on during playback. Network output selection applies to this session; playback depends on the formats accepted by the device.",
+        ),
+        Text::RemotePlayback => ("sortie réseau", "network output"),
+        Text::ConnectingOutput => ("Connexion au récepteur…", "Connecting to receiver…"),
         Text::AudioOutput => ("Sortie audio", "Audio output"),
         Text::RefreshOutputs => ("Actualiser les sorties", "Refresh outputs"),
         Text::SystemOutput => ("Périphérique système par défaut", "Default system device"),

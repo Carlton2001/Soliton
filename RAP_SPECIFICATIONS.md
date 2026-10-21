@@ -29,7 +29,7 @@ RAP s'inspire de la richesse fonctionnelle de MusicBee, mais cherche à éviter 
 ## 1.2 Principes directeurs
 
 - Application native et performante.
-- Fonctionnement local, sans compte utilisateur ni service cloud obligatoire.
+- Fonctionnement local, sans compte utilisateur ni service cloud obligatoire pour la bibliothèque et la lecture locale. La sortie Google Cast optionnelle peut dépendre des services du récepteur Google ; ne pas garantir son fonctionnement hors Internet sans validation.
 - Bibliothèque musicale strictement en lecture seule.
 - Aucune modification des fichiers musicaux.
 - Métadonnées et pochettes exclusivement issues des fichiers locaux.
@@ -731,9 +731,11 @@ Fonctions visées :
 
 Une architecture de sortie réseau distincte des sorties locales est recommandée.
 
+La phase 9 couvre également Google Cast / Chromecast (§11.5), avec une implémentation distincte du contrôle DLNA / UPnP et une sélection de sortie commune dans RAP.
+
 ## 11.2 Serveur de diffusion
 
-RAP pourra devoir exposer les fichiers musicaux via HTTP sur le réseau local.
+RAP doit pouvoir exposer les fichiers musicaux autorisés via HTTP sur le réseau local pour les récepteurs DLNA / UPnP et Google Cast.
 
 Prévoir :
 
@@ -744,6 +746,8 @@ Prévoir :
 - Gestion des interruptions réseau.
 
 Le transcodage pourra être ajouté ultérieurement.
+
+La lecture initiale privilégie les fichiers directement acceptés par le récepteur. Un format non pris en charge doit être signalé explicitement ; la prise en charge locale d'un format ne garantit pas sa lecture sur une sortie réseau.
 
 ## 11.3 Plusieurs appareils
 
@@ -761,9 +765,34 @@ RAP ne doit pas dépendre d'une intégration Alexa non officielle ou fragile.
 
 L'architecture réseau doit néanmoins rester suffisamment extensible pour permettre une intégration future.
 
+## 11.5 Google Cast / Chromecast
+
+Ajout au périmètre de la phase 9 à la demande de l'utilisateur le 21 octobre 2026.
+
+La NVIDIA SHIELD constitue une cible de validation explicite, via son récepteur Google Cast intégré, sans application DLNA intermédiaire à installer. Aucune marque ou modèle de Smart TV n'est imposé.
+
+Fonctions visées :
+
+- Découverte des récepteurs Google Cast disponibles sur le réseau local.
+- Sélection dans RAP avec identification du protocole et distinction des sorties locales et DLNA / UPnP.
+- Démarrage d'une session de lecture et envoi des médias locaux autorisés.
+- Lecture, pause, arrêt, navigation et changement de position lorsque pris en charge.
+- Consultation de l'état et de la progression réels du récepteur.
+- Contrôle du volume lorsque disponible.
+- Gestion des déconnexions, refus de session et formats incompatibles.
+- Transmission des métadonnées et pochettes locales lorsque le récepteur le permet.
+
+La couche de contrôle Cast est distincte de celle de DLNA / UPnP ; le serveur de diffusion local et les modèles de présentation peuvent être partagés. Cette diffusion ne dépend pas de l'API de contrôle reportée en phase 8.
+
+Le choix du client Cast compatible avec Rust / Windows, du récepteur et des dépendances doit être validé avant implémentation. Le récepteur média par défaut de Google est une option à étudier, sans imposer d'application réceptrice RAP personnalisée. La compatibilité doit être testée sur la SHIELD ; elle ne constitue pas une garantie pour tous les appareils Chromecast, Google TV ou les groupes d'enceintes. La synchronisation multiroom reste hors périmètre initial.
+
+Références : [Google Cast sur SHIELD](https://support-shield.nvidia.com/shield-tv-pro-user-guide/Google_Cast.htm), [API Google Cast](https://developers.google.com/cast/docs/reference), [récepteurs média](https://developers.google.com/cast/docs/web_receiver), [formats acceptés](https://developers.google.com/cast/docs/media).
+
 ---
 
 # 12. API locale
+
+Fonctionnalité reportée à la demande de l'utilisateur le 21 octobre 2026, hors du périmètre V1 retenu. La phase 9 utilise son propre service de diffusion réseau et ne dépend pas de cette API de contrôle.
 
 ## 12.1 Objectif
 
@@ -796,7 +825,7 @@ Aucune exposition publique par défaut.
 
 Si un accès distant est ajouté, il devra disposer de mécanismes d'authentification et d'autorisation appropriés.
 
-L'API de contrôle et le serveur de diffusion DLNA doivent être considérés comme deux services distincts.
+L'API de contrôle et le serveur de diffusion DLNA / Google Cast doivent être considérés comme deux services distincts.
 
 ---
 
@@ -818,6 +847,7 @@ RAP/
 │   ├── rap-core/
 │   ├── rap-library/
 │   ├── rap-audio/
+│   ├── rap-network/
 │   └── rap-platform/
 ├── assets/
 ├── docs/
@@ -892,7 +922,7 @@ Responsabilités :
 
 Les fonctionnalités réseau pourront initialement être organisées en modules dédiés.
 
-Une crate `rap-network` pourra être créée lorsque leur complexité le justifiera.
+La phase 9 introduit `rap-network` pour la découverte DLNA / Google Cast, le contrôle des récepteurs et la diffusion HTTP des seuls médias autorisés. Le moteur `rap-audio` conserve la file de lecture et l'arbitrage entre une sortie locale et une sortie réseau active.
 
 Éviter de créer des crates sans responsabilité réelle.
 
@@ -990,7 +1020,7 @@ Le moteur doit :
 
 ## 16.4 Réseau
 
-Les déconnexions NAS ou DLNA ne doivent pas bloquer RAP.
+Les déconnexions NAS, DLNA ou Google Cast ne doivent pas bloquer RAP.
 
 Prévoir des délais d'attente et une gestion explicite des erreurs.
 
@@ -1209,6 +1239,8 @@ L'égaliseur, le mode exclusif, le bit-perfect et la validation de formats suppl
 
 ## Phase 8 — API locale
 
+**Statut : reportée, hors V1**, à la demande de l'utilisateur le 21 octobre 2026. Le développement passe directement à la phase 9 ; les objectifs ci-dessous sont conservés pour une évolution ultérieure.
+
 Objectifs :
 
 - Serveur HTTP local.
@@ -1221,19 +1253,20 @@ Objectifs :
 
 **Livrable :** API locale documentée.
 
-## Phase 9 — DLNA / UPnP
+## Phase 9 — DLNA / UPnP et Google Cast / Chromecast
 
 Objectifs :
 
-- Découverte des appareils.
-- Sélection d'une sortie.
-- Serveur de diffusion local.
-- Contrôle de lecture.
+- Découverte des récepteurs DLNA / UPnP et Google Cast.
+- Sélection d'une sortie réseau dans une interface commune, avec protocole identifiable.
+- Serveur de diffusion local des fichiers et pochettes autorisés, utilisable par les deux protocoles.
+- Contrôle de lecture, état et progression du récepteur sélectionné.
 - Gestion de plusieurs périphériques.
 - Gestion des déconnexions.
 - Validation des formats compatibles.
+- Validation Google Cast sur la NVIDIA SHIELD, via son récepteur intégré.
 
-**Livrable :** diffusion DLNA fonctionnelle sur les appareils validés.
+**Livrable :** diffusion DLNA / UPnP fonctionnelle sur les appareils validés et diffusion Google Cast validée sur la NVIDIA SHIELD.
 
 ## Phase 10 — Distribution
 
@@ -1271,7 +1304,7 @@ Ce jalon doit être réellement fonctionnel, même si certaines fonctionnalités
 
 ## V1 Windows complète
 
-La V1 cible les fonctionnalités des phases 0 à 10, sous réserve de validation technique.
+La V1 cible les fonctionnalités des phases 0 à 10, à l'exception de la phase 8 reportée, et sous réserve de validation technique.
 
 Les fonctionnalités complexes doivent pouvoir être reportées individuellement sans bloquer la distribution.
 
@@ -1309,11 +1342,13 @@ Le support de ces formats peut nécessiter des bibliothèques complémentaires.
 
 Ne pas compromettre la simplicité de distribution pour les intégrer prématurément.
 
-## 21.4 DLNA
+## 21.4 DLNA et Google Cast
 
 Les appareils présentent des comportements et capacités variables.
 
 Il faudra tester sur du matériel réel.
+
+Google Cast nécessite un client distinct de DLNA / UPnP. Les API émettrices officiellement documentées concernent Android, iOS et le Web ; une intégration native Rust / Windows doit faire l'objet d'une validation spécifique. Le fonctionnement hors Internet du récepteur Google ne doit pas être supposé.
 
 ## 21.5 NAS
 
@@ -1359,9 +1394,10 @@ Les éléments suivants nécessitent une validation technique ou un arbitrage ul
 5. Politique de vérification des NAS.
 6. Format de distribution Windows.
 7. Méthode de notification des nouvelles versions.
-8. Périmètre exact de la diffusion DLNA multi-appareils.
+8. Périmètre exact de la diffusion réseau multi-appareils, hors synchronisation multiroom initiale.
 9. Détails de l'API HTTP.
 10. Modalités de réutilisation des composants d'Oxyde.
+11. Client Google Cast Rust / Windows, stratégie de récepteur et formats validés sur la NVIDIA SHIELD.
 
 Ces décisions ne doivent pas être inventées par Codex sans justification.
 

@@ -3,6 +3,8 @@ use crate::{
     resample::Converter,
 };
 use anyhow::Result;
+#[path = "remote.rs"]
+mod remote;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use std::{
     collections::VecDeque,
@@ -18,12 +20,14 @@ pub struct Engine {
     refresh_outputs: Sender<()>,
     pub events: Receiver<Playback>,
     shutdown: Arc<AtomicBool>,
+    finished: Receiver<()>,
 }
 
 impl Engine {
     pub fn start(volume: f32, selected_output: Option<String>) -> Result<Self> {
         let (commands, receiver) = bounded(32);
         let (events, snapshots) = bounded(8);
+        let (finished_tx, finished) = bounded(1);
         let (refresh_outputs, refresh) = bounded(1);
         let (discovered, devices) = bounded(1);
         // Device enumeration can involve slow drivers. It never holds up decoding.
@@ -54,8 +58,11 @@ impl Engine {
                         ..Default::default()
                     },
                     session: None,
+                    network: None,
+                    remote_generation: None,
                 };
                 let mut last = Instant::now() - Duration::from_secs(1);
+                let mut deferred = None;
                 while !worker_shutdown.load(Ordering::Relaxed) {
                     if let Ok(result) = devices.try_recv() {
                         match result {
@@ -74,15 +81,45 @@ impl Engine {
                                 || (!s.eof
                                     && s.output.samples.len() < s.output.samples.capacity() / 2))
                     });
-                    match receiver.recv_timeout(if hungry {
-                        Duration::ZERO
+                    let received = if let Some(command) = deferred.take() {
+                        Ok(command)
                     } else {
-                        Duration::from_millis(5)
-                    }) {
-                        Ok(command) => {
+                        receiver.recv_timeout(if hungry {
+                            Duration::ZERO
+                        } else {
+                            Duration::from_millis(5)
+                        })
+                    };
+                    match received {
+                        Ok(mut command) => {
+                            // A network round-trip must not turn slider updates
+                            // into a backlog of obsolete volume commands.
+                            if matches!(command, Command::Volume(_)) {
+                                while let Ok(next) = receiver.try_recv() {
+                                    if matches!(next, Command::Volume(_)) {
+                                        command = next;
+                                    } else {
+                                        deferred = Some(next);
+                                        break;
+                                    }
+                                }
+                            }
+                            worker.playback.output_changing =
+                                matches!(&command, Command::SelectNetworkOutput(_))
+                                    || (worker.playback.network_output.is_some()
+                                        && matches!(
+                                            &command,
+                                            Command::SelectOutput(_)
+                                                | Command::Play { .. }
+                                                | Command::Resume
+                                        ));
+                            if worker.playback.output_changing {
+                                let _ = events.try_send(worker.playback.clone());
+                            }
                             if let Err(error) = worker.command(command) {
                                 worker.fail(error);
                             }
+                            worker.playback.output_changing = false;
                             let _ = events.try_send(worker.playback.clone());
                         }
                         Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
@@ -96,12 +133,17 @@ impl Engine {
                         last = Instant::now();
                     }
                 }
+                if let Some(network) = worker.network.take() {
+                    network.shutdown();
+                }
+                let _ = finished_tx.try_send(());
             })?;
         Ok(Self {
             commands,
             refresh_outputs,
             events: snapshots,
             shutdown,
+            finished,
         })
     }
     /// Never block the UI on a full queue or a busy decoder.
@@ -115,6 +157,13 @@ impl Engine {
         self.commands
             .try_send(command)
             .map_err(|_| anyhow::anyhow!("Audio command queue unavailable"))
+    }
+
+    /// Called on a background executor when closing the app, so the remote
+    /// receiver and its authorized HTTP session can be shut down before exit.
+    pub fn shutdown(self) {
+        self.shutdown.store(true, Ordering::Relaxed);
+        let _ = self.finished.recv_timeout(Duration::from_secs(20));
     }
 }
 impl Drop for Engine {
@@ -161,14 +210,22 @@ impl Session {
     }
 }
 
+#[derive(Default)]
 struct Worker {
     queue: Queue,
     playback: Playback,
     session: Option<Session>,
+    network: Option<rap_network::Network>,
+    remote_generation: Option<u64>,
 }
 
 impl Worker {
     fn fail(&mut self, error: anyhow::Error) {
+        if self.remote_generation.take().is_some()
+            && let Some(network) = &self.network
+        {
+            let _ = network.call(rap_network::Command::Stop);
+        }
         self.session = None;
         self.playback.state = PlaybackState::Failed;
         self.playback.output = None;
@@ -181,13 +238,18 @@ impl Worker {
         self.playback.error = None;
         self.playback.position_ms = 0;
         let Some(track) = self.queue.current().cloned() else {
+            self.stop_remote()?;
             self.playback.track = None;
             self.playback.duration_ms = 0;
             self.playback.state = PlaybackState::Stopped;
             return Ok(());
         };
         self.playback.track = Some(track.clone());
+        self.playback.duration_ms = track.metadata.duration_ms;
         anyhow::ensure!(track.available, "Track is unavailable");
+        if self.playback.network_output.is_some() {
+            return self.start_remote(track, 0, true);
+        }
         let reader = Reader::open(&track.path)?;
         self.playback.duration_ms = if reader.duration_ms > 0 {
             reader.duration_ms
@@ -213,19 +275,24 @@ impl Worker {
                 self.start_current()?;
             }
             Command::Resume => {
-                if self.session.is_some() {
+                if self.remote_generation.is_some() {
+                    self.remote_command(rap_network::Command::Play)?;
+                } else if self.session.is_some() {
                     self.playback.state = PlaybackState::Playing;
                 } else {
                     self.start_current()?;
                 }
             }
             Command::Pause => {
-                if let Some(session) = &self.session {
+                if self.remote_generation.is_some() {
+                    self.remote_command(rap_network::Command::Pause)?;
+                } else if let Some(session) = &self.session {
                     session.output.playing.store(false, Ordering::Relaxed);
                     self.playback.state = PlaybackState::Paused;
                 }
             }
             Command::Stop => {
+                self.stop_remote()?;
                 self.session = None;
                 self.playback.state = PlaybackState::Stopped;
                 self.playback.position_ms = 0;
@@ -233,6 +300,14 @@ impl Worker {
                 self.playback.output = None;
             }
             Command::Volume(value) => {
+                if self.remote_generation.is_some() && value.is_finite() {
+                    if let Err(error) =
+                        self.remote_command(rap_network::Command::Volume(value.clamp(0., 1.)))
+                    {
+                        self.playback.output_error = Some(format!("{error:#}"));
+                    }
+                    return Ok(());
+                }
                 if value.is_finite() {
                     self.playback.volume = value.clamp(0., 1.);
                 }
@@ -255,6 +330,7 @@ impl Worker {
                 if self.queue.next(false) {
                     self.start_current()?;
                 } else {
+                    self.stop_remote()?;
                     self.session = None;
                     self.playback.output = None;
                     self.playback.state = PlaybackState::Stopped;
@@ -274,11 +350,29 @@ impl Worker {
                     self.select_output(selected).err().map(|e| format!("{e:#}"));
             }
             Command::RefreshOutputs => {}
+            Command::DiscoverNetworkOutputs => {
+                self.playback.network_error =
+                    self.discover_network().err().map(|e| format!("{e:#}"));
+            }
+            Command::SelectNetworkOutput(id) => {
+                if let Err(error) = self.select_network(&id) {
+                    if self.playback.network_output.is_some() {
+                        self.fail(error);
+                    } else {
+                        self.playback.output_error = Some(format!("{error:#}"));
+                    }
+                } else {
+                    self.playback.output_error = None;
+                }
+            }
         }
         Ok(())
     }
 
     fn seek(&mut self, position: u64) -> Result<()> {
+        if self.remote_generation.is_some() {
+            return self.remote_command(rap_network::Command::Seek(position));
+        }
         let Some(session) = self.session.take() else {
             return Ok(());
         };
@@ -302,6 +396,9 @@ impl Worker {
     /// Prepare the replacement before dropping the old stream. A failed choice
     /// leaves both the working output and the persisted preference untouched.
     fn select_output(&mut self, selected: Option<String>) -> Result<()> {
+        if self.playback.network_output.is_some() {
+            return self.select_local(selected);
+        }
         if let Some(current) = &self.session {
             let track = self
                 .playback
@@ -333,6 +430,10 @@ impl Worker {
     }
 
     fn pump(&mut self) -> Result<()> {
+        self.poll_network()?;
+        if self.remote_generation.is_some() {
+            return Ok(());
+        }
         let Some(session) = self.session.as_mut() else {
             return Ok(());
         };

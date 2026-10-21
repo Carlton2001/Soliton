@@ -458,3 +458,86 @@ restent non validés ; la déconnexion est couverte par le signal de panne simul
 
 Validation utilisateur : le fonctionnement et la mise à jour à chaud de la liste
 des périphériques de sortie sont confirmés après essai.
+
+## Phase 9 — sorties DLNA / UPnP et Google Cast
+
+La phase 8 reste reportée. `rap-network` rassemble les adaptateurs réseau sans
+GPUI ni décodage local. `rap-audio` conserve sa file unique : sélection, précédent,
+suivant, aléatoire et répétition utilisent les mêmes règles sur les deux sorties.
+Le réseau n'est démarré qu'à la demande de recherche. SSDP et mDNS découvrent les
+récepteurs sans les lancer ; la sélection explicite ouvre la session distante.
+La SHIELD est une cible de validation, sans filtre sur la marque des récepteurs
+Google Cast. Les composants GPUI et `cx.listener` du voisin Oxyde ont été examinés ;
+les composants existants de RAP suffisent, sans copie de code ni nouvelle icône.
+
+Le worker audio attend les acquittements hors du thread UI. Un runtime réseau
+distinct utilise deux threads et au plus huit threads bloquants ; commandes,
+découverte et téléchargements ont des files/concurrences bornées. Les commandes
+réseau ont une limite globale de douze secondes, seize secondes côté appelant.
+Le callback CPAL reste inchangé. Le volume reçu du matériel revient dans RAP ;
+les déplacements et l'état suivent les acquittements, sans simuler une progression.
+Une génération par chargement écarte les instantanés d'une ancienne piste.
+
+Les deux protocoles utilisent un serveur HTTP sur l'interface IPv4 du récepteur,
+avec port temporaire et UUID aléatoire par média. Seule l'IP choisie peut lire
+la piste active ou sa pochette mise en cache ; aucun chemin de fichier n'est
+accepté depuis le réseau. GET, HEAD, OPTIONS et plages d'octets sont pris en charge.
+Huit corps de réponse au maximum, lus par blocs de 64 Kio. Remplacement, arrêt,
+erreur, déconnexion et fermeture révoquent l'accès, y compris les flux en cours.
+Il ne s'agit pas de l'API de contrôle de la phase 8. La musique reste en lecture
+seule et aucun fichier temporaire n'est créé dans une source.
+
+SSDP limite les interfaces, réponses et descriptions ; les descriptions XML et
+réponses SOAP sont plafonnées à 1 MiB, sans DTD. Les URL UPnP doivent utiliser
+HTTP et l'IP littérale du périphérique annonçant, sans proxy ni redirection.
+AVTransport gère le transport ; RenderingControl le volume lorsqu'il est présent ;
+ConnectionManager renseigne les types MIME acceptés. Les capacités manquantes ou
+les formats refusés remontent une erreur. Aucun transcodage n'est introduit.
+
+Google Cast utilise oxicast et le Default Media Receiver, avec reconnexion
+automatique désactivée. Le lancement à froid peut durer plusieurs secondes.
+L'acquittement LOAD de la SHIELD peut encore porter IDLE sans motif pendant
+LOADING : RAP conserve alors la génération en Buffering. Seul FINISHED déclenche
+l'enchaînement automatique ; CANCELLED arrête et ERROR signale l'échec. Le motif
+de fin diffusé est conservé lorsque GET_STATUS renvoie ensuite une liste vide.
+Une autre session ou un autre média détecté ne doit pas être piloté comme le nôtre.
+La fermeture arrête uniquement la session de récepteur ouverte par RAP.
+
+La sortie réseau vaut pour la session. La préférence CPAL reste sauvegardée.
+Le retour local prépare le flux à la position distante avant de fermer la session
+réseau, et conserve lecture/pause. Un échec de transfert depuis une sortie locale
+laisse son flux utilisable. Une panne réseau ne démarre pas une sortie différente
+ou une reconnexion automatique. L'interface indique la connexion en cours et
+distingue les erreurs de découverte, de sélection et de lecture, en français/anglais.
+
+Validation matérielle Windows : SHIELD découverte par mDNS puis WAV PCM et FLAC
+synthétiques silencieux de douze secondes diffusés sans transcodage. Les exemples
+`smoke_cast` et `network_session` vérifient chargement, lecture, pause, seek,
+reprise, arrêt, précédent/suivant, répétition de piste à sa fin, boucle de file
+et retour à une sortie CPAL en pause. Ils exigent un récepteur inactif avant de
+commencer, utilisent un volume nul, restaurent le volume initial et ferment leur
+session. Des délais d'attente de chargement ont aussi été observés : une relance
+explicite permet de récupérer, avec diagnostic de la commande concernée.
+
+Le DLNA est validé avec un récepteur SOAP simulé et un vrai échange HTTP local ;
+aucun récepteur DLNA physique n'était disponible. Les tests couvrent aussi plages
+d'octets, autorisations, révocation, conservation des sources, découverte sans
+filtre de marque, URL UPnP, XML et états Cast. Les autres modèles Cast, formats
+matériels, coupures physiques du Wi-Fi, réseaux IPv6 et Linux restent non validés.
+Le réseau initial est limité aux IPv4 privées/de lien local et à une sortie active.
+
+La validation GUI utilise une copie `rap-phase9.exe`, car l'instance utilisateur
+verrouille l'exécutable habituel. Le manifeste est restauré après construction ;
+les données et médias de test restent isolés dans `target/`. Le smoke test
+`-NetworkOutputs` recherche réellement les appareils et capture les paramètres.
+La création des bibliothèques d'importation par MSVC peut produire un diagnostic
+`linker_messages` avec les dépendances TLS natives ; `cargo check` reste sans
+avertissement et aucun avertissement n'est masqué.
+
+`cargo fmt --check` et `cargo check --workspace --locked` passent. Le workspace
+compte 63 tests automatiques réussis et sept tests natifs ignorés par défaut.
+Les trois tests supplémentaires de `rap-audio` passent lorsqu'ils sont lancés
+explicitement (codecs générés et deux scénarios de sorties CPAL). Les quatre
+tests natifs de `rap-platform`, inchangés, n'ont pas été relancés pour ce jalon.
+Les captures contrôlées montrent la SHIELD dans les paramètres en français/sombre
+et anglais/clair/liste ; les deux scénarios GUI se ferment sans erreur.

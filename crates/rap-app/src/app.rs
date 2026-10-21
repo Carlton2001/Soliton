@@ -218,7 +218,13 @@ impl Rap {
                 || playback.selected_output != self.playback.selected_output
                 || playback.outputs != self.playback.outputs
                 || playback.output_error != self.playback.output_error
+                || playback.output_changing != self.playback.output_changing
                 || playback.outputs_error != self.playback.outputs_error
+                || playback.network_outputs != self.playback.network_outputs
+                || playback.network_output != self.playback.network_output
+                || playback.network_discovering != self.playback.network_discovering
+                || playback.network_enabled != self.playback.network_enabled
+                || playback.network_error != self.playback.network_error
                 || playback.track.as_ref().map(|t| t.id)
                     != self.playback.track.as_ref().map(|t| t.id);
             if let Some(error) = &playback.error
@@ -229,6 +235,7 @@ impl Rap {
             let output_errors: Vec<_> = [
                 (&playback.output_error, &self.playback.output_error),
                 (&playback.outputs_error, &self.playback.outputs_error),
+                (&playback.network_error, &self.playback.network_error),
             ]
             .into_iter()
             .filter_map(|(error, previous)| error.as_ref().filter(|_| error != previous).cloned())
@@ -240,6 +247,9 @@ impl Rap {
             if playback.selected_output != self.settings.output_device {
                 self.settings.output_device = playback.selected_output.clone();
                 self.save();
+            }
+            if playback.network_output.is_some() {
+                self.settings.volume = playback.volume;
             }
             self.playback = playback;
         }

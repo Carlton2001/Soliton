@@ -10,6 +10,7 @@ pub use devices::{OutputDevice, OutputInfo};
 pub use engine::Engine;
 pub use queue::Repeat;
 use rap_core::model::Track;
+pub use rap_network::{Device as NetworkDevice, Protocol as NetworkProtocol};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PlaybackState {
@@ -34,8 +35,14 @@ pub struct Playback {
     pub outputs: std::sync::Arc<Vec<OutputDevice>>,
     pub outputs_error: Option<String>,
     pub output: Option<OutputInfo>,
+    pub network_outputs: std::sync::Arc<Vec<NetworkDevice>>,
+    pub network_output: Option<NetworkDevice>,
+    pub network_enabled: bool,
+    pub network_discovering: bool,
+    pub network_error: Option<String>,
     /// Discovery/selection errors do not interrupt an existing working stream.
     pub output_error: Option<String>,
+    pub output_changing: bool,
     pub error: Option<String>,
 }
 
@@ -52,4 +59,6 @@ pub enum Command {
     Repeat(Repeat),
     SelectOutput(Option<String>),
     RefreshOutputs,
+    DiscoverNetworkOutputs,
+    SelectNetworkOutput(String),
 }

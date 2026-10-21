@@ -1,7 +1,8 @@
 # RAP — Rust Audio Player
 
-Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7 implémentées dans
+Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7, puis phase 9 implémentées dans
 l'ordre et validées sous Windows avec Rust 1.98.1 MSVC.
+La phase 8 (API locale de contrôle) est reportée.
 
 ## Lancer
 
@@ -40,6 +41,13 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   refusé conserve la sortie précédente. Une sortie préférée absente reste mémorisée.
   Le périphérique actif, la fréquence, les canaux et le format d'échantillons envoyés
   par RAP s'affichent dans les paramètres et la lecture en cours.
+- **Sorties réseau** : dans les paramètres audio, **Rechercher les appareils**
+  découvre les récepteurs DLNA/UPnP et Google Cast du réseau local. Choisir un
+  appareil y envoie la lecture ; les mêmes commandes de RAP et de Windows
+  pilotent la piste, le volume et la navigation. La NVIDIA SHIELD est prise en
+  charge via son récepteur Cast intégré. Le choix réseau vaut pour la session ;
+  le périphérique local préféré reste mémorisé. Choisir à nouveau une sortie
+  locale reprend sur le PC en conservant la position et l'état lecture/pause.
 - Erreurs et avertissements regroupés dans un bandeau consultable.
 - **Windows** : contrôles multimédias système (SMTC), titre, artiste, album,
   pochette et progression ; lecture/pause, arrêt, précédente/suivante et seek.
@@ -107,6 +115,8 @@ cargo test -p rap-audio -- --include-ignored
 ./scripts/smoke-windows.ps1 -CloseScenario Ask
 ./scripts/smoke-windows.ps1 -Taskbar
 ./scripts/smoke-windows.ps1 -AudioOutputs
+./scripts/smoke-windows.ps1 -NetworkOutputs -LocalOutputCount 2
+cargo run -p rap-network --example discover
 cargo test -p rap-platform -- --include-ignored
 ```
 
@@ -117,6 +127,18 @@ sa fenêtre. Il rejette un code de sortie non nul ou des erreurs dans les journa
 le retour au périphérique système et l'affichage en lecture ; `-AudioOutputRow 1`
 choisit la deuxième sortie de la liste. Le débranchement physique reste à valider.
 FFmpeg ne fait pas partie des dépendances de l'application.
+`-NetworkOutputs` recherche et capture les appareils réseau sans sélectionner un
+récepteur. `-LocalOutputCount` indique le nombre de sorties locales affichées.
+Pour une validation matérielle explicite sur un récepteur Cast **inactif**, avec
+un fichier synthétique silencieux de douze secondes :
+
+```powershell
+cargo run -p rap-network --example smoke_cast -- <identifiant-découvert> <fichier-synthétique>
+cargo run -p rap-audio --example network_session -- <identifiant-découvert> <fichier-synthétique>
+```
+
+Ces scénarios restaurent le volume initial. WAV et FLAC ont été vérifiés sur la
+SHIELD ; DLNA est couvert par un récepteur simulé, en attente de test matériel.
 Les tests natifs de `rap-platform` nécessitent un bureau Windows interactif : ils
 interrogent réellement SMTC, lisent sa pochette et envoient des commandes. Le test
 du registre utilise une clé temporaire `HKCU\Software\RAP-Test-<pid>` supprimée
@@ -129,6 +151,13 @@ cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
 ```
 
 ## Limites
+
+- Réseau : IPv4 sur les interfaces privées ou de lien local ; une seule sortie
+  active à la fois, aucun transcodage ni synchronisation multiroom. Le PC doit
+  rester allumé et joignable par le récepteur. Les autres modèles Cast et les
+  téléviseurs DLNA dépendent de leurs formats, capacités et réglages réseau.
+  La découverte seule ne lance aucune application sur les appareils. La lecture
+  locale fonctionne sans Internet ; le récepteur Cast peut dépendre de Google.
 
 - Lecture mono/stéréo, sortie partagée. Égaliseur, mode exclusif, bit-perfect et
   validation de formats supplémentaires exclus du périmètre retenu pour la phase 7.

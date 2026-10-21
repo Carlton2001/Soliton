@@ -11,6 +11,14 @@ const LOOSE_LIMIT: usize = 2000;
 
 impl Rap {
     pub fn audio_command(&mut self, command: Command, cx: &mut Context<Self>) {
+        if self.playback.output_changing
+            && matches!(
+                &command,
+                Command::SelectOutput(_) | Command::SelectNetworkOutput(_)
+            )
+        {
+            return;
+        }
         if let Some(audio) = &self.audio
             && let Err(error) = audio.send(command)
         {
