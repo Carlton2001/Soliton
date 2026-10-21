@@ -67,3 +67,14 @@ Références réseau examinées : [oxicast](https://github.com/denniskribl/oxica
 [mdns-sd](https://github.com/keepsimple1/mdns-sd),
 [Google Cast Media Receiver](https://developers.google.com/cast/docs/web_receiver),
 [formats Cast](https://developers.google.com/cast/docs/media).
+
+## Bluetooth Windows
+
+La connexion Bluetooth réutilise Windows et CPAL
+déjà présents dans RAP, sans dépendance ou service Amazon supplémentaire.
+L'énumération des appareils appairés utilise les API Windows Devices Enumeration,
+Bluetooth et Media Devices de `windows` 0.61.3, avec `windows-collections` 0.2.0
+et `windows-future` 0.2.1 déclarés uniquement pour Windows (versions déjà
+résolues dans le workspace). Aucun service supplémentaire n'est nécessaire.
+L'icône Bluetooth provient du SVG Lucide officiel `icons/bluetooth.svg`, sans
+modification, et relève de la même attribution dans `assets/NOTICE.md`.

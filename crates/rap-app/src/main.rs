@@ -3,6 +3,7 @@ mod album;
 mod app;
 mod assets;
 mod audio_preferences;
+mod bluetooth_preferences;
 mod catalog;
 mod filters;
 mod i18n;

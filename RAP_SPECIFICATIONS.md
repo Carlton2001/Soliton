@@ -755,15 +755,46 @@ La gestion de plusieurs appareils ne doit pas être confondue avec une synchroni
 
 La synchronisation audio stricte entre plusieurs enceintes est une fonctionnalité avancée, hors périmètre initial.
 
-## 11.4 Alexa
+## 11.4 Enceintes Bluetooth, dont Amazon Echo
 
-La prise en charge directe des enceintes Amazon Echo est reportée.
+Le 21 octobre 2026, l'utilisateur a abandonné la piste Alexa Wi-Fi / skill et
+demandé la connexion Bluetooth. Le prototype Wi-Fi n'est pas intégré à RAP et
+ne doit pas être démarré pour le parcours Bluetooth.
 
-Une étude de faisabilité spécifique sera nécessaire.
+Sous Windows, RAP ouvre les paramètres Bluetooth natifs pour ajouter, appairer
+ou reconnecter une enceinte ou un casque. Windows gère la découverte, les
+confirmations d'appairage et les codecs. RAP réutilise les sorties audio CPAL
+exposées par le système, leur actualisation en arrière-plan et leur sélection
+persistée. Aucune connexion à Amazon, skill, passerelle distante ou souscription
+n'est requise par RAP pour cette sortie.
 
-RAP ne doit pas dépendre d'une intégration Alexa non officielle ou fragile.
+La liste Bluetooth doit inclure les appareils déjà appairés même déconnectés,
+avec leur état et une action « Connecter dans Windows » ouvrant les paramètres
+natifs. Cette action ne doit pas prétendre établir la connexion elle-même.
+L'énumération et son actualisation périodique s'effectuent hors du thread UI.
+Les sorties audio sont associées aux appareils par leur identifiant de conteneur
+Windows ; aucun rapprochement approximatif de noms ne doit choisir une sortie.
+Une sortie associée n'est sélectionnable que si le moteur la voit disponible et
+non ambiguë. Les appareils déconnectés restent listés ; leurs sorties absentes
+ne deviennent pas sélectionnables pour autant.
 
-L'architecture réseau doit néanmoins rester suffisamment extensible pour permettre une intégration future.
+Le périphérique doit accepter l'audio Bluetooth du PC (A2DP). La découverte
+d'un appareil Alexa sur le Wi-Fi ou en Bluetooth ne garantit pas cette capacité.
+RAP ne sélectionne pas automatiquement le nouvel appareil et ne change pas le
+périphérique audio par défaut de Windows. Les échecs de sélection conservent
+la sortie fonctionnelle précédente ; une sortie absente reste mémorisée.
+
+La sortie Bluetooth utilise le codec négocié par Windows et le périphérique.
+Ne garantir ni lossless ni bit-perfect ; le format PCM affiché par RAP précède
+le transport Bluetooth et n'indique pas son codec. Une seule sortie est active ;
+pas de synchronisation multiroom ni de couplage stéréo entre Echo géré par RAP.
+L'entrée Bluetooth d'une Echo n'est pas redistribuée à la seconde Echo et à
+l'Echo Sub de son ensemble Alexa ; la sortie cible uniquement l'Echo connectée.
+Les textes d'aide et les actions doivent être disponibles en français et anglais.
+
+Références : [paramètres Windows](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings),
+[audio Bluetooth Windows](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/bluetooth-classic-audio),
+[appairage Echo](https://www.aboutamazon.com/news/devices/connect-alexa-bluetooth).
 
 ## 11.5 Google Cast / Chromecast
 
@@ -1311,7 +1342,8 @@ Les fonctionnalités complexes doivent pouvoir être reportées individuellement
 ## Évolutions ultérieures
 
 - Linux.
-- Alexa.
+- Diffusion Alexa par Wi-Fi uniquement sur nouvelle demande explicite ; la
+  sortie Bluetooth utilise déjà le parcours des sorties audio locales (§11.4).
 - Formats audio nécessitant des décodeurs complémentaires.
 - Transcodage DLNA avancé.
 - Synchronisation multiroom.

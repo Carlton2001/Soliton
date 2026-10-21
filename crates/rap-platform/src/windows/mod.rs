@@ -1,5 +1,6 @@
 //! Native ownership lives on one worker; callbacks only enqueue commands.
 mod autostart;
+pub(crate) mod bluetooth;
 mod media;
 mod taskbar;
 mod tray;

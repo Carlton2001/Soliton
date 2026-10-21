@@ -35,6 +35,7 @@ pub struct Rap {
     pub desktop: Option<rap_platform::Desktop>,
     pub autostart: Option<bool>,
     pub startup_pending: bool,
+    pub bluetooth: crate::bluetooth_preferences::BluetoothState,
     pub confirm_close: bool,
     pub quitting: bool,
     pub audio: Option<rap_audio::Engine>,
@@ -134,6 +135,7 @@ impl Rap {
             desktop: None,
             autostart: None,
             startup_pending: false,
+            bluetooth: Default::default(),
             confirm_close: false,
             quitting: false,
             audio,
@@ -206,6 +208,7 @@ impl Rap {
 
     /// Applies engine states, service events and query results.
     fn poll(&mut self, last_refresh: &mut Instant, cx: &mut Context<Self>) {
+        self.poll_bluetooth(cx);
         let mut changed = false;
         if let Some(playback) = self.audio.as_ref().and_then(|a| a.events.try_iter().last()) {
             changed |= playback.state != self.playback.state

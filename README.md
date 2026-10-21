@@ -4,6 +4,9 @@ Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7, puis phase 9 impl�
 l'ordre et validées sous Windows avec Rust 1.98.1 MSVC.
 La phase 8 (API locale de contrôle) est reportée.
 
+La piste Alexa Wi-Fi a été abandonnée au profit de la sortie Bluetooth le
+21 octobre 2026.
+
 ## Lancer
 
 Installer Rust MSVC, les Build Tools C++ et le SDK Windows, puis :
@@ -41,6 +44,23 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   refusé conserve la sortie précédente. Une sortie préférée absente reste mémorisée.
   Le périphérique actif, la fréquence, les canaux et le format d'échantillons envoyés
   par RAP s'affichent dans les paramètres et la lecture en cours.
+- **Bluetooth** : dans **Paramètres → Sortie audio → Appareils Bluetooth appairés**,
+  RAP liste les appareils déjà appairés, y compris déconnectés, avec leur état.
+  **Connecter dans Windows** et **Ajouter ou connecter un appareil Bluetooth**
+  ouvrent les paramètres Windows ; la connexion s'effectue dans ces paramètres.
+  Activez le Bluetooth du PC et le mode appairage de l'enceinte, puis ajoutez-la
+  ou reconnectez-la dans Windows. Sur une Echo compatible, dites « Alexa,
+  appairage Bluetooth ». Revenez dans RAP et sélectionnez sa sortie disponible
+  sous l'appareil ou dans la liste audio au-dessus. Les listes s'actualisent en
+  arrière-plan toutes les cinq secondes ou à la demande. Le choix est mémorisé
+  sans changer la sortie par défaut de Windows. Les autres enceintes et casques audio Bluetooth sont
+  également utilisables lorsqu'ils sont exposés comme sorties par Windows.
+  Un appareil Alexa découvert en Wi-Fi n'est pas nécessairement un récepteur
+  audio Bluetooth. Aucun compte Amazon ni service distant n'est utilisé par RAP.
+  Le codec dépend de Windows et du périphérique : ni lossless ni bit-perfect
+  ne sont garantis, et le format PCM affiché est celui envoyé au système.
+  Sur un ensemble de deux Echo et d'un Echo Sub, le Bluetooth alimente uniquement
+  l'Echo connectée au PC, sans transmettre au reste de l'ensemble Alexa.
 - **Sorties réseau** : dans les paramètres audio, **Rechercher les appareils**
   découvre les récepteurs DLNA/UPnP et Google Cast du réseau local. Choisir un
   appareil y envoie la lecture ; les mêmes commandes de RAP et de Windows
@@ -127,6 +147,36 @@ sa fenêtre. Il rejette un code de sortie non nul ou des erreurs dans les journa
 le retour au périphérique système et l'affichage en lecture ; `-AudioOutputRow 1`
 choisit la deuxième sortie de la liste. Le débranchement physique reste à valider.
 FFmpeg ne fait pas partie des dépendances de l'application.
+
+Test Bluetooth explicite sur une sortie déjà appairée/connectée dans Windows
+(remplacer le nom par celui affiché dans RAP) :
+
+```powershell
+cargo run -p rap-audio --example bluetooth_probe -- "Haut-parleurs (Echo Studio-231)"
+```
+
+Ce test crée dans un dossier temporaire un signal de cinq secondes à faible
+niveau, sélectionne exactement la sortie demandée et vérifie la progression,
+la pause/reprise, la fin de lecture et la conservation du choix. Il ne modifie
+ni le volume système ni la bibliothèque. Il faut confirmer séparément l'écoute
+sur la bonne enceinte ; aucune déduction sur le codec Bluetooth ou le lossless
+n'est faite à partir du format PCM.
+
+Validation du 21 octobre 2026 : `cargo fmt --all --check`, `cargo check
+--workspace --all-targets` sans avertissement de projet et 66 tests automatisés réussis
+(7 scénarios matériels/fixtures ignorés par défaut). Construction Windows et
+test réel du moteur sur `Haut-parleurs (Echo Studio-231)` réussis : flux
+44 100 Hz, deux canaux, F32 avant encodage Bluetooth ; progression,
+pause/reprise et fin de lecture vérifiées. Le premier signal n'a pas été entendu.
+Après mise à jour, l'utilisateur confirme la lecture sur ses casques Bluetooth
+et sur l'Echo principale de son ensemble ; la seconde Echo et l'Echo Sub ne
+reçoivent pas cette entrée Bluetooth, conformément à la limitation Alexa.
+L'énumération native retrouve les quatre appareils appairés et déconnectés du PC.
+Déconnexion physique pendant la lecture non testée.
+Les avertissements du linker MSVC signalent uniquement la création de fichiers
+`.lib`/`.exp`. Sous le sandbox, désactiver le cache incrémental avec
+`$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de copie au lieu de lien dur.
+
 `-NetworkOutputs` recherche et capture les appareils réseau sans sélectionner un
 récepteur. `-LocalOutputCount` indique le nombre de sorties locales affichées.
 Pour une validation matérielle explicite sur un récepteur Cast **inactif**, avec

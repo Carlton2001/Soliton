@@ -1,4 +1,4 @@
-//! Local output choices and the actual RAP stream format.
+//! Local/Bluetooth output choices and the actual RAP stream format.
 use crate::{
     app::Rap,
     i18n::Text,
@@ -6,6 +6,7 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 use rap_audio::Command;
+use rap_platform::Bluetooth;
 
 impl Rap {
     pub fn audio_preferences(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -28,6 +29,7 @@ impl Rap {
             .child(
                 div()
                     .flex()
+                    .flex_wrap()
                     .items_center()
                     .gap_3()
                     .child(div().text_lg().child(self.t(Text::AudioOutput)))
@@ -98,6 +100,9 @@ impl Rap {
                     selected.unwrap(),
                     self.t(Text::PreferredOutputUnavailable)
                 )))
+            })
+            .when(Bluetooth::SUPPORTED, |view| {
+                view.child(self.bluetooth_preferences(cx))
             })
             .child(self.network_preferences(cx))
             .when(self.playback.output_changing, |view| {

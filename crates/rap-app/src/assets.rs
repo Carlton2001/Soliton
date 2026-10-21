@@ -31,6 +31,7 @@ impl AssetSource for Assets {
             "shuffle",
             "repeat",
             "volume-2",
+            "bluetooth",
             "x",
             "maximize-2",
             "minimize-2",

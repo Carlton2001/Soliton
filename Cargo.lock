@@ -4887,6 +4887,8 @@ dependencies = [
  "resvg",
  "tempfile",
  "windows 0.61.3",
+ "windows-collections",
+ "windows-future",
  "windows-registry 0.5.3",
 ]
 

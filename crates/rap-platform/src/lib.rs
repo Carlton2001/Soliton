@@ -2,6 +2,9 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+mod bluetooth;
+pub use bluetooth::{Bluetooth, BluetoothDevice};
+
 mod desktop;
 pub use desktop::{
     Desktop, DesktopEvent, MediaCommand, MediaState, MediaTrack, PreviewColors, TransportState,
