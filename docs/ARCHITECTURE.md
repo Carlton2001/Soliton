@@ -392,3 +392,69 @@ avertissement, formatage vérifié. Le smoke test `-Taskbar -CloseScenario Minim
 pilote les quatre commandes dans RAP à volume nul ; les captures de pause et
 d'arrêt ont été contrôlées. Les scénarios Hidden (anglais/clair/liste) et Early
 passent aussi, sans erreur dans les journaux.
+
+## Phase 7 — Sorties audio locales — 21 octobre 2026
+
+Périmètre réduit à la demande de l'utilisateur : sélection des sorties locales
+et affichage du flux actif. Égaliseur, exclusif, bit-perfect et validation de
+formats supplémentaires sont reportés hors V1. Le choix CPAL 0.16 existant est
+conservé ; aucune dépendance n'est ajoutée. Les interactions `cx.listener` du
+voisin Oxyde ont été examinées et restent compatibles avec GPUI 0.2.2 de RAP ;
+aucun code ni composant de cette application n'a été copié.
+
+`rap-audio::devices` décrit les périphériques et les résout par leur nom, seul
+identifiant portable exposé par cette version de CPAL. Les doublons sont affichés
+mais refusés à la sélection ; on ne choisit jamais le premier appareil d'un nom
+ambigu. Une sortie renommée demande une nouvelle sélection. `None` désigne le
+périphérique système par défaut, résolu à chaque ouverture de flux ; un changement
+de sortie par défaut dans Windows ne migre pas un flux existant.
+
+Un worker dédié découvre les sorties au démarrage, toutes les cinq secondes et
+sur demande. Sa file est bornée ; l'énumération n'interrompt ni GPUI ni le décodage.
+Les commandes de sélection rejoignent le worker audio existant. Celui-ci prépare
+le nouveau lecteur, le flux et le convertisseur avant de remplacer la session,
+puis reprend à la position consommée sur l'ancienne sortie. L'état lecture/pause,
+la file, la répétition, l'aléatoire et le volume restent conservés. Un échec garde
+l'ancienne session et sa préférence ; ses diagnostics sont distincts d'une panne
+de lecture. Aucun nouveau travail n'est introduit dans le callback audio.
+
+Le choix acquitté par le moteur est sauvegardé via le worker de configuration,
+avec compatibilité des anciens JSON. Une préférence absente reste mémorisée et
+signalée ; la lecture échoue explicitement sans repli silencieux. Une panne de
+flux conserve la piste et retire ses caractéristiques actives ; une nouvelle
+sélection et une relance permettent de récupérer. Il n'y a pas de reprise
+automatique après déconnexion. Les sorties réseau restent une intégration
+distincte à ajouter en phase 9, sans assimiler une destination DLNA à un nom CPAL.
+
+L'interface FR/EN distingue la préférence, le périphérique actif et le format
+envoyé par RAP (fréquence, canaux, format d'échantillons). Elle ne présente pas
+ce format comme une mesure du signal après le mélangeur Windows ou le matériel.
+Les informations actives disparaissent à l'arrêt, à la fin de la file et en
+cas de panne. Les icônes Lucide déjà présentes sont réutilisées sans modification.
+
+Validation Windows MSVC : `cargo fmt --check`, `cargo check --workspace --locked`
+sans avertissement et 53 tests automatiques réussis. Deux tests audio natifs
+supplémentaires passent à volume nul : sélection pendant la pause et la lecture,
+refus sans perte de session, préférence absente sans repli, panne de callback
+simulée et récupération, sortie effacée à la fin de la file. Ils sont exécutés
+hors bac à sable à cause du `STATUS_INVALID_HANDLE` CPAL connu. Les tests de
+configuration utilisent un répertoire temporaire dans `target/test-temp` pour
+éviter les refus de remplacement de fichiers du dossier temporaire système.
+
+Le smoke test `-AudioOutputs` clique dans les paramètres, vérifie la sauvegarde
+du choix, revient au périphérique système et actualise la liste. Il passe en
+français/sombre et anglais/clair/liste, avec contrôle visuel des deux préférences
+et de la vue de lecture. `-AudioOutputRow` permet de choisir une autre ligne
+locale dans la configuration testée. Les commandes de la vue de lecture restent
+visibles avec les informations de sortie sur plusieurs lignes. Les essais ont
+notamment changé entre les sorties casque et haut-parleurs présentes.
+
+Une instance utilisateur verrouillant `target/debug/rap.exe`, la construction
+de validation utilise le nom `rap-phase7.exe`, sans fermer cette instance ni
+conserver de modification du manifeste. `-Executable` sélectionne cette copie
+dans le smoke test. Les données de QA restent dans `target/native-qa-data`,
+distinctes de la bibliothèque utilisateur. Le débranchement physique et Linux
+restent non validés ; la déconnexion est couverte par le signal de panne simulé.
+
+Validation utilisateur : le fonctionnement et la mise à jour à chaud de la liste
+des périphériques de sortie sont confirmés après essai.

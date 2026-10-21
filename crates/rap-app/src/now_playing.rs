@@ -12,7 +12,8 @@ impl Rap {
         let theme = self.theme();
         let viewport = window.viewport_size();
         // The cover takes what the text and controls leave, within reason.
-        let side = (f32::from(viewport.height) - 360.)
+        // Reserve room for wrapped device details as well as all playback controls.
+        let side = (f32::from(viewport.height) - 420.)
             .min(f32::from(viewport.width) * 0.5)
             .clamp(160., 640.);
         let fullscreen = window.is_fullscreen();
@@ -27,8 +28,11 @@ impl Rap {
             (album.id, edition)
         });
         let mut details = track.map(|t| quality(&t.metadata)).unwrap_or_default();
-        if let Some(rate) = self.playback.output_rate.filter(|_| track.is_some()) {
-            details.push_str(&format!(" → {} {rate} Hz", self.t(Text::Output)));
+        if let Some(output) = self.output_description().filter(|_| track.is_some()) {
+            details.push_str(&format!(
+                " → {}",
+                self.labelled(self.t(Text::Output), &output)
+            ));
         }
         div()
             .flex_1()

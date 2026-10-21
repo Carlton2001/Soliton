@@ -1,6 +1,6 @@
 # RAP — Rust Audio Player
 
-Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 6 implémentées dans
+Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7 implémentées dans
 l'ordre et validées sous Windows avec Rust 1.98.1 MSVC.
 
 ## Lancer
@@ -34,6 +34,12 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   fichier** : lecture ponctuelle avec tags et pochettes, sans ajout à la bibliothèque.
 - **Paramètres** : français/anglais, apparence système/clair/sombre, huit couleurs
   d'accent, taille des pochettes, masquage des albums indisponibles. Tout est conservé.
+- **Sortie audio** : choix du périphérique système par défaut ou d'une sortie locale
+  mémorisée dans les paramètres. La liste se rafraîchit automatiquement et manuellement.
+  Un changement conserve la piste, la position et l'état lecture/pause ; un choix
+  refusé conserve la sortie précédente. Une sortie préférée absente reste mémorisée.
+  Le périphérique actif, la fréquence, les canaux et le format d'échantillons envoyés
+  par RAP s'affichent dans les paramètres et la lecture en cours.
 - Erreurs et avertissements regroupés dans un bandeau consultable.
 - **Windows** : contrôles multimédias système (SMTC), titre, artiste, album,
   pochette et progression ; lecture/pause, arrêt, précédente/suivante et seek.
@@ -100,12 +106,16 @@ cargo test -p rap-audio -- --include-ignored
 ./scripts/smoke-windows.ps1 -CloseScenario Hidden
 ./scripts/smoke-windows.ps1 -CloseScenario Ask
 ./scripts/smoke-windows.ps1 -Taskbar
+./scripts/smoke-windows.ps1 -AudioOutputs
 cargo test -p rap-platform -- --include-ignored
 ```
 
 Le test de sortie native utilise un volume nul. Le smoke test ouvre puis ferme RAP
 sur une base et une collection synthétiques dans `target/`, et capture uniquement
 sa fenêtre. Il rejette un code de sortie non nul ou des erreurs dans les journaux.
+`-AudioOutputs` vérifie aussi la sélection et la sauvegarde d'une sortie locale,
+le retour au périphérique système et l'affichage en lecture ; `-AudioOutputRow 1`
+choisit la deuxième sortie de la liste. Le débranchement physique reste à valider.
 FFmpeg ne fait pas partie des dépendances de l'application.
 Les tests natifs de `rap-platform` nécessitent un bureau Windows interactif : ils
 interrogent réellement SMTC, lisent sa pochette et envoient des commandes. Le test
@@ -120,8 +130,14 @@ cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
 
 ## Limites
 
-- Lecture mono/stéréo, sortie partagée par défaut. Pas de garantie bit-perfect,
-  de mode exclusif, de sélection de sortie ou d'égaliseur à ce stade.
+- Lecture mono/stéréo, sortie partagée. Égaliseur, mode exclusif, bit-perfect et
+  validation de formats supplémentaires exclus du périmètre retenu pour la phase 7.
+- CPAL 0.16 identifie les sorties par leur nom : une sortie renommée doit être
+  sélectionnée à nouveau ; les noms identiques sont signalés et non sélectionnables.
+  Le choix système par défaut est résolu à chaque ouverture du flux (piste, seek,
+  sélection de sortie), sans migration automatique d'un flux déjà actif.
+  Les caractéristiques affichées décrivent ce que RAP envoie, avant les traitements
+  éventuels du mélangeur système et du matériel.
 - WAV, FLAC, MP3, AAC-LC/M4A, ALAC, OGG Vorbis et AIFF testés par décodage et seek
   sur des signaux générés. Opus, WMA et APE ne sont pas proposés.
 - Les éditions sont rapprochées seulement si artiste de l'album, titre et année

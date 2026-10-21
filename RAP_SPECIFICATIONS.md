@@ -21,7 +21,7 @@ L'application est destinée aux utilisateurs possédant une bibliothèque musica
 RAP privilégie trois objectifs fondamentaux :
 
 1. **La bibliothèque musicale :** organisation, exploration et présentation des albums.
-2. **La qualité audio :** lecture haute fidélité, gestion des périphériques et restitution bit-perfect lorsque possible.
+2. **La qualité audio :** lecture haute fidélité et gestion des périphériques. Le mode exclusif et la restitution bit-perfect sont hors du périmètre V1 retenu.
 3. **La simplicité :** interface épurée, sans accumulation de fonctionnalités secondaires.
 
 RAP s'inspire de la richesse fonctionnelle de MusicBee, mais cherche à éviter sa complexité visuelle et ses nombreuses options peu utiles.
@@ -546,7 +546,7 @@ Commandes principales :
 - SetOutputDevice.
 - SetShuffle.
 - SetRepeatMode.
-- SetEqualizer.
+- SetEqualizer (évolution ultérieure, hors V1).
 
 Événements principaux :
 
@@ -579,6 +579,7 @@ Le support effectif dépendra des décodeurs retenus.
 La V1 doit prioriser les formats correctement pris en charge par les bibliothèques Rust sélectionnées.
 
 WMA et APE pourront être reportés si leur prise en charge nécessite des dépendances natives importantes.
+La phase 7 n'ajoute ni ne valide de formats supplémentaires ; elle conserve les formats déjà pris en charge.
 
 ## 9.3 Décodage
 
@@ -600,8 +601,7 @@ Fonctions souhaitées :
 - Gestion du volume.
 - Détection des capacités.
 - Sortie partagée.
-- Sortie exclusive lorsque disponible.
-- Restitution bit-perfect lorsque possible.
+- Sortie exclusive et restitution bit-perfect : évolutions ultérieures, hors V1.
 
 ## 9.5 Modes audio
 
@@ -609,10 +609,12 @@ Fonctions souhaitées :
 
 - Compatibilité maximale.
 - Volume logiciel.
-- Égaliseur.
+- Égaliseur : hors V1.
 - Conversion audio si nécessaire.
 
 **Mode audiophile**
+
+Évolution ultérieure, hors du périmètre V1 retenu le 21 octobre 2026.
 
 - Priorité à l'absence de modification du signal.
 - Égaliseur désactivé.
@@ -624,7 +626,7 @@ Le statut bit-perfect ne doit pas être annoncé sans justification technique.
 
 ## 9.6 Égaliseur
 
-Prévoir un égaliseur audio désactivable.
+Évolution ultérieure, hors du périmètre V1 retenu le 21 octobre 2026 : égaliseur audio désactivable.
 
 Il doit fonctionner uniquement dans un chemin de traitement compatible.
 
@@ -872,7 +874,7 @@ Responsabilités :
 - Contrôle de lecture.
 - Périphériques.
 - Volume.
-- Égaliseur.
+- Égaliseur (évolution ultérieure, hors V1).
 - Gestion des erreurs audio.
 
 ## 13.6 rap-platform
@@ -1190,18 +1192,20 @@ Objectifs :
 
 **Livrable :** intégration Windows fonctionnelle.
 
-## Phase 7 — Audio avancé
+## Phase 7 — Sorties audio locales
 
 Objectifs :
 
-- Sélection des périphériques.
-- Égaliseur.
-- Étude et implémentation du mode exclusif.
-- Vérification des conditions bit-perfect.
-- Affichage des caractéristiques de sortie.
-- Validation des formats audio supplémentaires.
+- Découverte et sélection des périphériques de sortie locaux.
+- Choix du périphérique système par défaut ou d'un périphérique préféré mémorisé.
+- Changement de sortie en conservant la piste, la position et l'état lecture/pause.
+- Gestion des périphériques indisponibles sans changement silencieux de destination.
+- Affichage du périphérique actif et des caractéristiques du flux ouvert par RAP : fréquence, canaux et format d'échantillons.
+- Sélection extensible aux sorties réseau de la phase 9, avec des implémentations locales et réseau distinctes.
 
-**Livrable :** fonctions audiophiles validées sur les configurations prises en charge.
+L'égaliseur, le mode exclusif, le bit-perfect et la validation de formats supplémentaires sont exclus de cette phase et du périmètre V1 retenu.
+
+**Livrable :** sélection des sorties locales et informations de sortie fonctionnelles, validées sur les configurations prises en charge.
 
 ## Phase 8 — API locale
 
@@ -1349,7 +1353,7 @@ RAP devra respecter les principes suivants :
 Les éléments suivants nécessitent une validation technique ou un arbitrage ultérieur :
 
 1. Versions exactes des crates.
-2. Stratégie définitive de sortie audio exclusive.
+2. Stratégie définitive de sortie audio exclusive (évolution ultérieure, hors V1).
 3. Formats effectivement disponibles en Rust pur.
 4. Algorithme précis de regroupement des éditions.
 5. Politique de vérification des NAS.

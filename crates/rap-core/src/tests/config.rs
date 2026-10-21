@@ -16,6 +16,24 @@ fn settings_roundtrip_and_missing_defaults() {
 }
 
 #[test]
+fn output_preference_roundtrips_and_older_settings_use_system_default() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, br#"{"volume":0.4}"#).unwrap();
+    assert_eq!(Settings::load(&path).unwrap().output_device, None);
+    let mut settings = Settings::load(&path).unwrap();
+    settings.output_device = Some("DAC USB — Casque".into());
+    settings.save(&path).unwrap();
+    assert_eq!(
+        Settings::load(&path).unwrap().output_device,
+        settings.output_device
+    );
+    settings.output_device = None;
+    settings.save(&path).unwrap();
+    assert_eq!(Settings::load(&path).unwrap().output_device, None);
+}
+
+#[test]
 fn invalid_settings_are_reported() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");

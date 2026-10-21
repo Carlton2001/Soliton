@@ -15,14 +15,32 @@ use std::{
 
 pub struct Engine {
     commands: Sender<Command>,
+    refresh_outputs: Sender<()>,
     pub events: Receiver<Playback>,
     shutdown: Arc<AtomicBool>,
 }
 
 impl Engine {
-    pub fn start(volume: f32) -> Result<Self> {
+    pub fn start(volume: f32, selected_output: Option<String>) -> Result<Self> {
         let (commands, receiver) = bounded(32);
         let (events, snapshots) = bounded(8);
+        let (refresh_outputs, refresh) = bounded(1);
+        let (discovered, devices) = bounded(1);
+        // Device enumeration can involve slow drivers. It never holds up decoding.
+        std::thread::Builder::new()
+            .name("rap-outputs".into())
+            .spawn(move || {
+                loop {
+                    let result = crate::devices::list();
+                    if discovered.send(result).is_err() {
+                        break;
+                    }
+                    match refresh.recv_timeout(Duration::from_secs(5)) {
+                        Ok(()) | Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
+                        Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+                    }
+                }
+            })?;
         let shutdown = Arc::new(AtomicBool::new(false));
         let worker_shutdown = shutdown.clone();
         std::thread::Builder::new()
@@ -32,12 +50,24 @@ impl Engine {
                     queue: Queue::default(),
                     playback: Playback {
                         volume: volume.clamp(0., 1.),
+                        selected_output,
                         ..Default::default()
                     },
                     session: None,
                 };
                 let mut last = Instant::now() - Duration::from_secs(1);
                 while !worker_shutdown.load(Ordering::Relaxed) {
+                    if let Ok(result) = devices.try_recv() {
+                        match result {
+                            Ok(outputs) => {
+                                worker.playback.outputs = Arc::new(outputs);
+                                worker.playback.outputs_error = None;
+                            }
+                            Err(error) => {
+                                worker.playback.outputs_error = Some(format!("{error:#}"))
+                            }
+                        }
+                    }
                     let hungry = worker.session.as_ref().is_some_and(|s| {
                         worker.playback.state == PlaybackState::Playing
                             && (!s.pending.is_empty()
@@ -69,12 +99,19 @@ impl Engine {
             })?;
         Ok(Self {
             commands,
+            refresh_outputs,
             events: snapshots,
             shutdown,
         })
     }
     /// Never block the UI on a full queue or a busy decoder.
     pub fn send(&self, command: Command) -> Result<()> {
+        if matches!(command, Command::RefreshOutputs) {
+            return match self.refresh_outputs.try_send(()) {
+                Ok(()) | Err(crossbeam_channel::TrySendError::Full(_)) => Ok(()),
+                Err(error) => Err(error.into()),
+            };
+        }
         self.commands
             .try_send(command)
             .map_err(|_| anyhow::anyhow!("Audio command queue unavailable"))
@@ -94,6 +131,36 @@ struct Session {
     eof: bool,
     base_ms: u64,
 }
+
+impl Session {
+    fn open(
+        mut reader: Reader,
+        volume: f32,
+        selected: Option<&str>,
+        position: Option<u64>,
+    ) -> Result<Self> {
+        let base_ms = match position {
+            Some(position) => reader.seek(position)?,
+            None => 0,
+        };
+        let output = Output::open(reader.rate, reader.channels, volume, selected)?;
+        let converter = Converter::new(
+            reader.rate,
+            reader.channels,
+            output.rate,
+            output.channels as usize,
+        )?;
+        Ok(Self {
+            reader,
+            output,
+            converter,
+            pending: VecDeque::new(),
+            eof: false,
+            base_ms,
+        })
+    }
+}
+
 struct Worker {
     queue: Queue,
     playback: Playback,
@@ -104,49 +171,38 @@ impl Worker {
     fn fail(&mut self, error: anyhow::Error) {
         self.session = None;
         self.playback.state = PlaybackState::Failed;
-        self.playback.output_rate = None;
-        self.playback.output_channels = None;
+        self.playback.output = None;
         self.playback.error = Some(format!("{error:#}"));
     }
 
     fn start_current(&mut self) -> Result<()> {
         self.session = None;
+        self.playback.output = None;
         self.playback.error = None;
         self.playback.position_ms = 0;
         let Some(track) = self.queue.current().cloned() else {
             self.playback.track = None;
             self.playback.duration_ms = 0;
-            self.playback.output_rate = None;
-            self.playback.output_channels = None;
             self.playback.state = PlaybackState::Stopped;
             return Ok(());
         };
         self.playback.track = Some(track.clone());
         anyhow::ensure!(track.available, "Track is unavailable");
         let reader = Reader::open(&track.path)?;
-        let output = Output::open(reader.rate, reader.channels, self.playback.volume)?;
-        let converter = Converter::new(
-            reader.rate,
-            reader.channels,
-            output.rate,
-            output.channels as usize,
-        )?;
         self.playback.duration_ms = if reader.duration_ms > 0 {
             reader.duration_ms
         } else {
             track.metadata.duration_ms
         };
-        self.playback.output_rate = Some(output.rate);
-        self.playback.output_channels = Some(output.channels);
-        self.playback.state = PlaybackState::Playing;
-        self.session = Some(Session {
+        let session = Session::open(
             reader,
-            output,
-            converter,
-            pending: VecDeque::new(),
-            eof: false,
-            base_ms: 0,
-        });
+            self.playback.volume,
+            self.playback.selected_output.as_deref(),
+            None,
+        )?;
+        self.playback.output = Some(session.output.info.clone());
+        self.playback.state = PlaybackState::Playing;
+        self.session = Some(session);
         Ok(())
     }
 
@@ -174,8 +230,7 @@ impl Worker {
                 self.playback.state = PlaybackState::Stopped;
                 self.playback.position_ms = 0;
                 self.playback.error = None;
-                self.playback.output_rate = None;
-                self.playback.output_channels = None;
+                self.playback.output = None;
             }
             Command::Volume(value) => {
                 if value.is_finite() {
@@ -201,6 +256,7 @@ impl Worker {
                     self.start_current()?;
                 } else {
                     self.session = None;
+                    self.playback.output = None;
                     self.playback.state = PlaybackState::Stopped;
                     self.playback.position_ms = 0;
                 }
@@ -213,36 +269,66 @@ impl Worker {
                 }
             }
             Command::Seek(position) => self.seek(position)?,
+            Command::SelectOutput(selected) => {
+                self.playback.output_error =
+                    self.select_output(selected).err().map(|e| format!("{e:#}"));
+            }
+            Command::RefreshOutputs => {}
         }
         Ok(())
     }
 
     fn seek(&mut self, position: u64) -> Result<()> {
-        let Some(mut session) = self.session.take() else {
+        let Some(session) = self.session.take() else {
             return Ok(());
         };
         // Stop and drop the previous stream before publishing a new queue; samples
         // from before the seek can never leak into the replacement callback.
         session.output.playing.store(false, Ordering::Relaxed);
-        let base_ms = session.reader.seek(position)?;
         let reader = session.reader;
         drop(session.output);
-        let output = Output::open(reader.rate, reader.channels, self.playback.volume)?;
-        let converter = Converter::new(
-            reader.rate,
-            reader.channels,
-            output.rate,
-            output.channels as usize,
-        )?;
-        self.session = Some(Session {
+        let session = Session::open(
             reader,
-            output,
-            converter,
-            pending: VecDeque::new(),
-            eof: false,
-            base_ms,
-        });
-        self.playback.position_ms = base_ms;
+            self.playback.volume,
+            self.playback.selected_output.as_deref(),
+            Some(position),
+        )?;
+        self.playback.position_ms = session.base_ms;
+        self.playback.output = Some(session.output.info.clone());
+        self.session = Some(session);
+        Ok(())
+    }
+
+    /// Prepare the replacement before dropping the old stream. A failed choice
+    /// leaves both the working output and the persisted preference untouched.
+    fn select_output(&mut self, selected: Option<String>) -> Result<()> {
+        if let Some(current) = &self.session {
+            let track = self
+                .playback
+                .track
+                .as_ref()
+                .expect("Active session has a track");
+            let reader = Reader::open(&track.path)?;
+            let mut session =
+                Session::open(reader, self.playback.volume, selected.as_deref(), None)?;
+            // Slow device opening must not rewind the audio consumed meanwhile.
+            // Pause only once the replacement is ready, then sample the position.
+            let active = current.output.playing.swap(false, Ordering::Relaxed);
+            let position = current.base_ms + current.output.position_ms();
+            match session.reader.seek(position) {
+                Ok(base_ms) => session.base_ms = base_ms,
+                Err(error) => {
+                    current.output.playing.store(active, Ordering::Relaxed);
+                    return Err(error);
+                }
+            }
+            self.playback.position_ms = session.base_ms;
+            self.playback.output = Some(session.output.info.clone());
+            self.session = Some(session);
+        } else if selected.is_some() {
+            crate::devices::resolve(selected.as_deref())?;
+        }
+        self.playback.selected_output = selected;
         Ok(())
     }
 
@@ -298,6 +384,7 @@ impl Worker {
         self.playback.position_ms = session.base_ms + session.output.position_ms();
         if session.eof && session.pending.is_empty() && session.output.samples.is_empty() {
             self.session = None;
+            self.playback.output = None;
             if self.queue.next(true) {
                 self.start_current()?;
             } else {

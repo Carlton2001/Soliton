@@ -82,6 +82,8 @@ pub struct Settings {
     pub album_sort: AlbumSort,
     pub hide_unavailable: bool,
     pub volume: f32,
+    /// Local CPAL device name; None uses the system default.
+    pub output_device: Option<String>,
     pub close_behavior: CloseBehavior,
 }
 
@@ -96,6 +98,7 @@ impl Default for Settings {
             album_sort: AlbumSort::Artist,
             hide_unavailable: false,
             volume: 0.7,
+            output_device: None,
             close_behavior: CloseBehavior::Quit,
         }
     }

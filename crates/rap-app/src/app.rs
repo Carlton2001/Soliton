@@ -92,12 +92,14 @@ impl Rap {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (audio, audio_error) = match rap_audio::Engine::start(settings.volume) {
-            Ok(engine) => (Some(engine), None),
-            Err(error) => (None, Some(error.to_string())),
-        };
+        let (audio, audio_error) =
+            match rap_audio::Engine::start(settings.volume, settings.output_device.clone()) {
+                Ok(engine) => (Some(engine), None),
+                Err(error) => (None, Some(error.to_string())),
+            };
         let playback = rap_audio::Playback {
             volume: settings.volume,
+            selected_output: settings.output_device.clone(),
             ..Default::default()
         };
         let search = cx.new(TextInput::new);
@@ -212,12 +214,32 @@ impl Rap {
                 || playback.shuffle != self.playback.shuffle
                 || playback.repeat != self.playback.repeat
                 || playback.error != self.playback.error
+                || playback.output != self.playback.output
+                || playback.selected_output != self.playback.selected_output
+                || playback.outputs != self.playback.outputs
+                || playback.output_error != self.playback.output_error
+                || playback.outputs_error != self.playback.outputs_error
                 || playback.track.as_ref().map(|t| t.id)
                     != self.playback.track.as_ref().map(|t| t.id);
             if let Some(error) = &playback.error
                 && playback.error != self.playback.error
             {
                 self.report_error(error.clone());
+            }
+            let output_errors: Vec<_> = [
+                (&playback.output_error, &self.playback.output_error),
+                (&playback.outputs_error, &self.playback.outputs_error),
+            ]
+            .into_iter()
+            .filter_map(|(error, previous)| error.as_ref().filter(|_| error != previous).cloned())
+            .collect();
+            for error in output_errors {
+                self.report_error(self.labelled(self.t(Text::AudioOutput), &error));
+            }
+            // Save only an acknowledged choice; rejected changes keep the old one.
+            if playback.selected_output != self.settings.output_device {
+                self.settings.output_device = playback.selected_output.clone();
+                self.save();
             }
             self.playback = playback;
         }

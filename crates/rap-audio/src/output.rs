@@ -1,7 +1,8 @@
-use anyhow::{Context, Result, bail};
+use crate::{OutputInfo, devices};
+use anyhow::{Result, bail};
 use cpal::{
     FromSample, SampleFormat, SizedSample,
-    traits::{DeviceTrait, HostTrait, StreamTrait},
+    traits::{DeviceTrait, StreamTrait},
 };
 use crossbeam_queue::ArrayQueue;
 use std::sync::{
@@ -18,13 +19,12 @@ pub(crate) struct Output {
     pub failed: Arc<AtomicBool>,
     pub rate: u32,
     pub channels: u16,
+    pub info: OutputInfo,
 }
 
 impl Output {
-    pub fn open(rate: u32, channels: usize, volume: f32) -> Result<Self> {
-        let device = cpal::default_host()
-            .default_output_device()
-            .context("No audio output device")?;
+    pub fn open(rate: u32, channels: usize, volume: f32, preferred: Option<&str>) -> Result<Self> {
+        let device = devices::resolve(preferred)?;
         let default = device.default_output_config()?;
         let supported = device.supported_output_configs()?.find(|c| {
             c.channels() as usize == channels
@@ -41,6 +41,12 @@ impl Output {
         );
         let rate = config.sample_rate().0;
         let channels = config.channels();
+        let info = OutputInfo {
+            device_name: device.name()?,
+            sample_rate: rate,
+            channels,
+            sample_format: format!("{:?}", config.sample_format()),
+        };
         let samples = Arc::new(ArrayQueue::new(rate as usize * 2));
         let playing = Arc::new(AtomicBool::new(false));
         let volume = Arc::new(AtomicU32::new(volume.clamp(0., 1.).to_bits()));
@@ -78,6 +84,7 @@ impl Output {
             failed,
             rate,
             channels,
+            info,
         })
     }
     pub fn position_ms(&self) -> u64 {

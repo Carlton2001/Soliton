@@ -2,6 +2,7 @@
 mod album;
 mod app;
 mod assets;
+mod audio_preferences;
 mod catalog;
 mod filters;
 mod i18n;

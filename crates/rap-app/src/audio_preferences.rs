@@ -1,0 +1,133 @@
+//! Local output choices and the actual RAP stream format.
+use crate::{
+    app::Rap,
+    i18n::Text,
+    widgets::{button, choice},
+};
+use gpui::{prelude::*, *};
+use rap_audio::Command;
+
+impl Rap {
+    pub fn audio_preferences(&self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = self.theme();
+        let selected = self.playback.selected_output.as_ref();
+        let missing = selected.is_some_and(|name| {
+            !self
+                .playback
+                .outputs
+                .iter()
+                .any(|d| &d.name == name && d.selectable)
+        });
+        div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .min_w_0()
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .child(div().text_lg().child(self.t(Text::AudioOutput)))
+                    .child(
+                        button(
+                            "refresh-outputs",
+                            "refresh-cw",
+                            self.t(Text::RefreshOutputs),
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.audio_command(Command::RefreshOutputs, cx)
+                        })),
+                    ),
+            )
+            .child(
+                choice(
+                    "default-output",
+                    "volume-2",
+                    self.t(Text::SystemOutput),
+                    selected.is_none(),
+                    theme,
+                )
+                .on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.audio_command(Command::SelectOutput(None), cx)
+                    }),
+                ),
+            )
+            .children(
+                self.playback
+                    .outputs
+                    .iter()
+                    .enumerate()
+                    .map(|(index, device)| {
+                        let name = device.name.clone();
+                        let selectable = device.selectable;
+                        let label = if selectable {
+                            name.clone()
+                        } else {
+                            format!("{name} — {}", self.t(Text::AmbiguousOutput))
+                        };
+                        choice(
+                            ("audio-output", index),
+                            "volume-2",
+                            label,
+                            selected == Some(&name),
+                            theme,
+                        )
+                        .opacity(if selectable { 1. } else { 0.5 })
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            if selectable {
+                                this.audio_command(Command::SelectOutput(Some(name.clone())), cx);
+                            }
+                        }))
+                    }),
+            )
+            .when(self.playback.outputs.is_empty(), |view| {
+                view.child(
+                    div()
+                        .text_color(theme.muted)
+                        .child(self.t(Text::NoAudioOutputs)),
+                )
+            })
+            .when(missing, |view| {
+                view.child(div().text_color(theme.accent).child(format!(
+                    "{} — {}",
+                    selected.unwrap(),
+                    self.t(Text::PreferredOutputUnavailable)
+                )))
+            })
+            .child(
+                div().text_color(theme.muted).child(
+                    self.output_description()
+                        .unwrap_or_else(|| self.t(Text::NoActiveOutput).into()),
+                ),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.muted)
+                    .child(self.t(Text::OutputStreamHint)),
+            )
+            .into_any_element()
+    }
+
+    pub fn output_description(&self) -> Option<String> {
+        let info = self.playback.output.as_ref()?;
+        let format = match info.sample_format.as_str() {
+            "F32" => format!("32 {}", self.t(Text::FloatBits)),
+            "F64" => format!("64 {}", self.t(Text::FloatBits)),
+            "I16" => "16 bits PCM".into(),
+            "I32" => "32 bits PCM".into(),
+            "U16" => format!("16 {}", self.t(Text::UnsignedBits)),
+            other => other.into(),
+        };
+        Some(format!(
+            "{} — {} Hz · {} {} · {format}",
+            info.device_name,
+            info.sample_rate,
+            info.channels,
+            self.t(Text::Channels)
+        ))
+    }
+}

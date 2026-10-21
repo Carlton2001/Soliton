@@ -1,5 +1,14 @@
 [CmdletBinding()]
-param([ValidateSet('French','English')][string]$Language='French',[switch]$Light,[switch]$List,[switch]$Taskbar,[ValidateSet('Playing','Early','Minimized','Hidden','Ask')][string]$CloseScenario='Playing')
+param(
+    [ValidateSet('French','English')][string]$Language='French',
+    [switch]$Light,
+    [switch]$List,
+    [switch]$Taskbar,
+    [switch]$AudioOutputs,
+    [ValidateRange(0,16)][int]$AudioOutputRow=0,
+    [string]$Executable='rap.exe',
+    [ValidateSet('Playing','Early','Minimized','Hidden','Ask')][string]$CloseScenario='Playing'
+)
 $ErrorActionPreference = 'Stop'
 # Native QA uses only generated fixtures and an isolated RAP data directory.
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -29,6 +38,7 @@ public class RapNativeQa {
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect rect);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int height, uint flags);
  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint message, IntPtr w, IntPtr l);
+ [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
  [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
  public struct Rect { public int Left, Top, Right, Bottom; }
@@ -55,7 +65,7 @@ public class RapNativeQa {
 $process = $null
 $handle = [IntPtr]::Zero
 try {
-    $process = Start-Process -FilePath (Join-Path $project 'target\debug\rap.exe') -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $project 'target\native-qa-out.log') -RedirectStandardError (Join-Path $project 'target\native-qa-error.log')
+    $process = Start-Process -FilePath (Join-Path $project ('target\debug\' + $Executable)) -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $project 'target\native-qa-out.log') -RedirectStandardError (Join-Path $project 'target\native-qa-error.log')
     for ($attempt=0; $attempt -lt 30; $attempt++) {
         Start-Sleep -Milliseconds 200
         $process.Refresh()
@@ -89,6 +99,48 @@ try {
     [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]32,[IntPtr]0) | Out-Null
     Start-Sleep -Milliseconds 500
     Save-RapFrame 'qa-playing'
+    if ($AudioOutputs) {
+        # Targeted client clicks; the user's pointer is never moved.
+        $scale = [RapNativeQa]::GetDpiForWindow($handle) / 96.0
+        function Click-RapClient([double]$x, [double]$y) {
+            $previousDpi = [RapNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
+            try {
+                $point = ([int]($y*$scale) -shl 16) -bor [int]($x*$scale)
+                if (-not [RapNativeQa]::PostMessage($handle,0x0200,[IntPtr]0,[IntPtr]$point)) { throw 'Mouse move message failed' }
+                Start-Sleep -Milliseconds 100
+                if (-not [RapNativeQa]::PostMessage($handle,0x0201,[IntPtr]1,[IntPtr]$point)) { throw 'Mouse down message failed' }
+                Start-Sleep -Milliseconds 100
+                if (-not [RapNativeQa]::PostMessage($handle,0x0202,[IntPtr]0,[IntPtr]$point)) { throw 'Mouse up message failed' }
+            } finally { [RapNativeQa]::SetThreadDpiAwarenessContext($previousDpi) | Out-Null }
+        }
+        function Wait-RapOutputPreference([bool]$system) {
+            for ($attempt=0; $attempt -lt 30; $attempt++) {
+                $saved = Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json
+                if (($null -eq $saved.output_device) -eq $system) { return }
+                Start-Sleep -Milliseconds 100
+            }
+            Save-RapFrame 'qa-audio-rejected'
+            throw 'Output preference was not acknowledged and saved'
+        }
+        # Keep the active stream stable while checking its selection UI.
+        [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]32,[IntPtr]0) | Out-Null
+        [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]32,[IntPtr]0) | Out-Null
+        Start-Sleep -Milliseconds 200
+        Click-RapClient 90 310
+        Start-Sleep -Milliseconds 600
+        Save-RapFrame 'qa-audio-outputs'
+        Click-RapClient 400 (334 + 46.4*$AudioOutputRow)
+        Wait-RapOutputPreference $false
+        Save-RapFrame 'qa-audio-selected'
+        Click-RapClient 400 286
+        Wait-RapOutputPreference $true
+        Click-RapClient 450 240
+        Start-Sleep -Milliseconds 300
+        Save-RapFrame 'qa-audio-default'
+        Click-RapClient 1150 738
+        Start-Sleep -Milliseconds 300
+        Save-RapFrame 'qa-audio-now-playing'
+    }
     if ($Taskbar) {
         # THBN_CLICKED | button ID: only the isolated RAP window receives it.
         [RapNativeQa]::PostMessage($handle,0x0111,[IntPtr]0x18005241,[IntPtr]0) | Out-Null

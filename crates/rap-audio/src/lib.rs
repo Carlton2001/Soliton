@@ -1,10 +1,12 @@
 //! Independent audio engine. Commands and events are connected by the application.
 mod decoder;
+mod devices;
 mod engine;
 mod output;
 mod queue;
 mod resample;
 
+pub use devices::{OutputDevice, OutputInfo};
 pub use engine::Engine;
 pub use queue::Repeat;
 use rap_core::model::Track;
@@ -27,8 +29,13 @@ pub struct Playback {
     pub volume: f32,
     pub shuffle: bool,
     pub repeat: Repeat,
-    pub output_rate: Option<u32>,
-    pub output_channels: Option<u16>,
+    /// None selects the system default at the next stream opening.
+    pub selected_output: Option<String>,
+    pub outputs: std::sync::Arc<Vec<OutputDevice>>,
+    pub outputs_error: Option<String>,
+    pub output: Option<OutputInfo>,
+    /// Discovery/selection errors do not interrupt an existing working stream.
+    pub output_error: Option<String>,
     pub error: Option<String>,
 }
 
@@ -43,4 +50,6 @@ pub enum Command {
     Volume(f32),
     Shuffle(bool),
     Repeat(Repeat),
+    SelectOutput(Option<String>),
+    RefreshOutputs,
 }

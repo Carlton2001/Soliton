@@ -2,6 +2,17 @@ use rap_core::config::Language;
 
 #[derive(Clone, Copy)]
 pub enum Text {
+    AudioOutput,
+    RefreshOutputs,
+    SystemOutput,
+    NoAudioOutputs,
+    PreferredOutputUnavailable,
+    AmbiguousOutput,
+    NoActiveOutput,
+    OutputStreamHint,
+    FloatBits,
+    UnsignedBits,
+    Channels,
     WindowsIntegration,
     DesktopError,
     OnClose,
@@ -112,6 +123,29 @@ pub enum Text {
 
 pub fn text(language: Language, key: Text) -> &'static str {
     let (fr, en) = match key {
+        Text::AudioOutput => ("Sortie audio", "Audio output"),
+        Text::RefreshOutputs => ("Actualiser les sorties", "Refresh outputs"),
+        Text::SystemOutput => ("Périphérique système par défaut", "Default system device"),
+        Text::NoAudioOutputs => ("Aucun périphérique détecté", "No devices detected"),
+        Text::PreferredOutputUnavailable => (
+            "sortie préférée indisponible ; reconnectez-la ou choisissez une autre sortie",
+            "preferred output unavailable; reconnect it or choose another output",
+        ),
+        Text::AmbiguousOutput => (
+            "nom partagé par plusieurs périphériques",
+            "name shared by multiple devices",
+        ),
+        Text::NoActiveOutput => (
+            "Les caractéristiques de sortie s’affichent pendant la lecture.",
+            "Output details are shown during playback.",
+        ),
+        Text::OutputStreamHint => (
+            "Format envoyé par RAP, avant les traitements du système et du périphérique. Le choix système par défaut s’applique au démarrage d’une piste ou après un changement de position ou de sortie.",
+            "Format sent by RAP, before system and device processing. The system default applies when starting a track or after seeking or switching outputs.",
+        ),
+        Text::FloatBits => ("bits flottants", "bit float"),
+        Text::UnsignedBits => ("bits PCM non signés", "bit unsigned PCM"),
+        Text::Channels => ("canaux", "channels"),
         Text::WindowsIntegration => ("Intégration Windows", "Windows integration"),
         Text::DesktopError => ("Intégration système", "System integration"),
         Text::OnClose => ("À la fermeture", "When closing"),

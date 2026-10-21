@@ -70,6 +70,7 @@ impl Rap {
                     .on_click(cx.listener(move |this, _, _, cx| this.set_language(language, cx)))
                 })),
             )
+            .child(self.audio_preferences(cx))
             .child(div().text_lg().child(self.t(Text::Display)))
             .child(
                 row(Text::Theme).children(appearances.map(|(appearance, label)| {
