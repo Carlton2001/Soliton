@@ -47,7 +47,17 @@ pub struct Playback {
 }
 
 pub enum Command {
-    Play { tracks: Vec<Track>, start: usize },
+    Play {
+        tracks: Vec<Track>,
+        start: usize,
+    },
+    /// Prepares a queue paused at a position, without opening any output:
+    /// the next [`Command::Resume`] starts there.
+    Load {
+        tracks: Vec<Track>,
+        start: usize,
+        position_ms: u64,
+    },
     Resume,
     Pause,
     Stop,

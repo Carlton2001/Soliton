@@ -3,7 +3,9 @@ use crate::{
     app::Rap,
     i18n::Text,
     slider::OnChange,
-    widgets::{cover, time, tool},
+    widgets::{
+        CONTROL_HEIGHT, TEXT_CAPTION, TEXT_SMALL, cover, time, tinted_icon, tool, with_tooltip,
+    },
 };
 use gpui::{prelude::*, *};
 use rap_audio::{Command, PlaybackState, Repeat};
@@ -28,31 +30,32 @@ impl Rap {
             .flex_shrink_0()
             .flex()
             .items_center()
-            .gap_4()
-            .px_4()
-            .py_3()
+            .gap(rems(1.))
+            .px(rems(1.))
+            .py(rems(0.625))
             .bg(theme.panel)
             .border_t_1()
             .border_color(theme.border)
             .child(
                 div()
                     .id("current-track")
-                    .w(px(280.))
+                    .w(rems(17.5))
                     .flex_shrink_0()
                     .min_w_0()
                     .flex()
                     .items_center()
-                    .gap_3()
-                    .rounded_md()
+                    .gap(rems(0.75))
+                    .p(rems(0.25))
+                    .rounded(crate::widgets::RADIUS_LARGE)
                     .when(track.is_some(), |view| {
-                        view.hover(move |s| s.bg(theme.card)).on_click(cx.listener(
-                            |this, _, _, cx| {
+                        view.hover(move |s| s.bg(theme.hover))
+                            .active(move |s| s.bg(theme.pressed))
+                            .on_click(cx.listener(|this, _, _, cx| {
                                 this.now_playing = true;
                                 cx.notify();
-                            },
-                        ))
+                            }))
                     })
-                    .child(cover(track.and_then(|t| t.cover.as_ref()), 52., theme))
+                    .child(cover(track.and_then(|t| t.cover.as_ref()), 48., theme))
                     .child(
                         div()
                             .min_w_0()
@@ -71,7 +74,7 @@ impl Rap {
                             .child(
                                 div()
                                     .truncate()
-                                    .text_xs()
+                                    .text_size(TEXT_SMALL)
                                     .text_color(theme.muted)
                                     .child(subtitle),
                             ),
@@ -84,18 +87,18 @@ impl Rap {
                     .flex()
                     .flex_col()
                     .items_center()
-                    .gap_1()
+                    .gap(rems(0.25))
                     .child(self.transport(false, cx))
-                    .child(self.progress_row(cx).w_full().max_w(px(720.))),
+                    .child(self.progress_row(cx).w_full().max_w(rems(45.))),
             )
             .child(
                 div()
-                    .w(px(240.))
+                    .w(rems(15.))
                     .flex_shrink_0()
                     .flex()
                     .items_center()
                     .justify_end()
-                    .gap_1()
+                    .gap(rems(0.25))
                     .child(self.volume_control(110., cx))
                     .child(
                         tool(
@@ -128,20 +131,31 @@ impl Rap {
             Repeat::Track => Repeat::Off,
         };
         let playing = p.state == PlaybackState::Playing;
-        let main = tool(
-            "play-pause",
-            if playing { "pause" } else { "play" },
-            self.t(if playing { Text::Pause } else { Text::Play }),
-            false,
+        // The main action stands out with the accent fill.
+        let main = with_tooltip(
+            div()
+                .id("play-pause")
+                .size(if large { rems(3.5) } else { rems(2.5) })
+                .flex()
+                .flex_none()
+                .items_center()
+                .justify_center()
+                .rounded_full()
+                .bg(theme.accent)
+                .hover(|s| s.opacity(0.9))
+                .active(|s| s.opacity(0.8))
+                .child(
+                    tinted_icon(if playing { "pause" } else { "play" }, theme.on_accent)
+                        .size(if large { rems(1.5) } else { rems(1.125) }),
+                ),
+            self.t(if playing { Text::Pause } else { Text::Play })
+                .into(),
             theme,
-        )
-        .bg(theme.card)
-        .rounded_full()
-        .p(px(if large { 16. } else { 10. }));
+        );
         div()
             .flex()
             .items_center()
-            .gap(px(if large { 20. } else { 8. }))
+            .gap(if large { rems(1.25) } else { rems(0.5) })
             .when(self.audio.is_none(), |row| row.opacity(0.4))
             .child(
                 tool(
@@ -205,17 +219,17 @@ impl Rap {
         div()
             .flex()
             .items_center()
-            .gap_3()
-            .text_xs()
+            .gap(rems(0.75))
+            .text_size(TEXT_CAPTION)
             .text_color(theme.muted)
-            .child(div().w(px(40.)).flex().justify_end().child(time(shown)))
+            .child(div().w(rems(2.5)).flex().justify_end().child(time(shown)))
             .child(
                 self.seek_slider
                     .render(fraction, enabled, theme, on_change)
                     .flex_1()
-                    .h(px(18.)),
+                    .h(rems(1.125)),
             )
-            .child(div().w(px(40.)).child(time(p.duration_ms)))
+            .child(div().w(rems(2.5)).child(time(p.duration_ms)))
     }
 
     /// Mute toggle and draggable volume.
@@ -236,7 +250,7 @@ impl Rap {
         div()
             .flex()
             .items_center()
-            .gap_1()
+            .gap(rems(0.25))
             .child(
                 tool("mute", name, self.t(label), false, theme)
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_mute(cx))),
@@ -244,8 +258,8 @@ impl Rap {
             .child(
                 self.volume_slider
                     .render(volume, self.audio.is_some(), theme, on_change)
-                    .w(px(width))
-                    .h(px(18.)),
+                    .w(rems(width / 16.))
+                    .h(CONTROL_HEIGHT),
             )
     }
 }

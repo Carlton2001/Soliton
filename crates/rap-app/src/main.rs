@@ -1,4 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// aws-lc-sys (TLS for Google Cast) exports a few entropy functions, so the MSVC
+// linker reports creating an import library next to the executable. Harmless.
+#![allow(linker_messages)]
 mod album;
 mod app;
 mod assets;
@@ -6,20 +9,25 @@ mod audio_preferences;
 mod bluetooth_preferences;
 mod catalog;
 mod filters;
+mod history;
 mod i18n;
 mod indexing;
 mod input;
 mod keys;
 mod notices;
 mod now_playing;
+mod output_watch;
 mod playback;
 mod player;
 mod preferences;
+mod resume;
+mod scale;
 mod scrollbar;
 mod service;
 mod slider;
 mod system;
 mod theme;
+mod title_bar;
 mod views;
 mod widgets;
 
@@ -58,6 +66,7 @@ fn main() -> anyhow::Result<()> {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     window_min_size: Some(size(px(880.), px(600.))),
                     titlebar: Some(TitlebarOptions {
+                        appears_transparent: true,
                         title: Some("RAP".into()),
                         ..Default::default()
                     }),

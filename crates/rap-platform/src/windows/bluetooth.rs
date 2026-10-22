@@ -19,9 +19,9 @@ use windows::{
 use windows_collections::IIterable;
 use windows_future::{AsyncStatus, IAsyncOperation};
 
-struct Runtime(bool);
+pub(super) struct Runtime(bool);
 impl Runtime {
-    fn new() -> Result<Self> {
+    pub(super) fn new() -> Result<Self> {
         let status = unsafe { RoInitialize(RO_INIT_MULTITHREADED) };
         match status {
             Ok(()) => Ok(Self(true)),

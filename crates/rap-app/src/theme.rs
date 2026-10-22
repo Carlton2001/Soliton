@@ -8,8 +8,22 @@ pub struct Theme {
     pub card: Rgba,
     pub text: Rgba,
     pub muted: Rgba,
+    /// Dividers and container outlines.
     pub border: Rgba,
     pub accent: Rgba,
+    /// Text and icons drawn on an accent fill.
+    pub on_accent: Rgba,
+    /// Accent tint marking the selected item of a list or set.
+    pub selected: Rgba,
+    /// Fill and outline of buttons and other controls at rest.
+    pub control: Rgba,
+    pub control_border: Rgba,
+    pub control_hover: Rgba,
+    pub control_pressed: Rgba,
+    /// Translucent layers over any surface, for hovered and pressed controls.
+    pub hover: Rgba,
+    pub pressed: Rgba,
+    pub danger: Rgba,
     /// Translucent layer behind overlays and drop targets.
     pub scrim: Rgba,
 }
@@ -17,37 +31,56 @@ pub struct Theme {
 impl Theme {
     pub fn new(dark: bool, accent: Accent) -> Self {
         let accent = rgb(accent_color(accent, dark));
+        let selected = Rgba {
+            a: if dark { 0.18 } else { 0.14 },
+            ..accent
+        };
+        let layer = |value: f32, a: f32| Rgba {
+            r: value,
+            g: value,
+            b: value,
+            a,
+        };
+        // Palettes of Oxyde Windows Dark and Windows Light.
         if dark {
             Self {
-                background: rgb(0x14171c),
-                panel: rgb(0x191d24),
-                card: rgb(0x222831),
-                text: rgb(0xeef2f7),
-                muted: rgb(0x9ba8b8),
-                border: rgb(0x303944),
+                background: rgb(0x181818),
+                panel: rgb(0x1e1e1e),
+                card: rgb(0x2a2a2a),
+                text: rgb(0xd0d0d0),
+                muted: rgb(0x999999),
+                border: rgb(0x2e2e2e),
                 accent,
-                scrim: Rgba {
-                    r: 0.04,
-                    g: 0.05,
-                    b: 0.06,
-                    a: 0.82,
-                },
+                on_accent: rgb(0x111111),
+                selected,
+                control: rgb(0x2b2b2b),
+                control_border: rgb(0x3d3d3d),
+                control_hover: rgb(0x333333),
+                control_pressed: rgb(0x262626),
+                hover: layer(1., 0.07),
+                pressed: layer(1., 0.11),
+                danger: rgb(0xc42b1c),
+                scrim: layer(0.094, 0.82),
             }
         } else {
             Self {
-                background: rgb(0xf5f6f8),
+                background: rgb(0xeeeeee),
                 panel: rgb(0xffffff),
-                card: rgb(0xe7edf1),
-                text: rgb(0x202b37),
-                muted: rgb(0x5b6876),
-                border: rgb(0xd6dfe5),
+                card: rgb(0xededed),
+                text: rgb(0x2e2e2e),
+                muted: rgb(0x666666),
+                border: rgb(0xe0e0e0),
                 accent,
-                scrim: Rgba {
-                    r: 0.96,
-                    g: 0.965,
-                    b: 0.97,
-                    a: 0.88,
-                },
+                on_accent: rgb(0xffffff),
+                selected,
+                control: rgb(0xfdfdfd),
+                control_border: rgb(0xcfcfcf),
+                control_hover: rgb(0xf3f3f3),
+                control_pressed: rgb(0xe8e8e8),
+                hover: layer(0., 0.05),
+                pressed: layer(0., 0.09),
+                danger: rgb(0xc42b1c),
+                scrim: layer(0.933, 0.88),
             }
         }
     }

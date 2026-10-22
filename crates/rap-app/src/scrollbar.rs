@@ -44,16 +44,16 @@ impl Scrollbar {
                     0.45
                 };
                 window.paint_quad(fill(bounds, track));
-                let inset = (TRACK - THUMB) / 2.;
+                let inset = crate::scale::scaled((TRACK - THUMB) / 2.);
                 window.paint_quad(
                     fill(
                         Bounds::new(
                             point(bounds.origin.x + px(inset), thumb.origin.y),
-                            size(px(THUMB), thumb.size.height),
+                            size(crate::scale::scaled_px(THUMB), thumb.size.height),
                         ),
                         color,
                     )
-                    .corner_radii(px(THUMB / 2.)),
+                    .corner_radii(crate::scale::scaled_px(THUMB / 2.)),
                 );
                 window.on_mouse_event({
                     let (handle, grab, hitbox) = (handle.clone(), grab.clone(), hitbox.clone());
@@ -109,7 +109,7 @@ impl Scrollbar {
         .top_0()
         .right_0()
         .bottom_0()
-        .w(px(TRACK))
+        .w(rems(TRACK / 16.))
     }
 }
 
@@ -121,7 +121,8 @@ fn thumb_bounds(handle: &ScrollHandle, track: Bounds<Pixels>) -> Option<Bounds<P
     if max <= 0.5 || height <= 0. {
         return None;
     }
-    let length = (height * height / (height + max)).clamp(MIN_THUMB.min(height), height);
+    let length = (height * height / (height + max))
+        .clamp(crate::scale::scaled(MIN_THUMB).min(height), height);
     let ratio = (-f32::from(handle.offset().y) / max).clamp(0., 1.);
     Some(Bounds::new(
         point(

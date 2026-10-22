@@ -10,6 +10,11 @@ impl AssetSource for Assets {
                 _ => None,
             } };
         }
+        if path == "images/logo.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../../assets/log_rap_small.svg"
+            ))));
+        }
         Ok(icons!(
             "disc-3",
             "users",
@@ -43,7 +48,10 @@ impl AssetSource for Assets {
             "arrow-up-down",
             "check",
             "circle-alert",
-            "triangle-alert"
+            "triangle-alert",
+            "minus",
+            "copy",
+            "plus"
         ))
     }
     fn list(&self, _: &str) -> anyhow::Result<Vec<SharedString>> {

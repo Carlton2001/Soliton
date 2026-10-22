@@ -48,13 +48,14 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .p_5()
-            .gap_4()
+            .pt(rems(1.))
+            .gap(rems(1.25))
             .child(
                 div()
+                    .px(rems(1.25))
                     .flex()
                     .items_center()
-                    .gap_2()
+                    .gap(rems(0.5))
                     .child(
                         button("back", "arrow-left", self.t(Text::Back), theme).on_click(
                             cx.listener(|this, _, _, cx| {
@@ -64,7 +65,7 @@ impl Rap {
                         ),
                     )
                     .child(
-                        button(
+                        crate::widgets::accent_button(
                             "play-album",
                             "play",
                             self.t(if first_available.is_some() {
@@ -74,7 +75,6 @@ impl Rap {
                             }),
                             theme,
                         )
-                        .bg(theme.card)
                         .opacity(if first_available.is_some() { 1. } else { 0.5 })
                         .on_click(cx.listener(move |this, _, _, cx| {
                             if let Some(start) = first_available {
@@ -85,19 +85,21 @@ impl Rap {
             )
             .child(
                 div()
+                    .px(rems(1.25))
                     .flex()
-                    .gap_6()
+                    .gap(rems(1.5))
                     .items_center()
-                    .child(cover(edition.cover().or(album.cover()), 180., theme))
+                    .child(cover(edition.cover().or(album.cover()), 176., theme))
                     .child(
                         div()
                             .flex()
                             .flex_col()
-                            .gap_3()
+                            .items_start()
+                            .gap(rems(0.375))
                             .min_w_0()
                             .child(
                                 div()
-                                    .text_2xl()
+                                    .text_size(crate::widgets::TEXT_DISPLAY)
                                     .font_weight(FontWeight::BOLD)
                                     .child(album.title.clone()),
                             )
@@ -105,20 +107,27 @@ impl Rap {
                                 let artist = album.artist.clone();
                                 div()
                                     .id("album-artist")
-                                    .text_lg()
+                                    .text_size(crate::widgets::TEXT_SUBTITLE)
                                     .text_color(theme.accent)
-                                    .rounded_md()
+                                    .px(rems(0.25))
+                                    .mx(rems(-0.25))
+                                    .rounded(crate::widgets::RADIUS)
                                     .when(!artist.is_empty(), |link| {
-                                        link.hover(move |s| s.bg(theme.card)).on_click(cx.listener(
-                                            move |this, _, _, cx| {
+                                        link.hover(move |s| s.bg(theme.hover)).on_click(
+                                            cx.listener(move |this, _, _, cx| {
                                                 this.show_artist(artist.clone(), cx)
-                                            },
-                                        ))
+                                            }),
+                                        )
                                     })
                                     .child(self.album_artist(album))
                             })
-                            .child(summary)
-                            .child(quality(first)),
+                            .child(div().mt(rems(0.25)).child(summary))
+                            .child(
+                                div()
+                                    .text_size(crate::widgets::TEXT_SMALL)
+                                    .text_color(theme.muted)
+                                    .child(quality(first)),
+                            ),
                     ),
             )
             .when(album.editions.len() > 1, |view| {
@@ -137,19 +146,20 @@ impl Rap {
     ) -> impl IntoElement {
         let theme = self.theme();
         div()
+            .px(rems(1.25))
             .flex()
             .flex_wrap()
             .items_center()
-            .gap_2()
+            .gap(rems(0.5))
             .child(div().text_color(theme.muted).child(self.t(Text::Editions)))
             .children(album.editions.iter().enumerate().map(|(index, edition)| {
-                button(
+                crate::widgets::toggle_button(
                     ("edition", index),
                     "disc-3",
                     self.edition_label(edition),
+                    index == selected,
                     theme,
                 )
-                .when(index == selected, |v| v.bg(theme.card))
                 .when(!edition.available(), |v| v.text_color(theme.muted))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.selected_edition = index;
@@ -190,36 +200,61 @@ impl Rap {
                         .map(|(index, track)| {
                             let m = &track.metadata;
                             let available = track.available;
-                            div()
-                                .id(("track", index))
-                                .w_full()
-                                .h(px(48.))
-                                .flex()
-                                .items_center()
-                                .gap_4()
-                                .px_3()
-                                .border_b_1()
-                                .border_color(theme.border)
-                                .text_color(if track.available {
-                                    theme.text
-                                } else {
-                                    theme.muted
-                                })
-                                .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
-                                    if available && event.click_count() == 2 {
-                                        this.play_album(album_id, edition, index, cx);
-                                    }
-                                }))
-                                .child(div().w(px(40.)).child(format!(
-                                    "{}.{}",
-                                    m.disc.unwrap_or(1),
-                                    m.track.unwrap_or((index + 1) as u32)
-                                )))
-                                .child(div().flex_1().truncate().child(m.title.clone()))
-                                .child(div().w(px(150.)).truncate().child(m.artist.clone()))
-                                .child(quality(m))
-                                .when(!track.available, |v| v.child(this.t(Text::Unavailable)))
-                                .child(time(m.duration_ms))
+                            div().id(("track", index)).w_full().px(rems(0.75)).child(
+                                div()
+                                    .id(("track-row", index))
+                                    .h(rems(2.5))
+                                    .flex()
+                                    .items_center()
+                                    .gap(rems(1.))
+                                    .px(rems(0.5))
+                                    .rounded(crate::widgets::RADIUS)
+                                    .hover(move |s| s.bg(theme.hover))
+                                    .text_color(if track.available {
+                                        theme.text
+                                    } else {
+                                        theme.muted
+                                    })
+                                    .on_click(cx.listener(
+                                        move |this, event: &ClickEvent, _, cx| {
+                                            if available && event.click_count() == 2 {
+                                                this.play_album(album_id, edition, index, cx);
+                                            }
+                                        },
+                                    ))
+                                    .child(div().w(rems(2.5)).text_color(theme.muted).child(
+                                        format!(
+                                            "{}.{}",
+                                            m.disc.unwrap_or(1),
+                                            m.track.unwrap_or((index + 1) as u32)
+                                        ),
+                                    ))
+                                    .child(
+                                        div().flex_1().min_w_0().truncate().child(m.title.clone()),
+                                    )
+                                    .child(
+                                        div()
+                                            .w(rems(10.))
+                                            .truncate()
+                                            .text_color(theme.muted)
+                                            .child(m.artist.clone()),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(crate::widgets::TEXT_SMALL)
+                                            .text_color(theme.muted)
+                                            .child(quality(m)),
+                                    )
+                                    .when(!track.available, |v| v.child(this.t(Text::Unavailable)))
+                                    .child(
+                                        div()
+                                            .w(rems(3.))
+                                            .flex()
+                                            .justify_end()
+                                            .text_color(theme.muted)
+                                            .child(time(m.duration_ms)),
+                                    ),
+                            )
                         })
                         .collect()
                 }),

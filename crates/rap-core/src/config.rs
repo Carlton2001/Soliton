@@ -63,6 +63,37 @@ pub enum AlbumSort {
     Added,
 }
 
+/// Main page of the interface.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum View {
+    Artists,
+    #[default]
+    Albums,
+    Genres,
+    Years,
+    Settings,
+}
+
+/// Where the user was when the application closed, restored at startup.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LastView {
+    pub view: View,
+    /// Open album sheet, when it still exists in the library.
+    pub album: Option<i64>,
+    /// Artist whose albums were listed.
+    pub artist: Option<String>,
+}
+
+/// Play queue reopened paused at startup. Library track identifiers only.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LastQueue {
+    pub tracks: Vec<i64>,
+    pub current: Option<i64>,
+    pub position_ms: u64,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CloseBehavior {
     #[default]
@@ -78,6 +109,7 @@ pub struct Settings {
     pub appearance: Appearance,
     pub accent: Accent,
     pub album_grid: bool,
+    pub artist_grid: bool,
     pub cover_size: CoverSize,
     pub album_sort: AlbumSort,
     pub hide_unavailable: bool,
@@ -85,6 +117,20 @@ pub struct Settings {
     /// Local CPAL device name; None uses the system default.
     pub output_device: Option<String>,
     pub close_behavior: CloseBehavior,
+    /// Pixels per rem; every interface dimension scales with it.
+    pub ui_rem_size: u32,
+    pub last_view: LastView,
+    pub last_queue: LastQueue,
+}
+
+impl Settings {
+    pub const DEFAULT_REM_SIZE: u32 = 16;
+    pub const MIN_REM_SIZE: u32 = 12;
+    pub const MAX_REM_SIZE: u32 = 24;
+
+    pub fn clamp_rem_size(value: u32) -> u32 {
+        value.clamp(Self::MIN_REM_SIZE, Self::MAX_REM_SIZE)
+    }
 }
 
 impl Default for Settings {
@@ -94,12 +140,16 @@ impl Default for Settings {
             appearance: Appearance::System,
             accent: Accent::Teal,
             album_grid: true,
+            artist_grid: true,
             cover_size: CoverSize::Medium,
             album_sort: AlbumSort::Artist,
             hide_unavailable: false,
             volume: 0.7,
             output_device: None,
             close_behavior: CloseBehavior::Quit,
+            ui_rem_size: Self::DEFAULT_REM_SIZE,
+            last_view: LastView::default(),
+            last_queue: LastQueue::default(),
         }
     }
 }
@@ -125,6 +175,7 @@ impl Settings {
                     };
                 }
                 settings.volume = settings.volume.clamp(0.0, 1.0);
+                settings.ui_rem_size = Self::clamp_rem_size(settings.ui_rem_size);
                 Ok(settings)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),

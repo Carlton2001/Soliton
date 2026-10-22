@@ -18,6 +18,8 @@ use std::{
 pub struct Engine {
     commands: Sender<Command>,
     refresh_outputs: Sender<()>,
+    /// Output changes are notified by the platform; polling is only a safety net.
+    outputs_watched: Arc<AtomicBool>,
     pub events: Receiver<Playback>,
     shutdown: Arc<AtomicBool>,
     finished: Receiver<()>,
@@ -30,6 +32,8 @@ impl Engine {
         let (finished_tx, finished) = bounded(1);
         let (refresh_outputs, refresh) = bounded(1);
         let (discovered, devices) = bounded(1);
+        let outputs_watched = Arc::new(AtomicBool::new(false));
+        let watched = outputs_watched.clone();
         // Device enumeration can involve slow drivers. It never holds up decoding.
         std::thread::Builder::new()
             .name("rap-outputs".into())
@@ -39,7 +43,12 @@ impl Engine {
                     if discovered.send(result).is_err() {
                         break;
                     }
-                    match refresh.recv_timeout(Duration::from_secs(5)) {
+                    let interval = if watched.load(Ordering::Relaxed) {
+                        Duration::from_secs(60)
+                    } else {
+                        Duration::from_secs(5)
+                    };
+                    match refresh.recv_timeout(interval) {
                         Ok(()) | Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
                         Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
                     }
@@ -60,6 +69,7 @@ impl Engine {
                     session: None,
                     network: None,
                     remote_generation: None,
+                    resume_at: None,
                 };
                 let mut last = Instant::now() - Duration::from_secs(1);
                 let mut deferred = None;
@@ -141,11 +151,18 @@ impl Engine {
         Ok(Self {
             commands,
             refresh_outputs,
+            outputs_watched,
             events: snapshots,
             shutdown,
             finished,
         })
     }
+    /// Set once the caller forwards native output changes as
+    /// [`Command::RefreshOutputs`]; periodic enumeration then becomes rare.
+    pub fn set_outputs_watched(&self, watched: bool) {
+        self.outputs_watched.store(watched, Ordering::Relaxed);
+    }
+
     /// Never block the UI on a full queue or a busy decoder.
     pub fn send(&self, command: Command) -> Result<()> {
         if matches!(command, Command::RefreshOutputs) {
@@ -217,6 +234,8 @@ struct Worker {
     session: Option<Session>,
     network: Option<rap_network::Network>,
     remote_generation: Option<u64>,
+    /// Position of a loaded queue, used when playback first starts.
+    resume_at: Option<u64>,
 }
 
 impl Worker {
@@ -233,10 +252,15 @@ impl Worker {
     }
 
     fn start_current(&mut self) -> Result<()> {
+        self.start_current_at(0)
+    }
+
+    fn start_current_at(&mut self, position: u64) -> Result<()> {
+        self.resume_at = None;
         self.session = None;
         self.playback.output = None;
         self.playback.error = None;
-        self.playback.position_ms = 0;
+        self.playback.position_ms = position;
         let Some(track) = self.queue.current().cloned() else {
             self.stop_remote()?;
             self.playback.track = None;
@@ -248,7 +272,7 @@ impl Worker {
         self.playback.duration_ms = track.metadata.duration_ms;
         anyhow::ensure!(track.available, "Track is unavailable");
         if self.playback.network_output.is_some() {
-            return self.start_remote(track, 0, true);
+            return self.start_remote(track, position, true);
         }
         let reader = Reader::open(&track.path)?;
         self.playback.duration_ms = if reader.duration_ms > 0 {
@@ -260,7 +284,7 @@ impl Worker {
             reader,
             self.playback.volume,
             self.playback.selected_output.as_deref(),
-            None,
+            (position > 0).then_some(position),
         )?;
         self.playback.output = Some(session.output.info.clone());
         self.playback.state = PlaybackState::Playing;
@@ -274,13 +298,35 @@ impl Worker {
                 self.queue.set(tracks, start);
                 self.start_current()?;
             }
+            Command::Load {
+                tracks,
+                start,
+                position_ms,
+            } => {
+                self.stop_remote()?;
+                self.session = None;
+                self.queue.set(tracks, start);
+                let track = self.queue.current().cloned();
+                self.playback.duration_ms = track.as_ref().map_or(0, |t| t.metadata.duration_ms);
+                self.playback.position_ms = position_ms.min(self.playback.duration_ms);
+                self.playback.state = if track.is_some() {
+                    PlaybackState::Paused
+                } else {
+                    PlaybackState::Stopped
+                };
+                self.playback.track = track;
+                self.playback.output = None;
+                self.playback.error = None;
+                self.resume_at = Some(self.playback.position_ms);
+            }
             Command::Resume => {
                 if self.remote_generation.is_some() {
                     self.remote_command(rap_network::Command::Play)?;
                 } else if self.session.is_some() {
                     self.playback.state = PlaybackState::Playing;
                 } else {
-                    self.start_current()?;
+                    let position = self.resume_at.take().unwrap_or(0);
+                    self.start_current_at(position)?;
                 }
             }
             Command::Pause => {
@@ -292,6 +338,7 @@ impl Worker {
                 }
             }
             Command::Stop => {
+                self.resume_at = None;
                 self.stop_remote()?;
                 self.session = None;
                 self.playback.state = PlaybackState::Stopped;
@@ -374,6 +421,12 @@ impl Worker {
             return self.remote_command(rap_network::Command::Seek(position));
         }
         let Some(session) = self.session.take() else {
+            // A loaded queue has no stream yet: it will start at this position.
+            if self.resume_at.is_some() {
+                let position = position.min(self.playback.duration_ms);
+                self.resume_at = Some(position);
+                self.playback.position_ms = position;
+            }
             return Ok(());
         };
         // Stop and drop the previous stream before publishing a new queue; samples

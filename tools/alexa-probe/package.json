@@ -1,0 +1,16 @@
+{
+  "name": "rap-alexa-probe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:fixtures": "node --test tests/fixtures.check.mjs",
+    "login": "node src/cli.mjs login",
+    "probe": "node src/cli.mjs serve"
+  },
+  "dependencies": { "alexa-remote2": "8.1.1" },
+  "overrides": { "alexa-cookie2": { "cookie": "0.7.2" } }
+}

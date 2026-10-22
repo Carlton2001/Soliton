@@ -2,12 +2,19 @@
 use crate::{
     app::{Rap, Section},
     i18n::Text,
-    widgets::{button, choice},
+    preferences::{hint, notice, section},
+    widgets::{TEXT_SMALL, button, ghost, list_box, list_row, radio_row, tinted_icon},
 };
 use gpui::{prelude::*, *};
 use rap_audio::Command;
-use rap_platform::{Bluetooth, BluetoothDevice};
+use rap_platform::{Bluetooth, BluetoothDevice, DeviceWatch};
 use std::time::{Duration, Instant};
+
+/// Pause after the last native change before querying: connecting a device
+/// raises several events in a row.
+const SETTLE: Duration = Duration::from_millis(500);
+/// Query interval used only when native notifications are unavailable.
+const FALLBACK_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Default)]
 pub struct BluetoothState {
@@ -16,22 +23,73 @@ pub struct BluetoothState {
     opening: bool,
     refreshed: Option<Instant>,
     error: Option<String>,
+    /// Native notifications, kept only while the settings page is visible.
+    watch: Option<DeviceWatch>,
+    watch_starting: bool,
+    watch_failed: bool,
+    /// Last native change not yet followed by a query.
+    changed: Option<Instant>,
 }
 
 impl Rap {
     pub fn poll_bluetooth(&mut self, cx: &mut Context<Self>) {
-        if Bluetooth::SUPPORTED
+        let visible = Bluetooth::SUPPORTED
             && self.section == Section::Settings
             && !self.now_playing
-            && !self.quitting
-            && !self.bluetooth.refreshing
+            && !self.quitting;
+        if !visible {
+            // Leaving the page stops the native watchers; reopening starts fresh.
+            self.bluetooth.watch = None;
+            self.bluetooth.watch_failed = false;
+            self.bluetooth.refreshed = None;
+            self.bluetooth.changed = None;
+            return;
+        }
+        if self.bluetooth.watch.is_none()
+            && !self.bluetooth.watch_starting
+            && !self.bluetooth.watch_failed
+        {
+            self.start_bluetooth_watch(cx);
+        }
+        if let Some(watch) = &self.bluetooth.watch
+            && watch.changes.try_recv().is_ok()
+        {
+            self.bluetooth.changed = Some(Instant::now());
+        }
+        let settled = self
+            .bluetooth
+            .changed
+            .is_some_and(|last| last.elapsed() >= SETTLE);
+        let fallback = self.bluetooth.watch_failed
             && self
                 .bluetooth
                 .refreshed
-                .is_none_or(|last| last.elapsed() >= Duration::from_secs(5))
+                .is_some_and(|last| last.elapsed() >= FALLBACK_INTERVAL);
+        if (self.bluetooth.refreshed.is_none() || settled || fallback) && !self.bluetooth.refreshing
         {
+            self.bluetooth.changed = None;
             self.refresh_bluetooth(cx);
         }
+    }
+
+    fn start_bluetooth_watch(&mut self, cx: &mut Context<Self>) {
+        self.bluetooth.watch_starting = true;
+        let start = cx.background_executor().spawn(async { Bluetooth::watch() });
+        cx.spawn(async move |this, cx| {
+            let result = start.await;
+            let _ = this.update(cx, |this, _| {
+                this.bluetooth.watch_starting = false;
+                match result {
+                    // Dropped at the next poll if the page was left meanwhile.
+                    Ok(watch) => this.bluetooth.watch = Some(watch),
+                    Err(error) => {
+                        tracing::warn!("Bluetooth notifications unavailable: {error:#}");
+                        this.bluetooth.watch_failed = true;
+                    }
+                }
+            });
+        })
+        .detach();
     }
 
     fn refresh_bluetooth(&mut self, cx: &mut Context<Self>) {
@@ -40,149 +98,126 @@ impl Rap {
         }
         self.bluetooth.refreshing = true;
         self.bluetooth.refreshed = Some(Instant::now());
-        cx.notify();
         let query = cx
             .background_executor()
             .spawn(async { Bluetooth::devices() });
         cx.spawn(async move |this, cx| {
             let result = query.await;
             let _ = this.update(cx, |this, cx| {
-                this.bluetooth.refreshing = false;
-                this.bluetooth.refreshed = Some(Instant::now());
+                let state = &mut this.bluetooth;
+                let mut changed = false;
+                state.refreshing = false;
+                state.refreshed = Some(Instant::now());
                 match result {
                     Ok(devices) => {
-                        this.bluetooth.devices = devices;
-                        this.bluetooth.error = None;
+                        changed |= devices != state.devices || state.error.is_some();
+                        state.devices = devices;
+                        state.error = None;
                     }
-                    Err(error) => this.bluetooth.error = Some(error.to_string()),
+                    Err(error) => {
+                        let error = error.to_string();
+                        changed |= state.error.as_ref() != Some(&error);
+                        state.error = Some(error);
+                    }
                 }
-                cx.notify();
+                // Repaint only when something visible changed.
+                if changed {
+                    cx.notify();
+                }
             });
         })
         .detach();
     }
 
-    pub fn bluetooth_preferences(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub fn bluetooth_preferences(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !Bluetooth::SUPPORTED {
+            return None;
+        }
         let theme = self.theme();
-        div()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .mt_3()
-            .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .gap_3()
-                    .child(div().text_lg().child(self.t(Text::BluetoothAudio)))
-                    .child(
-                        button(
-                            "refresh-bluetooth",
-                            "refresh-cw",
-                            self.t(if self.bluetooth.refreshing {
-                                Text::SearchingBluetooth
-                            } else {
-                                Text::RefreshOutputs
-                            }),
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| this.refresh_bluetooth(cx))),
-                    ),
-            )
-            .children(self.bluetooth.devices.iter().map(|device| {
-                let outputs = self.ready_bluetooth_outputs(device);
-                let ready = !outputs.is_empty();
-                let status = if ready {
-                    Text::BluetoothAudioReady
-                } else if device.connected {
-                    Text::BluetoothAudioUnavailable
-                } else {
-                    Text::BluetoothDisconnected
-                };
-                div()
+        let mut rows = Vec::new();
+        for device in &self.bluetooth.devices {
+            let outputs = self.ready_bluetooth_outputs(device);
+            let ready = !outputs.is_empty();
+            let status = if ready {
+                Text::BluetoothAudioReady
+            } else if device.connected {
+                Text::BluetoothAudioUnavailable
+            } else {
+                Text::BluetoothDisconnected
+            };
+            rows.push(
+                list_row()
                     .id(SharedString::from(format!("bluetooth:{}", device.id)))
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .px_3()
-                    .py_2()
-                    .rounded_md()
-                    .bg(theme.card)
+                    .child(tinted_icon(
+                        "bluetooth",
+                        if ready { theme.accent } else { theme.muted },
+                    ))
                     .child(
                         div()
+                            .flex_1()
+                            .min_w_0()
                             .flex()
-                            .flex_wrap()
-                            .items_center()
-                            .gap_2()
-                            .child(crate::widgets::icon("bluetooth", theme))
-                            .child(device.name.clone())
+                            .flex_col()
+                            .child(div().truncate().child(device.name.clone()))
                             .child(
                                 div()
-                                    .text_sm()
+                                    .text_size(TEXT_SMALL)
                                     .text_color(theme.muted)
                                     .child(self.t(status)),
+                            ),
+                    )
+                    .when(!ready, |row| {
+                        row.child(
+                            button(
+                                SharedString::from(format!("connect-bluetooth:{}", device.id)),
+                                "bluetooth",
+                                self.t(Text::ConnectBluetoothWindows),
+                                theme,
                             )
-                            .when(!ready, |row| {
-                                row.child(
-                                    button(
-                                        SharedString::from(format!(
-                                            "connect-bluetooth:{}",
-                                            device.id
-                                        )),
-                                        "bluetooth",
-                                        self.t(Text::ConnectBluetoothWindows),
-                                        theme,
-                                    )
-                                    .opacity(if self.bluetooth.opening { 0.5 } else { 1. })
-                                    .on_click(cx.listener(
-                                        |this, _, _, cx| this.open_bluetooth_settings(cx),
-                                    )),
-                                )
-                            }),
-                    )
-                    .children(outputs.into_iter().map(|name| {
-                        let selected = self.playback.network_output.is_none()
-                            && self.playback.selected_output.as_ref() == Some(&name);
-                        choice(
-                            SharedString::from(format!("bluetooth-output:{}:{name}", device.id)),
-                            "volume-2",
-                            name.clone(),
-                            selected,
-                            theme,
+                            .when(self.bluetooth.opening, |button| button.opacity(0.5))
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.open_bluetooth_settings(cx)),
+                            ),
                         )
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.audio_command(Command::SelectOutput(Some(name.clone())), cx);
-                        }))
-                    }))
-            }))
-            .when(
-                self.bluetooth.refreshed.is_some()
-                    && !self.bluetooth.refreshing
-                    && self.bluetooth.devices.is_empty()
-                    && self.bluetooth.error.is_none(),
-                |view| {
-                    view.child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.muted)
-                            .child(self.t(Text::NoPairedBluetooth)),
-                    )
-                },
-            )
-            .when_some(self.bluetooth.error.as_ref(), |view, error| {
-                view.child(
-                    div()
-                        .text_sm()
-                        .text_color(theme.accent)
-                        .child(self.labelled(self.t(Text::BluetoothQueryError), error)),
+                    })
+                    .into_any_element(),
+            );
+            rows.extend(outputs.into_iter().map(|name| {
+                let selected = self.playback.network_output.is_none()
+                    && self.playback.selected_output.as_ref() == Some(&name);
+                radio_row(
+                    SharedString::from(format!("bluetooth-output:{}:{name}", device.id)),
+                    "volume-2",
+                    name.clone(),
+                    selected,
+                    theme,
                 )
-            })
-            .child(
-                div().child(
-                    button(
+                .pl(rems(2.5))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.audio_command(Command::SelectOutput(Some(name.clone())), cx);
+                }))
+                .into_any_element()
+            }));
+        }
+        if self.bluetooth.refreshed.is_some()
+            && !self.bluetooth.refreshing
+            && self.bluetooth.devices.is_empty()
+            && self.bluetooth.error.is_none()
+        {
+            rows.push(
+                list_row()
+                    .text_color(theme.muted)
+                    .child(self.t(Text::NoPairedBluetooth))
+                    .into_any_element(),
+            );
+        }
+        rows.push(
+            div()
+                .p(rems(0.375))
+                .child(
+                    ghost(
                         "add-bluetooth-output",
-                        "bluetooth",
+                        "plus",
                         self.t(if self.bluetooth.opening {
                             Text::OpeningBluetoothSettings
                         } else {
@@ -190,19 +225,27 @@ impl Rap {
                         }),
                         theme,
                     )
-                    .opacity(if self.bluetooth.opening { 0.5 } else { 1. })
+                    .when(self.bluetooth.opening, |button| button.opacity(0.5))
                     .on_click(cx.listener(|this, _, _, cx| this.open_bluetooth_settings(cx))),
-                ),
-            )
+                )
+                .into_any_element(),
+        );
+        let body = div()
+            .flex()
+            .flex_col()
+            .gap(rems(0.5))
+            .child(list_box(rows, theme))
+            .when_some(self.bluetooth.error.as_ref(), |view, error| {
+                view.child(notice(
+                    self.labelled(self.t(Text::BluetoothQueryError), error),
+                    theme,
+                ))
+            })
             .children(
-                [
-                    Text::BluetoothPairingHint,
-                    Text::BluetoothEchoHint,
-                    Text::BluetoothQualityHint,
-                ]
-                .map(|text| div().text_sm().text_color(theme.muted).child(self.t(text))),
-            )
-            .into_any_element()
+                [Text::BluetoothPairingHint, Text::BluetoothQualityHint]
+                    .map(|text| hint(self.t(text), theme)),
+            );
+        Some(section(self.t(Text::BluetoothAudio), None, body))
     }
 
     /// Names from the native container association still require an unambiguous,
@@ -228,10 +271,8 @@ impl Rap {
                     this.report_error(
                         this.labelled(this.t(Text::AddBluetoothDevice), &error.to_string()),
                     );
-                } else if !this.quitting {
-                    this.audio_command(Command::RefreshOutputs, cx);
-                    this.refresh_bluetooth(cx);
                 }
+                // Pairing happens in Windows; the watchers report its outcome.
                 cx.notify();
             });
         })

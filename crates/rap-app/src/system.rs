@@ -2,8 +2,9 @@
 use crate::{
     app::Rap,
     i18n::Text,
+    preferences::{section, setting_row},
     service::Work,
-    widgets::{button, choice},
+    widgets::{RADIUS_LARGE, TEXT_SUBTITLE, button, checkbox, list_box, segment, segments},
 };
 use gpui::{prelude::*, *};
 use rap_audio::{Command, PlaybackState};
@@ -169,6 +170,7 @@ impl Rap {
         if let Some(preparing) = &self.preparing {
             preparing.cancel();
         }
+        self.final_queue();
         let audio = self.audio.take();
         let desktop = self.desktop.take();
         let work = self.services.work.clone();
@@ -201,70 +203,56 @@ impl Rap {
         cx.notify();
     }
 
-    pub fn system_preferences(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub fn system_preferences(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !Desktop::SUPPORTED {
+            return None;
+        }
         let theme = self.theme();
-        div()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .when(Desktop::SUPPORTED, |view| {
-                view.child(div().text_lg().child(self.t(Text::WindowsIntegration)))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .flex_wrap()
-                            .gap_2()
-                            .child(div().w(px(200.)).child(self.t(Text::OnClose)))
-                            .children(
-                                [
-                                    (CloseBehavior::Quit, Text::QuitApp),
-                                    (CloseBehavior::Hide, Text::HideToTray),
-                                    (CloseBehavior::Ask, Text::AskOnClose),
-                                ]
-                                .map(|(behavior, label)| {
-                                    choice(
-                                        ("close-behavior", behavior as usize),
-                                        "square",
-                                        self.t(label),
-                                        self.settings.close_behavior == behavior,
-                                        theme,
-                                    )
-                                    .on_click(cx.listener(
-                                        move |this, _, _, cx| this.set_close_behavior(behavior, cx),
-                                    ))
-                                }),
-                            ),
-                    )
-                    .child(
-                        choice(
-                            "autostart",
-                            if self.autostart == Some(true) {
-                                "check"
-                            } else {
-                                "square"
-                            },
-                            self.t(Text::Autostart),
-                            self.autostart == Some(true),
-                            theme,
-                        )
-                        .opacity(if self.startup_pending || self.autostart.is_none() {
-                            0.5
-                        } else {
-                            1.
-                        })
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            if this.autostart.is_some() {
-                                this.toggle_autostart(cx);
-                            }
-                        })),
-                    )
-            })
-            .child(
-                button("quit-rap", "x", self.t(Text::QuitApp), theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.quit_app(cx))),
+        let on_close = segments(
+            [
+                (CloseBehavior::Quit, Text::QuitApp),
+                (CloseBehavior::Hide, Text::HideToTray),
+                (CloseBehavior::Ask, Text::AskOnClose),
+            ]
+            .map(|(behavior, label)| {
+                segment(
+                    ("close-behavior", behavior as usize),
+                    None,
+                    self.t(label),
+                    self.settings.close_behavior == behavior,
+                    theme,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| this.set_close_behavior(behavior, cx)))
+            }),
+            theme,
+        );
+        let autostart = div().px(rems(1.)).py(rems(0.625)).child(
+            checkbox(
+                "autostart",
+                self.autostart == Some(true),
+                self.t(Text::Autostart),
+                theme,
             )
-            .into_any_element()
+            .when(self.startup_pending || self.autostart.is_none(), |row| {
+                row.opacity(0.5)
+            })
+            .on_click(cx.listener(|this, _, _, cx| {
+                if this.autostart.is_some() {
+                    this.toggle_autostart(cx);
+                }
+            })),
+        );
+        Some(section(
+            self.t(Text::WindowsIntegration),
+            None,
+            list_box(
+                [
+                    setting_row(self.t(Text::OnClose), None, on_close, theme),
+                    autostart.into_any_element(),
+                ],
+                theme,
+            ),
+        ))
     }
 
     pub fn close_dialog(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -280,21 +268,28 @@ impl Rap {
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(rgba(0x00000080))
+                .bg(theme.scrim)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     div()
-                        .p_6()
-                        .rounded_lg()
+                        .p(rems(1.5))
+                        .rounded(RADIUS_LARGE)
+                        .border_1()
+                        .border_color(theme.control_border)
                         .bg(theme.panel)
                         .flex()
                         .flex_col()
-                        .gap_4()
-                        .child(div().text_lg().child(self.t(Text::CloseQuestion)))
+                        .gap(rems(1.25))
+                        .child(
+                            div()
+                                .text_size(TEXT_SUBTITLE)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(self.t(Text::CloseQuestion)),
+                        )
                         .child(
                             div()
                                 .flex()
-                                .gap_2()
+                                .gap(rems(0.5))
                                 .child(
                                     button("close-quit", "x", self.t(Text::QuitApp), theme)
                                         .on_click(cx.listener(|this, _, _, cx| this.quit_app(cx))),

@@ -12,6 +12,11 @@ Source : https://crates.io/crates/gpui/0.2.2
 - `src/platform/windows/directx_devices.rs` : l'échec de la sonde facultative
   DXGI Debug est un diagnostic debug. La création réelle du périphérique garde
   son traitement d'erreur et le repli sans Graphics Tools reste actif.
+- `src/platform/windows/events.rs` (barre de titre personnalisée) : comme dans
+  les versions ultérieures de GPUI, un clic non client n'est consommé que si un
+  gestionnaire arrête sa propagation, et non plus dès que le focus appelle
+  `prevent_default` ; le déplacement et les boutons natifs restent ainsi actifs.
+  Le bord supérieur de redimensionnement est testé avant les zones de contrôle.
 - `src/platform/windows/events.rs` : `WM_DESTROY` marque la fenêtre détruite,
   retire ses callbacks et révoque le glisser-déposer avant la perte du HWND.
 - `src/platform/windows/window.rs` : le destructeur retire les callbacks vers

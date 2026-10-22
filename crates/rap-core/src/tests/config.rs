@@ -89,3 +89,41 @@ fn earlier_theme_choice_is_kept() {
         Appearance::System
     );
 }
+
+#[test]
+fn interface_size_defaults_and_stays_in_range() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, br#"{}"#).unwrap();
+    assert_eq!(Settings::load(&path).unwrap().ui_rem_size, 16);
+    fs::write(&path, br#"{"ui_rem_size":100}"#).unwrap();
+    assert_eq!(Settings::load(&path).unwrap().ui_rem_size, 24);
+    fs::write(&path, br#"{"ui_rem_size":0}"#).unwrap();
+    assert_eq!(Settings::load(&path).unwrap().ui_rem_size, 12);
+}
+
+#[test]
+fn last_view_and_artist_layout_round_trip() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, br#"{}"#).unwrap();
+    let mut settings = Settings::load(&path).unwrap();
+    assert!(settings.artist_grid);
+    assert_eq!(settings.last_view, LastView::default());
+    settings.artist_grid = false;
+    settings.last_queue = LastQueue {
+        tracks: vec![3, 1, 2],
+        current: Some(1),
+        position_ms: 61_000,
+    };
+    settings.last_view = LastView {
+        view: View::Artists,
+        album: Some(42),
+        artist: Some("Björk".into()),
+    };
+    settings.save(&path).unwrap();
+    let loaded = Settings::load(&path).unwrap();
+    assert!(!loaded.artist_grid);
+    assert_eq!(loaded.last_view, settings.last_view);
+    assert_eq!(loaded.last_queue, settings.last_queue);
+}

@@ -263,17 +263,45 @@ impl Drop for Tray {
     }
 }
 
-/// Rasterize the unmodified official Lucide play SVG on a solid accent tile.
+/// Load the executable's multi-size icon at the shell's small-icon size, so
+/// Windows picks the matching frame instead of shrinking a single bitmap.
 fn icon() -> Result<HICON> {
+    unsafe {
+        let module = GetModuleHandleW(None)?;
+        let loaded = LoadImageW(
+            Some(module.into()),
+            windows::core::PCWSTR(1 as _),
+            IMAGE_ICON,
+            GetSystemMetrics(SM_CXSMICON),
+            GetSystemMetrics(SM_CYSMICON),
+            LR_DEFAULTCOLOR,
+        );
+        match loaded {
+            Ok(handle) => Ok(HICON(handle.0)),
+            Err(_) => rendered_icon(),
+        }
+    }
+}
+
+/// Fallback for binaries without the icon resource: the logo on a 32px tile.
+fn rendered_icon() -> Result<HICON> {
     let tree = resvg::usvg::Tree::from_data(
-        include_bytes!("../../../../assets/icons/play.svg"),
+        include_bytes!("../../../../assets/log_rap_small.svg"),
         &Default::default(),
     )?;
     let mut image = resvg::tiny_skia::Pixmap::new(32, 32).context("Cannot allocate tray icon")?;
-    image.fill(resvg::tiny_skia::Color::from_rgba8(45, 212, 191, 255));
+    let bounds = tree.root().abs_bounding_box();
+    let scale = 32. / bounds.width().max(bounds.height());
     resvg::render(
         &tree,
-        resvg::tiny_skia::Transform::from_scale(32. / 24., 32. / 24.),
+        resvg::tiny_skia::Transform::from_row(
+            scale,
+            0.,
+            0.,
+            scale,
+            (32. - bounds.width() * scale) / 2. - bounds.x() * scale,
+            (32. - bounds.height() * scale) / 2. - bounds.y() * scale,
+        ),
         &mut image.as_mut(),
     );
     let mut pixels = Vec::with_capacity(32 * 32 * 4);

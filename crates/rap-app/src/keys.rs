@@ -20,11 +20,26 @@ impl Rap {
         match key {
             "f" if control => {
                 self.now_playing = false;
+                if self.section == Section::Settings {
+                    self.navigate(Section::Albums, cx);
+                }
                 self.search.read(cx).focus_handle(cx).focus(window);
                 return;
             }
             "o" if control => {
                 self.open_file(cx);
+                return;
+            }
+            "+" | "=" | "add" if control => {
+                self.set_ui_rem_size(self.settings.ui_rem_size + 1, cx);
+                return;
+            }
+            "-" | "subtract" if control => {
+                self.set_ui_rem_size(self.settings.ui_rem_size.saturating_sub(1), cx);
+                return;
+            }
+            "0" if control => {
+                self.set_ui_rem_size(rap_core::config::Settings::DEFAULT_REM_SIZE, cx);
                 return;
             }
             "f11" => {

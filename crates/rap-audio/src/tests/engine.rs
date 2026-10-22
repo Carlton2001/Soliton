@@ -228,3 +228,39 @@ fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered()
     assert_eq!(worker.playback.state, PlaybackState::Stopped);
     assert!(worker.playback.output.is_none());
 }
+
+#[test]
+fn loading_a_queue_stays_paused_at_its_position_without_a_device() {
+    let track = rap_core::model::Track {
+        id: 1,
+        source_id: 1,
+        path: "missing.flac".into(),
+        metadata: rap_core::model::Metadata {
+            duration_ms: 60_000,
+            ..Default::default()
+        },
+        cover: None,
+        available: true,
+    };
+    let engine = Engine::start(0., None).unwrap();
+    engine
+        .send(Command::Load {
+            tracks: vec![track],
+            start: 0,
+            position_ms: 90_000,
+        })
+        .unwrap();
+    engine.send(Command::Seek(12_000)).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let value = engine.events.recv_timeout(Duration::from_secs(2)).unwrap();
+        if value.position_ms == 12_000 {
+            assert_eq!(value.state, PlaybackState::Paused);
+            assert_eq!(value.track.map(|t| t.id), Some(1));
+            assert!(value.output.is_none());
+            break;
+        }
+        assert!(Instant::now() < deadline, "Load was not applied");
+    }
+    engine.shutdown();
+}

@@ -6,13 +6,26 @@ use rap_core::{
 };
 use std::{
     cmp::Reverse,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
+    path::PathBuf,
     sync::Arc,
 };
+
+/// One tile of the Artists view.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArtistCard {
+    pub name: String,
+    /// Albums by the artist, or containing at least one of their tracks.
+    pub albums: usize,
+    /// Cover of the most recent of those albums that has one.
+    pub cover: Option<PathBuf>,
+}
 
 #[derive(Clone, Default)]
 pub struct Facets {
     pub artists: Vec<String>,
+    /// Same order as `artists`.
+    pub artist_cards: Vec<ArtistCard>,
     pub genres: Vec<String>,
     pub years: Vec<u32>,
     pub decades: Vec<u32>,
@@ -35,14 +48,69 @@ impl Facets {
             }
         }
         let decades: BTreeSet<_> = years.iter().map(|year| year / 10 * 10).collect();
+        let artists = artists.into_values();
         Self {
-            artists: artists.into_values(),
+            artist_cards: artist_cards(snapshot, &artists),
+            artists,
             genres: genres.into_values(),
             years: years.into_iter().collect(),
             decades: decades.into_iter().collect(),
             formats: formats.into_iter().collect(),
         }
     }
+}
+
+/// Cover of the artist's most recent album: albums credited to the artist come
+/// before those where they only appear on a track; undated albums come last.
+fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCard> {
+    #[derive(Default)]
+    struct Found<'a> {
+        albums: usize,
+        best: Option<((bool, bool, Reverse<u32>, String), &'a PathBuf)>,
+    }
+    let mut found: HashMap<String, Found> = HashMap::new();
+    for album in &snapshot.albums {
+        let year = album
+            .primary()
+            .tracks
+            .iter()
+            .filter_map(|track| track.metadata.year)
+            .max();
+        let credited = fold(&album.artist);
+        let mut names: BTreeSet<String> = album
+            .tracks()
+            .map(|track| fold(&track.metadata.artist))
+            .collect();
+        names.insert(credited.clone());
+        names.remove("");
+        for name in names {
+            let entry = found.entry(name.clone()).or_default();
+            entry.albums += 1;
+            if let Some(cover) = album.cover() {
+                let rank = (
+                    name != credited,
+                    year.is_none(),
+                    Reverse(year.unwrap_or(0)),
+                    fold(&album.title),
+                );
+                if entry.best.as_ref().is_none_or(|(best, _)| rank < *best) {
+                    entry.best = Some((rank, cover));
+                }
+            }
+        }
+    }
+    artists
+        .iter()
+        .map(|name| {
+            let entry = found.get(&fold(name));
+            ArtistCard {
+                name: name.clone(),
+                albums: entry.map_or(0, |entry| entry.albums),
+                cover: entry
+                    .and_then(|entry| entry.best.as_ref().map(|(_, cover)| (*cover).clone())),
+            }
+        })
+        .collect()
 }
 
 /// Spellings of tag values that differ only by case or spacing, grouped under

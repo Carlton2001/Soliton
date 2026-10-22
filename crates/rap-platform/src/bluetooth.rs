@@ -1,4 +1,5 @@
 //! Pairing belongs to the OS; RAP uses the resulting ordinary audio outputs.
+use crate::DeviceWatch;
 use anyhow::Result;
 
 pub struct Bluetooth;
@@ -24,6 +25,19 @@ impl Bluetooth {
         return crate::windows::bluetooth::devices();
         #[cfg(not(target_os = "windows"))]
         anyhow::bail!("Bluetooth enumeration is not implemented on this platform")
+    }
+
+    /// Native change notifications, replacing periodic queries. Cheap to keep
+    /// while the device list is visible; drop it to stop watching.
+    /// Audio endpoints are watched too: they decide which devices are ready.
+    pub fn watch() -> Result<DeviceWatch> {
+        #[cfg(target_os = "windows")]
+        {
+            use crate::windows::device_watch::Source;
+            crate::watch::start(&[Source::PairedBluetooth, Source::AudioOutputs])
+        }
+        #[cfg(not(target_os = "windows"))]
+        anyhow::bail!("Bluetooth notifications are not implemented on this platform")
     }
 
     /// Opens the native pairing/connection settings, without changing devices or

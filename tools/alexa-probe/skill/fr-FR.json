@@ -1,0 +1,21 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "rap musique",
+      "intents": [
+        {
+          "name": "PlayProbeIntent",
+          "slots": [{ "name": "code", "type": "AMAZON.NUMBER" }],
+          "samples": ["lancer le test numéro {code}", "lance le test numéro {code}", "jouer le test {code}"]
+        },
+        { "name": "AMAZON.ResumeIntent", "samples": [] },
+        { "name": "AMAZON.PauseIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] }
+      ],
+      "types": []
+    }
+  }
+}

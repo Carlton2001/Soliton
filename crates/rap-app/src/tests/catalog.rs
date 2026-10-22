@@ -204,3 +204,47 @@ fn periods_qualities_sorting_and_unavailable_albums() {
         assert_eq!(catalog.matches(&filter), order, "{sort:?}");
     }
 }
+
+#[test]
+fn artist_cover_comes_from_the_latest_credited_album() {
+    let mut late = album(
+        "Late",
+        "Band",
+        vec![vec![track("A", "Band", "Rock", 1999, "FLAC")]],
+    );
+    late.editions[0].tracks[0].cover = Some("late.png".into());
+    let mut early = album(
+        "Early",
+        "Band",
+        vec![vec![track("B", "Band", "Rock", 1971, "FLAC")]],
+    );
+    early.editions[0].tracks[0].cover = Some("early.png".into());
+    // A newer album where the band only guests does not represent it.
+    let mut guest = album(
+        "Guest",
+        "Other",
+        vec![vec![track("C", "Band", "Rock", 2020, "FLAC")]],
+    );
+    guest.editions[0].tracks[0].cover = Some("guest.png".into());
+    let facets = Facets::collect(&LibrarySnapshot {
+        sources: vec![],
+        albums: vec![late, guest, early],
+    });
+    let band = facets
+        .artist_cards
+        .iter()
+        .find(|card| card.name == "Band")
+        .unwrap();
+    assert_eq!(band.albums, 3);
+    assert_eq!(band.cover, Some("late.png".into()));
+    let other = facets
+        .artist_cards
+        .iter()
+        .find(|card| card.name == "Other")
+        .unwrap();
+    assert_eq!(
+        (other.albums, other.cover.clone()),
+        (1, Some("guest.png".into()))
+    );
+    assert_eq!(facets.artist_cards.len(), facets.artists.len());
+}

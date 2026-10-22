@@ -871,58 +871,58 @@ impl WindowsWindowInner {
         }
 
         let mut lock = self.state.borrow_mut();
-        if let Some(mut callback) = lock.callbacks.hit_test_window_control.take() {
+        let control_area = if let Some(mut callback) = lock.callbacks.hit_test_window_control.take() {
             drop(lock);
             let area = callback();
             self.state.borrow_mut().callbacks.hit_test_window_control = Some(callback);
-            if let Some(area) = area {
-                return match area {
-                    WindowControlArea::Drag => Some(HTCAPTION as _),
-                    WindowControlArea::Close => Some(HTCLOSE as _),
-                    WindowControlArea::Max => Some(HTMAXBUTTON as _),
-                    WindowControlArea::Min => Some(HTMINBUTTON as _),
-                };
-            }
+            area.map(|area| match area {
+                WindowControlArea::Drag => HTCAPTION as isize,
+                WindowControlArea::Close => HTCLOSE as _,
+                WindowControlArea::Max => HTMAXBUTTON as _,
+                WindowControlArea::Min => HTMINBUTTON as _,
+            })
         } else {
             drop(lock);
-        }
+            None
+        };
 
         if !self.hide_title_bar {
             // If the OS draws the title bar, we don't need to handle hit test messages.
-            return None;
+            return control_area;
         }
 
         // default handler for resize areas
         let hit = unsafe { DefWindowProcW(handle, msg, wparam, lparam) };
         if matches!(
             hit.0 as u32,
-            HTNOWHERE
-                | HTRIGHT
-                | HTLEFT
-                | HTTOPLEFT
-                | HTTOP
-                | HTTOPRIGHT
-                | HTBOTTOMRIGHT
-                | HTBOTTOM
-                | HTBOTTOMLEFT
+            HTRIGHT | HTLEFT | HTTOPLEFT | HTTOP | HTTOPRIGHT | HTBOTTOMRIGHT | HTBOTTOM | HTBOTTOMLEFT
         ) {
             return Some(hit.0);
         }
 
-        if self.state.borrow().is_fullscreen() {
-            return Some(HTCLIENT as _);
-        }
-
+        // The top resize edge lies inside the client area, above the title bar
+        // controls, and takes precedence over them.
         let dpi = unsafe { GetDpiForWindow(handle) };
-        let frame_y = unsafe { GetSystemMetricsForDpi(SM_CYFRAME, dpi) };
-
+        let frame = get_frame_thickness(dpi);
         let mut cursor_point = POINT {
             x: lparam.signed_loword().into(),
             y: lparam.signed_hiword().into(),
         };
         unsafe { ScreenToClient(handle, &mut cursor_point).ok().log_err() };
-        if !self.state.borrow().is_maximized() && cursor_point.y >= 0 && cursor_point.y <= frame_y {
-            return Some(HTTOP as _);
+        if !self.state.borrow().is_maximized() && cursor_point.y >= 0 && cursor_point.y <= frame {
+            let mut rect = RECT::default();
+            unsafe { GetClientRect(handle, &mut rect).log_err() };
+            return Some(if cursor_point.x <= frame {
+                HTTOPLEFT
+            } else if cursor_point.x >= rect.right - frame {
+                HTTOPRIGHT
+            } else {
+                HTTOP
+            } as _);
+        }
+
+        if let Some(area) = control_area {
+            return Some(area);
         }
 
         Some(HTCLIENT as _)
@@ -979,7 +979,7 @@ impl WindowsWindowInner {
                 first_mouse: false,
             });
             let result = func(input);
-            let handled = !result.propagate || result.default_prevented;
+            let handled = !result.propagate;
             self.state.borrow_mut().callbacks.input = Some(func);
 
             if handled {

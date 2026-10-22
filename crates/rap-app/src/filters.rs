@@ -4,7 +4,9 @@ use crate::{
     app::{Rap, Section},
     catalog::{Period, Quality},
     i18n::{Text, decade},
-    widgets::{button, choice, tinted_icon},
+    widgets::{
+        CONTROL_HEIGHT, RADIUS, button, menu_item, nav_item, popover, tinted_icon, toggle_button,
+    },
 };
 use gpui::{prelude::*, *};
 use rap_core::{config::AlbumSort, text::fold};
@@ -165,42 +167,56 @@ impl Rap {
     pub fn filter_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let active = self.filter.active();
+        let open = matches!(self.menu, Some(Menu::Filters(_)));
         div()
             .flex()
             .flex_wrap()
-            .gap_2()
+            .gap(rems(0.5))
             .items_center()
             .child(
-                choice(
-                    "filters",
-                    "sliders-horizontal",
-                    self.t(Text::Filters),
-                    matches!(self.menu, Some(Menu::Filters(_))),
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    let kind = FilterKind::ALL
-                        .into_iter()
-                        .find(|&k| this.current(k).is_some())
-                        .unwrap_or(FilterKind::Genre);
-                    this.open_menu(Menu::Filters(kind), cx)
-                })),
+                div()
+                    .relative()
+                    .child(
+                        toggle_button(
+                            "filters",
+                            "sliders-horizontal",
+                            self.t(Text::Filters),
+                            open,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            let kind = FilterKind::ALL
+                                .into_iter()
+                                .find(|&k| this.current(k).is_some())
+                                .unwrap_or(FilterKind::Genre);
+                            this.open_menu(Menu::Filters(kind), cx)
+                        })),
+                    )
+                    .children(match self.menu {
+                        Some(Menu::Filters(kind)) => {
+                            Some(dropdown(self.filters_menu(kind, cx), false))
+                        }
+                        _ => None,
+                    }),
             )
             .children(FilterKind::ALL.into_iter().filter_map(|kind| {
                 let value = self.current(kind)?;
                 Some(
                     div()
                         .id(("chip", kind as usize))
+                        .h(CONTROL_HEIGHT)
                         .flex()
                         .items_center()
-                        .gap_2()
-                        .px_3()
-                        .py_1()
-                        .rounded_full()
+                        .gap(rems(0.375))
+                        .pl(rems(0.75))
+                        .pr(rems(0.5))
+                        .rounded(RADIUS)
                         .border_1()
                         .border_color(theme.accent)
+                        .bg(theme.selected)
                         .text_color(theme.accent)
-                        .hover(move |s| s.bg(theme.card))
+                        .hover(move |s| s.bg(theme.hover))
+                        .active(move |s| s.bg(theme.pressed))
                         .child(self.labelled(self.t(kind.label()), &value))
                         .child(tinted_icon("x", theme.accent))
                         .on_click(cx.listener(move |this, _, _, cx| this.apply(kind, None, cx))),
@@ -215,86 +231,78 @@ impl Rap {
     }
 
     pub fn sort_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        choice(
-            "sort",
-            "arrow-up-down",
-            self.labelled(
-                self.t(Text::Sort),
-                self.sort_label(self.settings.album_sort),
-            ),
-            self.menu == Some(Menu::Sort),
-            self.theme(),
-        )
-        .on_click(cx.listener(|this, _, _, cx| this.open_menu(Menu::Sort, cx)))
+        div()
+            .relative()
+            .child(
+                toggle_button(
+                    "sort",
+                    "arrow-up-down",
+                    self.labelled(
+                        self.t(Text::Sort),
+                        self.sort_label(self.settings.album_sort),
+                    ),
+                    self.menu == Some(Menu::Sort),
+                    self.theme(),
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.open_menu(Menu::Sort, cx))),
+            )
+            .when(self.menu == Some(Menu::Sort), |anchor| {
+                anchor.child(dropdown(self.sort_menu(cx), true))
+            })
     }
 
-    /// The open menu above a backdrop that closes it.
-    pub fn menu_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let menu = self.menu?;
+    fn sort_menu(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
-        let panel = div()
-            .absolute()
-            .p_2()
-            .bg(theme.panel)
-            .border_1()
-            .border_color(theme.border)
-            .rounded_lg()
-            .shadow_lg()
-            .occlude()
-            .flex();
-        let panel = match menu {
-            Menu::Sort => panel
-                .top(px(72.))
-                .right(px(160.))
-                .w(px(240.))
-                .flex_col()
-                .children(SORTS.iter().map(|&sort| {
-                    choice(
-                        ("sort-option", sort as usize),
-                        "arrow-up-down",
-                        self.sort_label(sort),
-                        self.settings.album_sort == sort,
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.menu = None;
-                        this.set_sort(sort, cx);
-                    }))
+        popover(theme)
+            .w(rems(15.))
+            .flex()
+            .flex_col()
+            .children(SORTS.iter().map(|&sort| {
+                menu_item(
+                    ("sort-option", sort as usize),
+                    self.sort_label(sort),
+                    self.settings.album_sort == sort,
+                    theme,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.menu = None;
+                    this.set_sort(sort, cx);
                 }))
-                .into_any_element(),
-            Menu::Filters(kind) => panel
-                .top(px(132.))
-                .left(px(225.))
-                .w(px(560.))
-                .h(px(380.))
-                .gap_2()
-                .child(self.kinds_column(kind, cx))
-                .child(self.values_column(kind, cx))
-                .into_any_element(),
-        };
+            }))
+            .into_any_element()
+    }
+
+    fn filters_menu(&self, kind: FilterKind, cx: &mut Context<Self>) -> AnyElement {
+        let theme = self.theme();
+        popover(theme)
+            .w(rems(36.))
+            .h(rems(24.))
+            .flex()
+            .gap(rems(0.25))
+            .child(self.kinds_column(kind, cx))
+            .child(div().w(px(1.)).h_full().bg(theme.border))
+            .child(self.values_column(kind, cx))
+            .into_any_element()
+    }
+
+    /// Transparent layer closing the open menu when clicking outside of it.
+    pub fn menu_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        self.menu?;
         Some(
             div()
+                .id("menu-backdrop")
                 .absolute()
                 .top_0()
                 .left_0()
                 .size_full()
-                .child(
-                    div()
-                        .id("menu-backdrop")
-                        .absolute()
-                        .top_0()
-                        .left_0()
-                        .size_full()
-                        .occlude()
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(|this, _, _, cx| {
-                                this.menu = None;
-                                cx.notify();
-                            }),
-                        ),
+                .occlude()
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, cx| {
+                        this.menu = None;
+                        cx.notify();
+                    }),
                 )
-                .child(panel)
                 .into_any_element(),
         )
     }
@@ -302,26 +310,27 @@ impl Rap {
     fn kinds_column(&self, selected: FilterKind, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         div()
-            .w(px(190.))
+            .w(rems(12.))
             .flex_shrink_0()
             .flex()
             .flex_col()
-            .gap_1()
+            .gap(rems(0.125))
             .children(FilterKind::ALL.into_iter().map(|kind| {
                 let current = self.current(kind);
                 let label = match &current {
                     Some(value) => self.labelled(self.t(kind.label()), value),
                     None => self.t(kind.label()).into(),
                 };
-                choice(
+                nav_item(
                     ("filter-kind", kind as usize),
                     if current.is_some() { "check" } else { "tag" },
                     label,
                     kind == selected,
                     theme,
                 )
+                .h(rems(2.))
                 .min_w_0()
-                .truncate()
+                .overflow_hidden()
                 .on_click(
                     cx.listener(move |this, _, _, cx| this.open_menu(Menu::Filters(kind), cx)),
                 )
@@ -346,13 +355,15 @@ impl Rap {
             .min_w_0()
             .flex()
             .flex_col()
-            .gap_2()
+            .gap(rems(0.25))
             .when(searchable, |column| {
                 column.child(
                     div()
+                        .rounded(RADIUS)
+                        .border_1()
+                        .border_color(theme.control_border)
                         .bg(theme.background)
-                        .rounded_md()
-                        .px_3()
+                        .px(rems(0.5))
                         .child(self.menu_search.clone()),
                 )
             })
@@ -368,17 +379,11 @@ impl Rap {
                                     None => current.is_none(),
                                     Some(_) => current.as_deref() == Some(label.as_str()),
                                 };
-                                choice(
-                                    ("filter-value", index),
-                                    if selected { "check" } else { "tag" },
-                                    label,
-                                    selected,
-                                    this.theme(),
-                                )
-                                .w_full()
-                                .on_click(cx.listener(
-                                    move |this, _, _, cx| this.apply(kind, value.clone(), cx),
-                                ))
+                                menu_item(("filter-value", index), label, selected, this.theme())
+                                    .w_full()
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        this.apply(kind, value.clone(), cx)
+                                    }))
                             })
                             .collect()
                     }),
@@ -387,4 +392,19 @@ impl Rap {
                 .flex_1(),
             )
     }
+}
+
+/// Places a menu under its button, painted above the rest of the window.
+fn dropdown(menu: AnyElement, align_right: bool) -> AnyElement {
+    deferred(
+        div()
+            .absolute()
+            .top_full()
+            .mt(rems(0.25))
+            .when(align_right, |anchor| anchor.right_0())
+            .when(!align_right, |anchor| anchor.left_0())
+            .child(menu),
+    )
+    .with_priority(1)
+    .into_any_element()
 }

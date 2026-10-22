@@ -13,9 +13,11 @@ impl Rap {
         let viewport = window.viewport_size();
         // The cover takes what the text and controls leave, within reason.
         // Reserve room for wrapped device details as well as all playback controls.
-        let side = (f32::from(viewport.height) - 420.)
+        let side = (f32::from(viewport.height) - crate::scale::scaled(440.))
             .min(f32::from(viewport.width) * 0.5)
-            .clamp(160., 640.);
+            .clamp(crate::scale::scaled(160.), crate::scale::scaled(640.));
+        // Covers are sized in reference pixels, like every design length.
+        let side = side * 16. / f32::from(window.rem_size());
         let fullscreen = window.is_fullscreen();
         let track = self.playback.track.as_ref();
         // The album sheet opens on the edition being played.
@@ -45,7 +47,7 @@ impl Rap {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .p_4()
+                    .p(rems(1.))
                     .child(
                         button("collapse", "chevron-down", self.t(Text::Collapse), theme).on_click(
                             cx.listener(|this, _, window, cx| {
@@ -84,19 +86,19 @@ impl Rap {
                     .flex_col()
                     .items_center()
                     .justify_center()
-                    .gap_4()
-                    .px_8()
+                    .gap(rems(1.))
+                    .px(rems(2.))
                     .child(cover(track.and_then(|t| t.cover.as_ref()), side, theme))
                     .child(
                         div()
-                            .max_w(px(side.max(480.)))
+                            .max_w(rems(side.max(480.) / 16.))
                             .flex()
                             .flex_col()
                             .items_center()
-                            .gap_1()
+                            .gap(rems(0.25))
                             .child(
                                 div()
-                                    .text_3xl()
+                                    .text_size(rems(1.75))
                                     .font_weight(FontWeight::BOLD)
                                     .truncate()
                                     .child(
@@ -111,12 +113,12 @@ impl Rap {
                                     .child(
                                         div()
                                             .id("now-artist")
-                                            .text_xl()
+                                            .text_size(rems(1.125))
                                             .text_color(theme.accent)
                                             .truncate()
-                                            .rounded_md()
-                                            .px_2()
-                                            .hover(move |s| s.bg(theme.card))
+                                            .rounded(crate::widgets::RADIUS)
+                                            .px(rems(0.5))
+                                            .hover(move |s| s.bg(theme.hover))
                                             .child(artist.clone())
                                             .on_click(cx.listener(move |this, _, _, cx| {
                                                 this.show_artist(artist.clone(), cx)
@@ -128,16 +130,22 @@ impl Rap {
                                             .truncate()
                                             .child(track.metadata.album.clone()),
                                     )
-                                    .child(div().text_xs().text_color(theme.muted).child(details))
+                                    .child(
+                                        div()
+                                            .mt(rems(0.25))
+                                            .text_size(crate::widgets::TEXT_SMALL)
+                                            .text_color(theme.muted)
+                                            .child(details),
+                                    )
                             }),
                     )
-                    .child(self.progress_row(cx).w_full().max_w(px(640.)))
+                    .child(self.progress_row(cx).w_full().max_w(rems(40.)))
                     .child(self.transport(true, cx))
                     .child(
                         div()
                             .flex()
                             .items_center()
-                            .gap_4()
+                            .gap(rems(1.))
                             .child(self.volume_control(160., cx))
                             .when_some(album, |row, (id, edition)| {
                                 row.child(

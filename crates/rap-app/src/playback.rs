@@ -11,6 +11,7 @@ const LOOSE_LIMIT: usize = 2000;
 
 impl Rap {
     pub fn audio_command(&mut self, command: Command, cx: &mut Context<Self>) {
+        self.resume.played(&command);
         if self.playback.output_changing
             && matches!(
                 &command,

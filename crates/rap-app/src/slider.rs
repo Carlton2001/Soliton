@@ -1,5 +1,5 @@
 //! Horizontal slider for playback position and volume, dragged with the left button.
-use crate::theme::Theme;
+use crate::{scale::scaled, theme::Theme};
 use gpui::*;
 use std::{cell::Cell, rc::Rc};
 
@@ -28,30 +28,34 @@ impl Slider {
         canvas(
             |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
             move |bounds, hitbox, window, _| {
+                let (rail_height, knob) = (scaled(RAIL), scaled(KNOB));
                 let active = enabled && (dragging.get() || hitbox.is_hovered(window));
                 let width = f32::from(bounds.size.width);
                 let rail = Bounds::new(
-                    point(bounds.origin.x, bounds.center().y - px(RAIL / 2.)),
-                    size(bounds.size.width, px(RAIL)),
+                    point(bounds.origin.x, bounds.center().y - px(rail_height / 2.)),
+                    size(bounds.size.width, px(rail_height)),
                 );
                 let mut background = theme.muted;
                 background.a = 0.3;
-                window.paint_quad(fill(rail, background).corner_radii(px(RAIL / 2.)));
+                window.paint_quad(fill(rail, background).corner_radii(px(rail_height / 2.)));
                 let filled = px(width * value.clamp(0., 1.));
                 let fill_color = if enabled { theme.accent } else { theme.muted };
                 window.paint_quad(
-                    fill(Bounds::new(rail.origin, size(filled, px(RAIL))), fill_color)
-                        .corner_radii(px(RAIL / 2.)),
+                    fill(
+                        Bounds::new(rail.origin, size(filled, px(rail_height))),
+                        fill_color,
+                    )
+                    .corner_radii(px(rail_height / 2.)),
                 );
                 if active {
-                    let knob = Bounds::new(
+                    let thumb = Bounds::new(
                         point(
-                            bounds.origin.x + filled - px(KNOB / 2.),
-                            bounds.center().y - px(KNOB / 2.),
+                            bounds.origin.x + filled - px(knob / 2.),
+                            bounds.center().y - px(knob / 2.),
                         ),
-                        size(px(KNOB), px(KNOB)),
+                        size(px(knob), px(knob)),
                     );
-                    window.paint_quad(fill(knob, theme.text).corner_radii(px(KNOB / 2.)));
+                    window.paint_quad(fill(thumb, theme.text).corner_radii(px(knob / 2.)));
                 }
                 if !enabled {
                     return;

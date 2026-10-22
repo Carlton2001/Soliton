@@ -617,13 +617,12 @@ impl Render for TextInput {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
-            .line_height(px(30.))
-            .text_size(px(14.))
+            .line_height(rems(1.5))
+            .text_size(crate::widgets::TEXT_BODY)
             .child(
                 div()
-                    .h(px(30. + 4. * 2.))
+                    .h(rems(1.5))
                     .w_full()
-                    .p(px(4.))
                     .child(TextElement { input: cx.entity() }),
             )
     }

@@ -5,6 +5,9 @@ use std::path::PathBuf;
 mod bluetooth;
 pub use bluetooth::{Bluetooth, BluetoothDevice};
 
+mod watch;
+pub use watch::{AudioOutputs, DeviceWatch};
+
 mod desktop;
 pub use desktop::{
     Desktop, DesktopEvent, MediaCommand, MediaState, MediaTrack, PreviewColors, TransportState,

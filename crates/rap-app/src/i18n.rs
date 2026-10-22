@@ -11,7 +11,6 @@ pub enum Text {
     RemotePlayback,
     ConnectingOutput,
     AudioOutput,
-    RefreshOutputs,
     SystemOutput,
     NoAudioOutputs,
     PreferredOutputUnavailable,
@@ -22,9 +21,7 @@ pub enum Text {
     AddBluetoothDevice,
     OpeningBluetoothSettings,
     BluetoothPairingHint,
-    BluetoothEchoHint,
     BluetoothQualityHint,
-    SearchingBluetooth,
     BluetoothAudioReady,
     BluetoothAudioUnavailable,
     BluetoothDisconnected,
@@ -63,6 +60,9 @@ pub enum Text {
     Rescan,
     Cancel,
     Search,
+    SearchArtists,
+    SearchGenres,
+    SearchYears,
     Empty,
     EmptyHint,
     NoResults,
@@ -132,6 +132,7 @@ pub enum Text {
     AudioUnavailable,
     NoResultsHint,
     EmptyFacet,
+    NoFacetMatch,
     ShowAll,
     Hide,
     DismissAll,
@@ -140,6 +141,13 @@ pub enum Text {
     Output,
     AlbumUnavailable,
     Find,
+    General,
+    InterfaceSize,
+    InterfaceSizeHint,
+    Smaller,
+    Larger,
+    DefaultSize,
+    StreamFormat,
 }
 
 pub fn text(language: Language, key: Text) -> &'static str {
@@ -162,7 +170,6 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::RemotePlayback => ("sortie réseau", "network output"),
         Text::ConnectingOutput => ("Connexion au récepteur…", "Connecting to receiver…"),
         Text::AudioOutput => ("Sortie audio", "Audio output"),
-        Text::RefreshOutputs => ("Actualiser les sorties", "Refresh outputs"),
         Text::SystemOutput => ("Périphérique système par défaut", "Default system device"),
         Text::NoAudioOutputs => ("Aucun périphérique détecté", "No devices detected"),
         Text::PreferredOutputUnavailable => (
@@ -194,15 +201,10 @@ pub fn text(language: Language, key: Text) -> &'static str {
             "Les appareils appairés restent visibles une fois déconnectés. « Connecter dans Windows » ouvre les paramètres Bluetooth pour établir la connexion. Revenez dans RAP pour choisir la sortie audio disponible ; les listes s’actualisent automatiquement.",
             "Paired devices stay visible when disconnected. “Connect in Windows” opens Bluetooth settings to establish the connection. Return to RAP to choose the available audio output; the lists refresh automatically.",
         ),
-        Text::BluetoothEchoHint => (
-            "Pour une enceinte Echo compatible : dites « Alexa, appairage Bluetooth ». L’appareil doit accepter l’audio Bluetooth (A2DP) ; sa présence sur le Wi-Fi ne suffit pas.",
-            "For a compatible Echo speaker, say “Alexa, pair Bluetooth”. The device must receive Bluetooth audio (A2DP); being on Wi-Fi is not enough.",
-        ),
         Text::BluetoothQualityHint => (
             "La qualité Bluetooth dépend du codec négocié par Windows et l’appareil. Le format PCM affiché par RAP ne décrit pas ce codec et ne garantit pas une transmission sans perte.",
             "Bluetooth quality depends on the codec negotiated by Windows and the device. RAP’s displayed PCM format does not describe that codec or guarantee lossless transmission.",
         ),
-        Text::SearchingBluetooth => ("Actualisation…", "Refreshing…"),
         Text::BluetoothAudioReady => ("Sortie audio disponible", "Audio output available"),
         Text::BluetoothAudioUnavailable => (
             "Connecté — sortie audio indisponible",
@@ -252,7 +254,13 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::AddSource => ("Ajouter un dossier", "Add folder"),
         Text::Rescan => ("Actualiser", "Rescan"),
         Text::Cancel => ("Annuler", "Cancel"),
-        Text::Search => ("Rechercher dans la bibliothèque…", "Search your library…"),
+        Text::Search => (
+            "Rechercher un album, un artiste ou un titre…",
+            "Search albums, artists or tracks…",
+        ),
+        Text::SearchArtists => ("Filtrer les artistes…", "Filter artists…"),
+        Text::SearchGenres => ("Filtrer les genres…", "Filter genres…"),
+        Text::SearchYears => ("Filtrer les années…", "Filter years…"),
         Text::Empty => ("Votre musique, tout simplement.", "Your music, simply."),
         Text::EmptyHint => (
             "Ajoutez un dossier pour retrouver vos albums et leurs pochettes.",
@@ -343,6 +351,7 @@ pub fn text(language: Language, key: Text) -> &'static str {
             "No album matches the search and filters.",
         ),
         Text::EmptyFacet => ("Rien à afficher pour l'instant.", "Nothing to show yet."),
+        Text::NoFacetMatch => ("Aucun résultat.", "No match."),
         Text::ShowAll => ("Tout afficher", "Show all"),
         Text::Hide => ("Masquer", "Hide"),
         Text::DismissAll => ("Tout effacer", "Dismiss all"),
@@ -351,6 +360,16 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::Output => ("Sortie", "Output"),
         Text::AlbumUnavailable => ("Aucune édition accessible", "No edition available"),
         Text::Find => ("Rechercher…", "Search…"),
+        Text::General => ("Général", "General"),
+        Text::InterfaceSize => ("Taille de l’interface", "Interface size"),
+        Text::InterfaceSizeHint => (
+            "Ctrl + Plus, Ctrl + Moins et Ctrl + 0 depuis n’importe quelle page.",
+            "Ctrl + Plus, Ctrl + Minus and Ctrl + 0 from any page.",
+        ),
+        Text::Smaller => ("Réduire", "Smaller"),
+        Text::Larger => ("Agrandir", "Larger"),
+        Text::DefaultSize => ("Par défaut", "Default"),
+        Text::StreamFormat => ("Format envoyé", "Stream format"),
     };
     match language {
         Language::French => fr,
@@ -363,6 +382,15 @@ pub fn labelled(language: Language, label: &str, value: &str) -> String {
     match language {
         Language::French => format!("{label} : {value}"),
         Language::English => format!("{label}: {value}"),
+    }
+}
+
+/// `1 album` / `3 albums`, written the same way in French and English.
+pub fn album_count(count: usize) -> String {
+    if count <= 1 {
+        format!("{count} album")
+    } else {
+        format!("{count} albums")
     }
 }
 
