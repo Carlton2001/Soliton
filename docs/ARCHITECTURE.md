@@ -212,9 +212,12 @@ de taille des pochettes, thème système, tri et masquage des albums indisponibl
 glisser-déposer distingue lecture ponctuelle et ajout d'un dossier à la bibliothèque.
 Sur décision de l'utilisateur, le dépôt sert uniquement à la lecture ponctuelle ;
 les sources s'ajoutent seulement par « Ajouter un dossier ». Le cahier des charges
-reste à mettre à jour sur ce point.
+a été mis à jour le 22 octobre 2026 : la fonction est retirée.
 
-**Lecture ponctuelle.** `rap_library::read_loose_files` parcourt fichiers et dossiers
+**Lecture ponctuelle (retirée le 22 octobre 2026).** RAP gère une bibliothèque : le
+glisser-déposer, « Ouvrir un fichier » et `Ctrl+O` ont été supprimés, ainsi que les pages
+Genres et Années, redondantes avec les filtres. Historique :
+`rap_library::read_loose_files` parcourt fichiers et dossiers
 déposés ou ouverts (liens non suivis, 2 000 fichiers au plus), lit tags et pochettes
 sur l'exécuteur d'arrière-plan de GPUI, sans base de données. Les identifiants sont
 négatifs pour ne jamais correspondre à une piste indexée. Les pochettes vont dans

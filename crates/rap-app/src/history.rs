@@ -136,8 +136,6 @@ impl From<View> for Section {
         match view {
             View::Artists => Section::Artists,
             View::Albums => Section::Albums,
-            View::Genres => Section::Genres,
-            View::Years => Section::Years,
             View::Settings => Section::Settings,
         }
     }
@@ -148,8 +146,6 @@ impl From<Section> for View {
         match section {
             Section::Artists => View::Artists,
             Section::Albums => View::Albums,
-            Section::Genres => View::Genres,
-            Section::Years => View::Years,
             Section::Settings => View::Settings,
         }
     }

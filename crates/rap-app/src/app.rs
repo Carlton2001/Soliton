@@ -1,5 +1,5 @@
 use crate::{
-    catalog::{Facets, Filter},
+    catalog::{Facets, Filter, FilterOptions},
     filters::Menu,
     i18n::{Text, text},
     input::TextInput,
@@ -26,8 +26,6 @@ use std::{
 pub enum Section {
     Albums,
     Artists,
-    Genres,
-    Years,
     Settings,
 }
 
@@ -76,6 +74,7 @@ pub struct Rap {
     pub notices: Notices,
     pub columns: usize,
     pub facets: Arc<Facets>,
+    pub filter_options: Arc<FilterOptions>,
     pub menu: Option<Menu>,
     pub now_playing: bool,
     pub seek_slider: Slider,
@@ -84,9 +83,6 @@ pub struct Rap {
     pub seek_preview: Option<f32>,
     /// Volume restored when sound is turned back on.
     pub muted_volume: Option<f32>,
-    /// Files dropped or opened for one-off playback are being read.
-    pub preparing: Option<Cancellation>,
-    pub loose_covers: PathBuf,
     query_pending: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -179,7 +175,6 @@ impl Rap {
             selected_edition: 0,
             search,
             menu_search,
-            loose_covers: paths.covers.join("loose"),
             services: Services::start(paths),
             scanning: false,
             cancellation: Cancellation::default(),
@@ -187,13 +182,13 @@ impl Rap {
             notices: Notices::default(),
             columns: 4,
             facets: Default::default(),
+            filter_options: Default::default(),
             menu: None,
             now_playing: false,
             seek_slider: Slider::default(),
             volume_slider: Slider::default(),
             seek_preview: None,
             muted_volume: None,
-            preparing: None,
             query_pending: true,
             _subscriptions: subscriptions,
         };
@@ -312,6 +307,7 @@ impl Rap {
                     }
                     self.visible = view.visible;
                     self.facets = view.facets;
+                    self.filter_options = view.options;
                     self.keyboard_index = self
                         .keyboard_index
                         .min(self.visible.len().saturating_sub(1));
@@ -530,9 +526,6 @@ fn is_dark(appearance: WindowAppearance) -> bool {
 impl Drop for Rap {
     fn drop(&mut self) {
         self.cancellation.cancel();
-        if let Some(preparing) = &self.preparing {
-            preparing.cancel();
-        }
     }
 }
 
@@ -540,12 +533,10 @@ impl Render for Rap {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::scale::apply(self.settings.ui_rem_size, window);
         self.record_place();
-        // Tile and gap widths, then the sidebar, list padding and scrollbar margin.
+        // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
-        let reserved = crate::scale::scaled(
-            (crate::views::SIDEBAR_WIDTH + 2. * crate::views::CONTENT_PADDING - 1.) * 16. + 12.,
-        );
+        let reserved = crate::scale::scaled((2. * crate::views::CONTENT_PADDING - 1.) * 16. + 12.);
         self.columns = ((f32::from(window.viewport_size().width) - reserved + gap) / (tile + gap))
             .floor()
             .max(1.) as usize;
@@ -555,8 +546,6 @@ impl Render for Rap {
         let changed = std::mem::replace(&mut self.search_section, section) != section;
         let placeholder = self.t(match section {
             Section::Artists => Text::SearchArtists,
-            Section::Genres => Text::SearchGenres,
-            Section::Years => Text::SearchYears,
             _ => Text::Search,
         });
         self.search.update(cx, |input, cx| {
@@ -576,14 +565,13 @@ impl Render for Rap {
                 Section::Settings => self.settings_view(cx),
                 _ if self.selected.is_some() => self.album_view(cx),
                 Section::Albums => self.albums_view(cx),
-                _ => self.facets_view(cx),
+                Section::Artists => self.artists_view(cx),
             };
             div()
                 .flex()
                 .flex_1()
                 .min_h_0()
                 .overflow_hidden()
-                .child(self.sidebar(cx))
                 .child(
                     div()
                         .flex()
@@ -611,9 +599,6 @@ impl Render for Rap {
                 MouseButton::Navigate(NavigationDirection::Forward),
                 cx.listener(|this, _, _, cx| this.go_forward(cx)),
             )
-            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
-                this.play_paths(paths.paths().to_vec(), cx)
-            }))
             .size_full()
             .flex()
             .flex_col()
@@ -626,7 +611,6 @@ impl Render for Rap {
             .children(notices)
             .when(!self.now_playing, |view| view.child(self.footer(cx)))
             .children(self.menu_view(cx))
-            .child(self.drop_overlay())
             .children(self.close_dialog(cx))
     }
 }

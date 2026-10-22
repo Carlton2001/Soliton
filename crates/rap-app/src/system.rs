@@ -167,9 +167,6 @@ impl Rap {
         self.quitting = true;
         self.confirm_close = false;
         self.cancellation.cancel();
-        if let Some(preparing) = &self.preparing {
-            preparing.cancel();
-        }
         self.final_queue();
         let audio = self.audio.take();
         let desktop = self.desktop.take();

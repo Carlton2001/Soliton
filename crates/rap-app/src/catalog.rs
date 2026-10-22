@@ -6,7 +6,7 @@ use rap_core::{
 };
 use std::{
     cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     path::PathBuf,
     sync::Arc,
 };
@@ -27,15 +27,12 @@ pub struct Facets {
     /// Same order as `artists`.
     pub artist_cards: Vec<ArtistCard>,
     pub genres: Vec<String>,
-    pub years: Vec<u32>,
-    pub decades: Vec<u32>,
     pub formats: Vec<String>,
 }
 impl Facets {
     pub fn collect(snapshot: &LibrarySnapshot) -> Self {
         let mut artists = Variants::default();
         let mut genres = Variants::default();
-        let mut years = BTreeSet::new();
         let mut formats = BTreeSet::new();
         for album in &snapshot.albums {
             artists.add(&album.artist);
@@ -43,18 +40,14 @@ impl Facets {
                 let m = &track.metadata;
                 artists.add(&m.artist);
                 genres.add(&m.genre);
-                years.extend(m.year);
                 formats.insert(m.format.clone());
             }
         }
-        let decades: BTreeSet<_> = years.iter().map(|year| year / 10 * 10).collect();
         let artists = artists.into_values();
         Self {
             artist_cards: artist_cards(snapshot, &artists),
             artists,
             genres: genres.into_values(),
-            years: years.into_iter().collect(),
-            decades: decades.into_iter().collect(),
             formats: formats.into_iter().collect(),
         }
     }
@@ -160,7 +153,7 @@ impl Period {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Quality {
     /// More than 16 bits or more than 48 kHz.
     HiRes,
@@ -206,6 +199,17 @@ impl Filter {
     }
 }
 
+/// Folded artists and genres, years, formats and qualities offered by the
+/// filter menu; the facets keep their displayed spellings.
+#[derive(Clone, Debug, Default)]
+pub struct FilterOptions {
+    pub artists: HashSet<String>,
+    pub genres: HashSet<String>,
+    pub years: BTreeSet<u32>,
+    pub formats: HashSet<String>,
+    pub qualities: HashSet<Quality>,
+}
+
 /// A snapshot with its facets and folded search keys, built once per library
 /// change so that each keystroke only compares prepared strings. Case, accent and
 /// spacing differences between tags never hide an album.
@@ -240,6 +244,57 @@ impl Catalog {
             snapshot: Arc::new(snapshot),
             albums,
         }
+    }
+
+    /// Values of each filter kind still reachable under the other active
+    /// criteria, so that combining filters never leads to an empty list.
+    pub fn options(&self, filter: &Filter) -> FilterOptions {
+        let artist = filter.artist.as_deref().map(fold);
+        let genre = filter.genre.as_deref().map(fold);
+        let mut options = FilterOptions::default();
+        let albums = self
+            .snapshot
+            .albums
+            .iter()
+            .zip(&self.albums)
+            .filter(|(album, _)| {
+                !filter.hide_unavailable || album.editions.iter().any(|e| e.available())
+            });
+        for (album, text) in albums {
+            for (track, track_text) in album.tracks().zip(&text.tracks) {
+                let m = &track.metadata;
+                let quality = Quality::of(m);
+                let ok = [
+                    artist
+                        .as_ref()
+                        .is_none_or(|a| &text.artist == a || &track_text.artist == a),
+                    genre.as_ref().is_none_or(|g| &track_text.genre == g),
+                    filter
+                        .period
+                        .is_none_or(|period| m.year.is_some_and(|y| period.contains(y))),
+                    filter.format.as_ref().is_none_or(|f| &m.format == f),
+                    filter.quality.is_none_or(|q| quality == q),
+                ];
+                let others = |skip: usize| ok.iter().enumerate().all(|(i, &ok)| i == skip || ok);
+                if others(0) {
+                    options.artists.insert(text.artist.clone());
+                    options.artists.insert(track_text.artist.clone());
+                }
+                if others(1) {
+                    options.genres.insert(track_text.genre.clone());
+                }
+                if others(2) {
+                    options.years.extend(m.year);
+                }
+                if others(3) {
+                    options.formats.insert(m.format.clone());
+                }
+                if others(4) {
+                    options.qualities.insert(quality);
+                }
+            }
+        }
+        options
     }
 
     /// Indices of matching albums, in the requested order.

@@ -67,10 +67,10 @@ pub enum AlbumSort {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum View {
     Artists,
+    /// Former Genres and Years pages reopen on the albums.
     #[default]
+    #[serde(alias = "Genres", alias = "Years")]
     Albums,
-    Genres,
-    Years,
     Settings,
 }
 

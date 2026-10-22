@@ -24,7 +24,7 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   la meilleure disponible en premier. Les sous-dossiers `CD1`, `Disc 2`… forment
   un seul album, et une compilation sans artiste d'album apparaît sous « Artistes divers ».
 - Double-cliquer une piste lance la lecture à partir de celle-ci.
-- **Artistes**, **Genres**, **Années** : accès aux albums correspondants ; cliquer
+- **Artistes** : accès aux albums correspondants ; cliquer
   l'artiste d'une fiche ou de la lecture en cours affiche ses albums.
 - Recherche par album, titre, artiste ou genre, sans tenir compte de la casse ni des accents.
 - **Filtres** : genre, période (décennie ou année), artiste, format et qualité
@@ -34,8 +34,6 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   précédente/suivante, aléatoire, répétition, position et volume glissables, sourdine.
 - **Lecture en cours** : grande pochette et commandes essentielles, plein écran
   Windows avec `F11`.
-- **Glisser-déposer** de fichiers ou de dossiers sur la fenêtre, et **Ouvrir un
-  fichier** : lecture ponctuelle avec tags et pochettes, sans ajout à la bibliothèque.
 - **Paramètres** : français/anglais, apparence système/clair/sombre, huit couleurs
   d'accent, taille des pochettes, masquage des albums indisponibles. Tout est conservé.
 - **Sortie audio** : choix du périphérique système par défaut ou d'une sortie locale
@@ -85,7 +83,7 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   qu'elle n'a pas été activée. Le réglage concerne l'utilisateur courant et le
   chemin de l'exécutable ; réactiver l'option après avoir déplacé RAP.
 
-Clavier : `Ctrl+F` recherche, `Ctrl+O` ouverture ponctuelle, flèches pour les albums,
+Clavier : `Ctrl+F` recherche, flèches pour les albums,
 `Entrée` pour ouvrir une fiche, `Espace` lecture/pause, `Ctrl+←/→` ±10 s, `F11`
 plein écran, `Échap` ou bouton Précédent de la souris pour revenir. Le champ de
 recherche prend en charge sélection, copier/coller et saisie IME.
@@ -226,9 +224,6 @@ cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
   les complète. Pas de réglage de l'intervalle à ce stade.
 - L'annulation attend la fin d'une E/S système en cours. Les performances sur
   grandes collections/NAS et l'écoute prolongée restent à valider sur des données réelles.
-- Le glisser-déposer lit au plus 2 000 fichiers et n'ajoute jamais de dossier à la
-  bibliothèque (choix validé, voir l'architecture). Il n'a pas été testé par un dépôt
-  réel automatisé ; la lecture des fichiers déposés est couverte par un test unitaire.
 - Les touches multimédias physiques, un vrai redémarrage d'Explorer et le lancement
   après ouverture de session restent à vérifier manuellement. Windows peut aussi
   désactiver le lancement via ses propres paramètres de démarrage.

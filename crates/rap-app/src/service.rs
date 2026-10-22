@@ -17,6 +17,7 @@ pub struct View {
     pub visible: Vec<usize>,
     pub filter: Filter,
     pub facets: Arc<catalog::Facets>,
+    pub options: Arc<catalog::FilterOptions>,
 }
 pub enum Event {
     Progress(ScanProgress),
@@ -73,6 +74,7 @@ impl Services {
                         Ok(View {
                             snapshot: catalog.snapshot.clone(),
                             visible: catalog.matches(&filter),
+                            options: Arc::new(catalog.options(&filter)),
                             filter,
                             facets: catalog.facets.clone(),
                         })

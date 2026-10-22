@@ -397,7 +397,7 @@ Direction graphique :
 
 L'interface principale comporte :
 
-- Une navigation latérale.
+- Une navigation dans la barre de titre.
 - Une zone centrale de bibliothèque.
 - Une recherche globale.
 - Des filtres contextuels.
@@ -407,9 +407,9 @@ Sections principales :
 
 - Albums.
 - Artistes.
-- Genres.
-- Années.
 - Paramètres.
+
+Genres et années sont accessibles par les filtres de la vue Albums.
 
 ## 8.4 Vue Albums
 
@@ -513,16 +513,9 @@ Un mode de lecture plein écran doit afficher une grande pochette et les command
 Interactions indispensables :
 
 - Double-clic pour lancer la lecture.
-- Glisser-déposer de fichiers audio.
-- Glisser-déposer de dossiers.
 - Navigation fluide au clavier et à la souris.
 
-Le glisser-déposer doit distinguer :
-
-- Lecture ponctuelle.
-- Ajout d'un dossier à la bibliothèque.
-
-Un fichier ouvert ponctuellement ne doit pas nécessairement être indexé.
+RAP gère une bibliothèque : il ne propose ni lecture ponctuelle de fichiers hors bibliothèque, ni glisser-déposer. Les dossiers s'ajoutent depuis les paramètres.
 
 ---
 
@@ -1233,7 +1226,6 @@ Objectifs :
 - Filtres combinables.
 - Préférences d'affichage.
 - Couleur d'accent.
-- Glisser-déposer.
 - Amélioration de l'ergonomie.
 - Gestion des états vides et des erreurs.
 

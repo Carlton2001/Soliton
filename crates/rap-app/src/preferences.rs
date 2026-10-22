@@ -14,7 +14,7 @@ use rap_core::config::{Accent, Appearance, CoverSize, Language, Settings};
 
 /// Section title with an optional action aligned on the right, above its content.
 pub fn section(
-    title: &'static str,
+    title: impl IntoElement,
     action: Option<AnyElement>,
     body: impl IntoElement,
 ) -> AnyElement {
@@ -337,6 +337,14 @@ impl Rap {
                 this.choose_source(cx)
             }
         }));
+        let rescan = button("settings-rescan", "refresh-cw", self.t(Text::Rescan), theme)
+            .when(self.scanning, |button| button.opacity(0.5))
+            .on_click(cx.listener(|this, _, _, cx| {
+                if !this.scanning {
+                    this.scan(Vec::new(), cx)
+                }
+            }));
+        let actions = div().flex().gap(rems(0.5)).child(rescan).child(add);
         let rows: Vec<AnyElement> = if self.snapshot.sources.is_empty() {
             vec![
                 list_row()
@@ -347,9 +355,21 @@ impl Rap {
         } else {
             self.sources_rows(theme, cx)
         };
+        let title = div()
+            .flex()
+            .items_baseline()
+            .gap(rems(0.75))
+            .child(self.t(Text::Sources))
+            .child(
+                div()
+                    .text_size(TEXT_SMALL)
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(theme.muted)
+                    .child(crate::i18n::album_count(self.snapshot.albums.len())),
+            );
         section(
-            self.t(Text::Sources),
-            Some(add.into_any_element()),
+            title,
+            Some(actions.into_any_element()),
             list_box(rows, theme),
         )
     }

@@ -1,19 +1,15 @@
 use crate::{
     app::{Rap, Section},
-    catalog::Period,
     i18n::Text,
     scrollbar::Scrollbar,
     theme::Theme,
     widgets::{
-        CONTROL_HEIGHT, RADIUS, TEXT_CAPTION, TEXT_SMALL, TEXT_TITLE, button, cover, ghost,
-        nav_item, segment, segments, time,
+        CONTROL_HEIGHT, RADIUS, TEXT_SMALL, TEXT_TITLE, button, cover, segment, segments, time,
     },
 };
 use gpui::{prelude::*, *};
 use rap_core::{config::CoverSize, text::fold};
 
-/// Width of the sidebar, in rems.
-pub const SIDEBAR_WIDTH: f32 = 13.;
 /// Horizontal padding of the album list and grid, in rems.
 pub const CONTENT_PADDING: f32 = 1.25;
 /// Gap between grid tiles, in rems.
@@ -29,77 +25,6 @@ pub fn cover_side(size: CoverSize) -> f32 {
 }
 
 impl Rap {
-    pub fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme();
-        let entries = [
-            (Section::Artists, "users", Text::Artists),
-            (Section::Albums, "disc-3", Text::Albums),
-            (Section::Genres, "tag", Text::Genres),
-            (Section::Years, "calendar", Text::Years),
-            (Section::Settings, "settings", Text::Settings),
-        ];
-        div()
-            .w(rems(SIDEBAR_WIDTH))
-            .flex_shrink_0()
-            .h_full()
-            .bg(theme.panel)
-            .border_r_1()
-            .border_color(theme.border)
-            .px(rems(0.75))
-            .pt(rems(1.))
-            .pb(rems(0.75))
-            .flex()
-            .flex_col()
-            .gap(rems(0.125))
-            .children(
-                entries
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, (section, icon, label))| {
-                        nav_item(
-                            ("nav", index),
-                            icon,
-                            self.t(label),
-                            self.section == section,
-                            theme,
-                        )
-                        .on_click(cx.listener(
-                            move |this, _, window, cx| {
-                                this.focus.focus(window);
-                                this.navigate(section, cx);
-                            },
-                        ))
-                    }),
-            )
-            .child(div().flex_1())
-            .child(
-                ghost("add-source", "folder-plus", self.t(Text::AddSource), theme)
-                    .opacity(if self.scanning { 0.5 } else { 1. })
-                    .on_click(cx.listener(|this, _, _, cx| this.choose_source(cx))),
-            )
-            .child(
-                ghost("rescan", "refresh-cw", self.t(Text::Rescan), theme)
-                    .opacity(if self.scanning { 0.5 } else { 1. })
-                    .on_click(cx.listener(|this, _, _, cx| this.scan(Vec::new(), cx))),
-            )
-            .child(
-                ghost("open-file", "play", self.t(Text::OpenFile), theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.open_file(cx))),
-            )
-            .child(
-                div()
-                    .px(rems(0.75))
-                    .pt(rems(0.5))
-                    .text_size(TEXT_CAPTION)
-                    .text_color(theme.muted)
-                    .child(format!(
-                        "{} · {}",
-                        self.snapshot.albums.len(),
-                        self.t(Text::Albums)
-                    )),
-            )
-    }
-
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let albums = self.section == Section::Albums && self.selected.is_none();
@@ -341,7 +266,7 @@ impl Rap {
     }
 
     /// Artists as tiles sharing the album grid's size and columns.
-    fn artists_view(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub fn artists_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let query = self.facet_query(cx);
         let cards: Vec<_> = self
             .facets
@@ -457,51 +382,6 @@ impl Rap {
         }
     }
 
-    pub fn facets_view(&self, cx: &mut Context<Self>) -> AnyElement {
-        if self.section == Section::Artists {
-            return self.artists_view(cx);
-        }
-        let query = self.facet_query(cx);
-        let values: Vec<String> = match self.section {
-            Section::Genres => self.facets.genres.clone(),
-            _ => self.facets.years.iter().map(u32::to_string).collect(),
-        }
-        .into_iter()
-        .filter(|value| query.is_empty() || fold(value).contains(&query))
-        .collect();
-        if values.is_empty() {
-            return self.facet_empty(&query);
-        }
-        let section = self.section;
-        let theme = self.theme();
-        let list = uniform_list(
-            "facets",
-            values.len(),
-            cx.processor(move |_this, range: std::ops::Range<usize>, _, cx| {
-                range
-                    .map(|index| {
-                        let value = values[index].clone();
-                        ghost(("facet", index), "disc-3", value.clone(), theme)
-                            .mx(rems(CONTENT_PADDING - 0.5))
-                            .h(rems(2.25))
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                match section {
-                                    Section::Genres => this.filter.genre = Some(value.clone()),
-                                    _ => this.filter.period = value.parse().ok().map(Period::Year),
-                                }
-                                this.section = Section::Albums;
-                                this.refresh(cx);
-                            }))
-                    })
-                    .collect()
-            }),
-        )
-        .track_scroll(self.facet_scroll.clone())
-        .flex_1()
-        .min_h_0();
-        scroll_area(list, &self.facet_bar, theme)
-    }
-
     pub fn footer(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         div()
@@ -537,45 +417,7 @@ impl Rap {
                         )),
                 )
             })
-            .when(self.preparing.is_some(), |view| {
-                view.child(
-                    div()
-                        .px(rems(CONTENT_PADDING))
-                        .py(rems(0.5))
-                        .bg(theme.panel)
-                        .border_t_1()
-                        .border_color(theme.border)
-                        .text_size(TEXT_SMALL)
-                        .child(self.t(Text::Preparing)),
-                )
-            })
             .child(self.player(cx))
-    }
-
-    /// Visible only while files are dragged over the window.
-    pub fn drop_overlay(&self) -> impl IntoElement {
-        let theme = self.theme();
-        div()
-            .id("drop-overlay")
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-            .flex()
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .gap(rems(0.75))
-            .opacity(0.)
-            .drag_over::<ExternalPaths>(move |style, _, _, _| style.opacity(1.).bg(theme.scrim))
-            .child(
-                div()
-                    .text_size(crate::widgets::TEXT_DISPLAY)
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(theme.accent)
-                    .child(self.t(Text::DropToPlay)),
-            )
-            .child(div().text_color(theme.muted).child(self.t(Text::DropHint)))
     }
 }
 

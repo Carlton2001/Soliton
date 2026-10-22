@@ -176,7 +176,22 @@ fn periods_qualities_sorting_and_unavailable_albums() {
         sources: vec![],
         albums: vec![first, second, third],
     });
-    assert_eq!(catalog.facets.decades, [1970, 1980]);
+    let all = catalog.options(&Filter::default());
+    assert_eq!(
+        all.years.into_iter().collect::<Vec<_>>(),
+        [1975, 1979, 1981]
+    );
+    // Each filter only offers values reachable under the others.
+    let options = catalog.options(&Filter {
+        format: Some("MP3".into()),
+        ..Default::default()
+    });
+    assert_eq!(options.years.iter().copied().collect::<Vec<_>>(), [1981]);
+    assert_eq!(options.formats.len(), 2);
+    assert_eq!(
+        options.qualities.into_iter().collect::<Vec<_>>(),
+        [Quality::Lossy]
+    );
     let mut filter = Filter {
         period: Some(Period::Decade(1970)),
         ..Default::default()

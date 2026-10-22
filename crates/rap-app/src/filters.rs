@@ -10,7 +10,10 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 use rap_core::{config::AlbumSort, text::fold};
-use std::rc::Rc;
+use std::{
+    collections::{BTreeSet, HashSet},
+    rc::Rc,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FilterKind {
@@ -96,29 +99,35 @@ impl Rap {
         }
     }
 
+    /// Values compatible with the other active filters.
     fn values(&self, kind: FilterKind) -> Vec<(String, Value)> {
         let facets = &self.facets;
-        let texts = |values: &[String]| {
+        let options = &self.filter_options;
+        let texts = |values: &[String], allowed: &HashSet<String>, folded: bool| {
             values
                 .iter()
+                .filter(|v| allowed.contains(&if folded { fold(v) } else { (*v).clone() }))
                 .map(|v| (v.clone(), Value::Text(v.clone())))
                 .collect()
         };
         match kind {
-            FilterKind::Genre => texts(&facets.genres),
-            FilterKind::Artist => texts(&facets.artists),
-            FilterKind::Format => texts(&facets.formats),
+            FilterKind::Genre => texts(&facets.genres, &options.genres, true),
+            FilterKind::Artist => texts(&facets.artists, &options.artists, true),
+            FilterKind::Format => texts(&facets.formats, &options.formats, false),
             FilterKind::Quality => Quality::ALL
                 .iter()
+                .filter(|q| options.qualities.contains(q))
                 .map(|&q| (self.quality_label(q).into(), Value::Quality(q)))
                 .collect(),
-            FilterKind::Period => facets
-                .decades
-                .iter()
-                .map(|&d| Period::Decade(d))
-                .chain(facets.years.iter().map(|&y| Period::Year(y)))
-                .map(|p| (self.period_label(p), Value::Period(p)))
-                .collect(),
+            FilterKind::Period => {
+                let decades: BTreeSet<u32> = options.years.iter().map(|y| y / 10 * 10).collect();
+                decades
+                    .into_iter()
+                    .map(Period::Decade)
+                    .chain(options.years.iter().map(|&y| Period::Year(y)))
+                    .map(|p| (self.period_label(p), Value::Period(p)))
+                    .collect()
+            }
         }
     }
 
