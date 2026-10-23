@@ -2,6 +2,7 @@ use super::{DEPTH, Filter, History, Place, Section};
 
 fn place(section: Section, album: Option<i64>) -> Place {
     Place {
+        home_artist: None,
         playlist: None,
         section,
         album: album.map(|id| (id, 0)),
@@ -58,5 +59,20 @@ fn queue_is_a_named_history_destination() {
     assert_eq!(
         rap_core::config::View::from(Section::Queue),
         rap_core::config::View::Queue
+    );
+}
+
+#[test]
+fn home_keeps_its_artist_and_album_in_navigation_history() {
+    let mut history = History::default();
+    let mut home = place(Section::Home, Some(42));
+    home.home_artist = Some("Björk".into());
+    history.observe(home.clone());
+    history.observe(place(Section::Artists, None));
+    assert!(history.back() == Some(home));
+    assert!(Section::from(rap_core::config::View::Home) == Section::Home);
+    assert_eq!(
+        rap_core::config::View::from(Section::Home),
+        rap_core::config::View::Home
     );
 }

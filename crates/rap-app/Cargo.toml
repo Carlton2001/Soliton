@@ -21,6 +21,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 crossbeam-channel = "0.5"
 unicode-segmentation = "1"
 raw-window-handle = "0.6"
+rustybuzz = "=0.20.1"
+
+[dev-dependencies]
+tempfile = "3"
 
 [target.'cfg(windows)'.build-dependencies]
 embed-resource = "=3.0.12"

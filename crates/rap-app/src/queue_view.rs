@@ -28,6 +28,7 @@ impl Rap {
                     .map(|(index, e)| {
                         this.selection_row(
                             TrackRow {
+                                multi_disc: false,
                                 selection: Selection::Queue(e.id),
                                 index,
                                 metadata: &e.track.metadata,

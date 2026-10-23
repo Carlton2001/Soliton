@@ -39,11 +39,29 @@ enum Action {
 pub struct TrackRow<'a> {
     pub selection: Selection,
     pub index: usize,
+    /// Prefix album track numbers with their disc; queues/playlists use positions.
+    pub multi_disc: bool,
     pub metadata: &'a Metadata,
     pub available: bool,
     pub current: bool,
     pub first: bool,
     pub last: bool,
+}
+
+fn album_track_number(metadata: &Metadata, index: usize, multi_disc: bool) -> String {
+    let track = metadata
+        .track
+        .filter(|&n| n > 0)
+        .map_or_else(|| (index + 1).to_string(), |n| n.to_string());
+    if multi_disc {
+        format!(
+            "{}.{}",
+            metadata.disc.filter(|&n| n > 0).unwrap_or(1),
+            track
+        )
+    } else {
+        track
+    }
 }
 
 impl Rap {
@@ -144,11 +162,15 @@ impl Rap {
             )
             .child(
                 div()
-                    .w(rems(1.75))
+                    .min_w(rems(if row.multi_disc { 2.75 } else { 1.75 }))
                     .flex_none()
                     .text_color(theme.muted)
                     .font(crate::widgets::numeric_font())
-                    .child((row.index + 1).to_string()),
+                    .child(if matches!(selection, Selection::Album { .. }) {
+                        album_track_number(row.metadata, row.index, row.multi_disc)
+                    } else {
+                        (row.index + 1).to_string()
+                    }),
             )
             .child(
                 div()
@@ -386,3 +408,7 @@ impl Rap {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/track_list.rs"]
+mod tests;

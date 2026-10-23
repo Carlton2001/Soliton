@@ -58,13 +58,50 @@ fn tagged_album_artist(metadata: &Metadata) -> &str {
 /// Stable per-track key of the edition. Inferred album artists are ignored so that
 /// untagged compilations stay one edition.
 pub(crate) fn edition_identity(source: i64, folder: &str, metadata: &Metadata) -> String {
-    serde_json::json!([
+    edition_identity_with_artist(
         source,
         folder,
-        fold(&metadata.album),
-        fold(tagged_album_artist(metadata))
-    ])
-    .to_string()
+        &metadata.album,
+        tagged_album_artist(metadata),
+    )
+}
+
+pub(crate) fn edition_identity_with_artist(
+    source: i64,
+    folder: &str,
+    album: &str,
+    artist: &str,
+) -> String {
+    serde_json::json!([source, folder, fold(album), fold(artist)]).to_string()
+}
+
+/// Fill missing album-artist identities only when this album in this folder has
+/// one explicit album artist and every untagged track agrees with that artist.
+/// Never change the metadata itself or guess for compilations/conflicting tags.
+pub(crate) fn compatible_album_artist<'a>(
+    tracks: impl IntoIterator<Item = &'a Metadata>,
+) -> Option<String> {
+    let tracks: Vec<_> = tracks.into_iter().collect();
+    if tracks
+        .iter()
+        .any(|track| track.compilation || track.is_inferred("album"))
+    {
+        return None;
+    }
+    let explicit: BTreeSet<_> = tracks
+        .iter()
+        .map(|track| fold(tagged_album_artist(track)))
+        .filter(|artist| !artist.is_empty())
+        .collect();
+    if explicit.len() != 1 {
+        return None;
+    }
+    let artist = explicit.into_iter().next()?;
+    tracks
+        .iter()
+        .filter(|track| tagged_album_artist(track).is_empty())
+        .all(|track| !track.is_inferred("artist") && fold(&track.artist) == artist)
+        .then_some(artist)
 }
 
 #[derive(Debug, PartialEq, Eq)]

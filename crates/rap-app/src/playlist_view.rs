@@ -48,6 +48,7 @@ impl Rap {
                             let track = e.track_id.and_then(|id| known.get(&id));
                             this.selection_row(
                                 TrackRow {
+                                    multi_disc: false,
                                     selection: Selection::Playlist {
                                         list: id,
                                         entry: e.id,

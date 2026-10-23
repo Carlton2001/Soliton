@@ -32,7 +32,6 @@ impl Rap {
         let theme = self.theme();
         let first = &edition.tracks[0].metadata;
         let album_id = album.id;
-        let first_available = edition.tracks.iter().position(|t| t.available);
         let wide = f32::from(window.viewport_size().width) > crate::scale::scaled(1000.);
         let summary = [
             first.year.map(|y| y.to_string()),
@@ -120,54 +119,7 @@ impl Rap {
             .flex()
             .flex_col()
             .gap(rems(1.25))
-            .child(
-                div()
-                    .px(rems(1.5))
-                    .pt(rems(1.))
-                    .flex()
-                    .items_center()
-                    .gap(rems(0.5))
-                    .flex_wrap()
-                    .child(
-                        button("back", "arrow-left", self.t(Text::Albums), theme).on_click(
-                            cx.listener(|this, _, _, cx| {
-                                this.selected = None;
-                                cx.notify();
-                            }),
-                        ),
-                    )
-                    .child(
-                        crate::widgets::accent_button(
-                            "play-album",
-                            "play",
-                            self.t(if first_available.is_some() {
-                                Text::Play
-                            } else {
-                                Text::AlbumUnavailable
-                            }),
-                            theme,
-                        )
-                        .opacity(if first_available.is_some() { 1. } else { 0.5 })
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            if let Some(start) = first_available {
-                                this.play_album(album_id, edition_index, start, cx);
-                            }
-                        })),
-                    )
-                    .child(
-                        button("album-next", "skip-forward", self.t(Text::PlayNext), theme)
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.enqueue_album(album_id, edition_index, true, cx)
-                            })),
-                    )
-                    .child(
-                        button("album-append", "list-end", self.t(Text::AppendQueue), theme)
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.enqueue_album(album_id, edition_index, false, cx)
-                            })),
-                    )
-                    .child(self.playlist_tools(edition.tracks.clone(), "album-to-playlist", cx)),
-            )
+            .child(self.album_actions(album, edition_index, true, cx))
             .child(
                 div()
                     .flex_1()
@@ -183,13 +135,77 @@ impl Rap {
             .into_any_element()
     }
 
+    /// Shared album actions; Home keeps its panes instead of a back button.
+    pub(super) fn album_actions(
+        &self,
+        album: &Album,
+        edition_index: usize,
+        back: bool,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let theme = self.theme();
+        let edition = &album.editions[edition_index];
+        let album_id = album.id;
+        let first_available = edition.tracks.iter().position(|t| t.available);
+        div()
+            .px(rems(1.5))
+            .pt(rems(1.))
+            .flex()
+            .items_center()
+            .gap(rems(0.5))
+            .flex_wrap()
+            .when(back, |v| {
+                v.child(
+                    button("back", "arrow-left", self.t(Text::Albums), theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.selected = None;
+                            cx.notify();
+                        }),
+                    ),
+                )
+            })
+            .child(
+                crate::widgets::accent_button(
+                    "play-album",
+                    "play",
+                    self.t(if first_available.is_some() {
+                        Text::Play
+                    } else {
+                        Text::AlbumUnavailable
+                    }),
+                    theme,
+                )
+                .opacity(if first_available.is_some() { 1. } else { 0.5 })
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if let Some(start) = first_available {
+                        this.play_album(album_id, edition_index, start, cx);
+                    }
+                })),
+            )
+            .child(
+                button("album-next", "skip-forward", self.t(Text::PlayNext), theme).on_click(
+                    cx.listener(move |this, _, _, cx| {
+                        this.enqueue_album(album_id, edition_index, true, cx)
+                    }),
+                ),
+            )
+            .child(
+                button("album-append", "list-end", self.t(Text::AppendQueue), theme).on_click(
+                    cx.listener(move |this, _, _, cx| {
+                        this.enqueue_album(album_id, edition_index, false, cx)
+                    }),
+                ),
+            )
+            .child(self.playlist_tools(edition.tracks.clone(), "album-to-playlist", cx))
+    }
+
     /// One choice per edition, best first, shown only when several exist.
-    fn editions_view(
+    pub(super) fn editions_view(
         &self,
         album: &Album,
         selected: usize,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> Div {
         let theme = self.theme();
         div()
             .px(rems(1.25))
@@ -227,10 +243,28 @@ impl Rap {
         parts.join(" · ")
     }
 
-    fn tracks_view(&self, album_id: i64, edition: usize, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn tracks_view(
+        &self,
+        album_id: i64,
+        edition: usize,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let count = self
             .selected_album()
             .map_or(0, |(a, i)| a.editions[i].tracks.len());
+        let home = self.section == crate::app::Section::Home;
+        let content_width = self.selected_album().map_or(512., |(album, index)| {
+            self.home
+                .catalog
+                .metrics
+                .tracks_width(album.editions[index].id)
+        });
+        let multi_disc = self.selected_album().is_some_and(|(album, index)| {
+            album.editions[index]
+                .tracks
+                .iter()
+                .any(|track| track.metadata.disc.unwrap_or(1) > 1)
+        });
         let list = uniform_list(
             "tracks",
             count,
@@ -242,7 +276,7 @@ impl Rap {
                 range
                     .filter_map(|i| tracks.get(i).map(|t| (i, t)))
                     .map(|(index, track)| {
-                        this.selection_row(
+                        let row = this.selection_row(
                             crate::track_list::TrackRow {
                                 selection: crate::track_list::Selection::Album {
                                     album: album_id,
@@ -250,6 +284,7 @@ impl Rap {
                                     track: track.id,
                                 },
                                 index,
+                                multi_disc,
                                 metadata: &track.metadata,
                                 available: track.available,
                                 current: this
@@ -261,14 +296,42 @@ impl Rap {
                                 last: index + 1 == tracks.len(),
                             },
                             cx,
-                        )
+                        );
+                        if home {
+                            div()
+                                .w_full()
+                                .min_w(rems(content_width / 16.))
+                                .child(row)
+                                .into_any_element()
+                        } else {
+                            row
+                        }
                     })
                     .collect()
             }),
         )
         .track_scroll(self.track_scroll.clone())
+        .when(home, |list| {
+            list.px(rems(0.75))
+                .with_horizontal_sizing_behavior(ListHorizontalSizingBehavior::Unconstrained)
+        })
         .flex_1()
+        .min_w_0()
         .min_h_0();
-        scroll_area(list, &self.track_bar, self.theme())
+        if home {
+            div()
+                .relative()
+                .flex_1()
+                .min_h_0()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .child(list)
+                .child(self.track_bar.render(self.theme()))
+                .child(self.track_bar.render_horizontal(self.theme()))
+                .into_any_element()
+        } else {
+            scroll_area(list, &self.track_bar, self.theme())
+        }
     }
 }

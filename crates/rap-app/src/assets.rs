@@ -24,6 +24,7 @@ impl AssetSource for Assets {
             ))));
         }
         Ok(icons!(
+            "house",
             "disc-3",
             "users",
             "tag",

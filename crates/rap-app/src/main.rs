@@ -10,6 +10,7 @@ mod bluetooth_preferences;
 mod catalog;
 mod filters;
 mod history;
+mod home;
 mod i18n;
 mod indexing;
 mod input;

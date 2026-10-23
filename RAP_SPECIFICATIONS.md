@@ -263,6 +263,13 @@ Les critères possibles comprennent :
 
 Le regroupement doit rester prudent.
 
+Dans un même dossier et pour un même titre d’album renseigné, un tag d’artiste
+d’album manquant ne crée pas une édition supplémentaire si un seul artiste
+d’album explicite existe et que tous les morceaux sans ce tag portent ce même
+artiste dans leurs tags. Les compilations et les cas contradictoires ou déduits
+restent séparés. Cette réconciliation utilise les métadonnées stockées dans RAP
+et ne modifie aucun tag source.
+
 En cas d'ambiguïté, il vaut mieux présenter deux albums distincts plutôt que fusionner incorrectement des éditions.
 
 Aucune suppression ou modification des fichiers ne doit intervenir.
@@ -405,6 +412,7 @@ L'interface principale comporte :
 
 Sections principales :
 
+- Accueil.
 - Albums.
 - Artistes.
 - Playlists manuelles.
@@ -412,6 +420,22 @@ Sections principales :
 - Paramètres.
 
 Genres et années sont accessibles par les filtres de la vue Albums.
+
+La vue Accueil, placée avant Artistes dans la navigation, propose trois panneaux
+simultanés : artistes, albums de l’artiste sélectionné, puis pistes de l’album
+sélectionné. Les listes défilent indépendamment. Les actions de lecture, les
+éditions, la recherche et les filtres réutilisent les contrôles existants. La
+navigation principale et le lecteur restent visibles. Les couleurs et les
+contrôles ne changent pas. La dernière sélection est restaurée au redémarrage.
+Les colonnes Artistes et Albums sont dimensionnées automatiquement au contenu
+pour afficher les noms complets sur une ligne. La largeur des albums s’adapte
+aux albums visibles de l’artiste sélectionné, y compris après filtrage.
+Elles sont incompressibles et
+ne disposent pas de redimensionnement manuel. La colonne des pistes occupe
+l’espace restant et permet un défilement horizontal indépendant si nécessaire.
+Les ascenseurs verticaux restent au bord droit de chaque colonne. Les sélections
+occupent la largeur disponible entre les marges intérieures. L’en-tête décoratif
+« Votre collection / Choisir un disque » n’est pas affiché sur Accueil.
 
 ## 8.4 Vue Albums
 

@@ -36,7 +36,10 @@ impl Rap {
         }
         match key {
             "f" if control => {
-                if !matches!(self.section, Section::Albums | Section::Artists) {
+                if !matches!(
+                    self.section,
+                    Section::Home | Section::Albums | Section::Artists
+                ) {
                     self.navigate(Section::Albums, cx);
                 }
                 self.search.read(cx).focus_handle(cx).focus(window);

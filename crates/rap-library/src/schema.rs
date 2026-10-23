@@ -9,7 +9,7 @@ use rap_core::model::Metadata;
 use rusqlite::{Connection, TransactionBehavior, params};
 use std::{collections::BTreeSet, path::Path};
 
-pub(crate) const VERSION: i64 = 6;
+pub(crate) const VERSION: i64 = 7;
 
 pub(crate) fn version(connection: &Connection) -> Result<i64> {
     Ok(connection.query_row("PRAGMA user_version", [], |row| row.get(0))?)
@@ -70,6 +70,9 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 7 {
+        reconcile_album_artists(connection)?;
+    }
     let violations: i64 =
         connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
             row.get(0)
@@ -77,6 +80,23 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
     if violations > 0 {
         bail!("Library database has {violations} inconsistent references");
     }
+    Ok(())
+}
+
+/// v7: repair editions split by partially populated album-artist tags. All
+/// information comes from SQLite, including for currently inaccessible sources.
+fn reconcile_album_artists(connection: &mut Connection) -> Result<()> {
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    transaction.execute_batch(
+        "CREATE INDEX IF NOT EXISTS editions_source_folder ON editions(source_id,folder);",
+    )?;
+    let editions = transaction
+        .prepare("SELECT id FROM editions")?
+        .query_map([], |row| row.get(0))?
+        .collect::<rusqlite::Result<BTreeSet<i64>>>()?;
+    catalog::regroup(&transaction, &editions)?;
+    transaction.pragma_update(None, "user_version", 7)?;
+    transaction.commit()?;
     Ok(())
 }
 

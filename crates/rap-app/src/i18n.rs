@@ -2,6 +2,9 @@ use rap_core::config::Language;
 
 #[derive(Clone, Copy)]
 pub enum Text {
+    Home,
+    ChooseArtist,
+    ChooseAlbum,
     Actions,
     Playlists,
     NewPlaylist,
@@ -308,6 +311,9 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::RepeatAll => ("File", "Queue"),
         Text::PlaybackError => ("Erreur", "Error"),
         Text::Albums => ("Albums", "Albums"),
+        Text::Home => ("Accueil", "Home"),
+        Text::ChooseArtist => ("Choisissez un artiste", "Choose an artist"),
+        Text::ChooseAlbum => ("Choisissez un album", "Choose an album"),
         Text::Artists => ("Artistes", "Artists"),
         Text::Settings => ("Paramètres", "Settings"),
         Text::AddSource => ("Ajouter un dossier", "Add folder"),

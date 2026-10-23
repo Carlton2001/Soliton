@@ -4802,6 +4802,8 @@ dependencies = [
  "rap-platform",
  "raw-window-handle",
  "resvg",
+ "rustybuzz 0.20.1",
+ "tempfile",
  "tracing",
  "tracing-subscriber",
  "unicode-segmentation",

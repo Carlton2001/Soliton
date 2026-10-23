@@ -6,6 +6,7 @@ use lofty::{
     prelude::TagExt,
     tag::{ItemKey, Tag, TagType},
 };
+use std::collections::BTreeSet;
 
 fn wav(path: &Path) {
     pcm(path, 44_100, 16);
@@ -64,6 +65,133 @@ fn album_tags<'a>(album: &'a str, artist: &'a str, year: &'a str) -> Vec<(ItemKe
 
 fn scan(library: &mut Library, id: i64) -> ScanReport {
     library.scan(id, &Cancellation::default(), |_| {}).unwrap()
+}
+
+#[test]
+fn partial_album_artist_tags_form_one_edition_and_later_conflicts_split_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("music/Nirvana");
+    let mut originals = Vec::new();
+    for index in 1..=11 {
+        let path = source.join(format!("Bleach-{index:02}.wav"));
+        pcm(&path, 96_000, 24);
+        let mut items = album_tags("Bleach", "Nirvana", "1989");
+        if index != 5 {
+            items.retain(|(key, _)| *key != ItemKey::AlbumArtist);
+        }
+        tag(&path, &items, false);
+        originals.push((path.clone(), std::fs::read(path).unwrap()));
+    }
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    let id = library.add_source(&source).unwrap();
+    scan(&mut library, id);
+    let snapshot = library.snapshot().unwrap();
+    assert_eq!(snapshot.albums.len(), 1);
+    assert_eq!(snapshot.albums[0].editions.len(), 1);
+    assert_eq!(snapshot.albums[0].primary().tracks.len(), 11);
+    let ids: BTreeSet<_> = snapshot.albums[0].tracks().map(|t| t.id).collect();
+    assert_eq!(scan(&mut library, id).progress.unchanged, 11);
+    // Adding a different explicit album artist makes the previously missing tags ambiguous.
+    let extra = source.join("other.wav");
+    pcm(&extra, 96_000, 24);
+    tag(&extra, &album_tags("Bleach", "Other", "1989"), false);
+    scan(&mut library, id);
+    let snapshot = library.snapshot().unwrap();
+    let nirvana = snapshot
+        .albums
+        .iter()
+        .find(|a| a.artist == "Nirvana")
+        .unwrap();
+    assert_eq!(nirvana.editions.len(), 2);
+    assert_eq!(nirvana.tracks().map(|t| t.id).collect::<BTreeSet<_>>(), ids);
+    for (path, bytes) in originals {
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn v6_migration_repairs_split_editions_offline_and_preserves_tracks_and_playlists() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("music/Nirvana");
+    let path = source.join("song.wav");
+    wav(&path);
+    tag(&path, &album_tags("Bleach", "Nirvana", "1989"), false);
+    let missing = source.join("other.wav");
+    wav(&missing);
+    let mut tags = album_tags("Bleach", "Nirvana", "1989");
+    tags.retain(|(key, _)| *key != ItemKey::AlbumArtist);
+    tag(&missing, &tags, false);
+    let storage = dir.path().join("data");
+    let mut library = Library::open(&storage).unwrap();
+    let id = library.add_source(&source).unwrap();
+    scan(&mut library, id);
+    let snapshot = library.snapshot().unwrap();
+    let tracks: Vec<_> = snapshot.albums[0].tracks().cloned().collect();
+    library
+        .change_playlist(rap_core::playlist::PlaylistChange::Create {
+            name: "Nirvana".into(),
+            tracks: tracks.clone(),
+        })
+        .unwrap();
+    // Recreate the v6 split using stored metadata; IDs and all file rows stay intact.
+    let untagged = tracks
+        .iter()
+        .find(|t| t.metadata.is_inferred("album_artist"))
+        .unwrap();
+    let folder = path_text(&source.canonicalize().unwrap())
+        .unwrap()
+        .to_owned();
+    let identity = crate::grouping::edition_identity(id, &folder, &untagged.metadata);
+    library
+        .connection
+        .execute(
+            "INSERT INTO editions(identity,source_id,folder,album_id) VALUES(?1,?2,?3,?4)",
+            params![identity, id, folder, snapshot.albums[0].id],
+        )
+        .unwrap();
+    let edition = library.connection.last_insert_rowid();
+    library
+        .connection
+        .execute(
+            "UPDATE tracks SET edition_id=?1 WHERE id=?2",
+            params![edition, untagged.id],
+        )
+        .unwrap();
+    library
+        .connection
+        .execute_batch(
+            "UPDATE files SET available=0; UPDATE sources SET available=0; PRAGMA user_version=6;",
+        )
+        .unwrap();
+    drop(library);
+    std::fs::rename(&source, dir.path().join("offline")).unwrap();
+    let library = Library::open(&storage).unwrap();
+    let snapshot = library.snapshot().unwrap();
+    assert_eq!(snapshot.albums.len(), 1);
+    assert_eq!(snapshot.albums[0].editions.len(), 1);
+    assert_eq!(snapshot.albums[0].primary().tracks.len(), 2);
+    assert!(snapshot.albums[0].tracks().all(|t| !t.available));
+    assert!(!snapshot.sources[0].available);
+    assert_eq!(
+        snapshot.albums[0]
+            .tracks()
+            .map(|t| t.id)
+            .collect::<BTreeSet<_>>(),
+        tracks.iter().map(|t| t.id).collect()
+    );
+    let playlist = library.playlists().unwrap().remove(0);
+    assert_eq!(
+        playlist
+            .entries
+            .iter()
+            .map(|e| e.track_id)
+            .collect::<Vec<_>>(),
+        tracks.iter().map(|t| Some(t.id)).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        schema::version(&library.connection).unwrap(),
+        schema::VERSION
+    );
 }
 
 #[test]

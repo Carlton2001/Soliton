@@ -14,6 +14,7 @@ const DEPTH: usize = 50;
 /// display settings.
 #[derive(Clone, PartialEq)]
 pub struct Place {
+    home_artist: Option<String>,
     playlist: Option<i64>,
     section: Section,
     album: Option<(i64, usize)>,
@@ -65,6 +66,9 @@ impl History {
 impl Rap {
     fn place(&self) -> Place {
         Place {
+            home_artist: (self.section == Section::Home)
+                .then(|| self.home.artist.clone())
+                .flatten(),
             playlist: if self.section == Section::Playlists {
                 self.playlists.selected
             } else {
@@ -92,7 +96,11 @@ impl Rap {
             playlist: self.playlists.selected,
             view: self.section.into(),
             album: self.selected,
-            artist: self.filter.artist.clone(),
+            artist: if self.section == Section::Home {
+                self.home.artist.clone()
+            } else {
+                self.filter.artist.clone()
+            },
         };
         if last != self.settings.last_view {
             self.settings.last_view = last;
@@ -120,6 +128,9 @@ impl Rap {
         let filter_changed = self.place().filter != place.filter;
         self.track_menu = None;
         self.section = place.section;
+        if self.section == Section::Home {
+            self.home.artist = place.home_artist;
+        }
         self.playlists.selected = place.playlist;
         self.selected = place.album.map(|(id, _)| id);
         self.selected_edition = place.album.map_or(0, |(_, edition)| edition);
@@ -140,6 +151,7 @@ impl Rap {
 impl From<View> for Section {
     fn from(view: View) -> Self {
         match view {
+            View::Home => Section::Home,
             View::Artists => Section::Artists,
             View::Albums => Section::Albums,
             View::Playlists => Section::Playlists,
@@ -152,6 +164,7 @@ impl From<View> for Section {
 impl From<Section> for View {
     fn from(section: Section) -> Self {
         match section {
+            Section::Home => View::Home,
             Section::Artists => View::Artists,
             Section::Albums => View::Albums,
             Section::Playlists => View::Playlists,

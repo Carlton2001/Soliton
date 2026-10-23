@@ -66,6 +66,7 @@ pub enum AlbumSort {
 /// Main page of the interface.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum View {
+    Home,
     Artists,
     /// Former Genres and Years pages reopen on the albums.
     #[default]

@@ -275,7 +275,8 @@ impl Library {
 
 /// Recomputes the album of each edition, then forgets empty editions and albums.
 pub(crate) fn regroup(connection: &Connection, editions: &BTreeSet<i64>) -> Result<()> {
-    for &edition in editions {
+    let editions = crate::edition_groups::reconcile(connection, editions)?;
+    for edition in editions {
         let identity: Option<String> = connection
             .prepare_cached("SELECT identity FROM editions WHERE id=?1")?
             .query_row([edition], |row| row.get(0))

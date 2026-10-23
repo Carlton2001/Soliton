@@ -27,7 +27,8 @@ pub fn cover_side(size: CoverSize) -> f32 {
 impl Rap {
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
-        let albums = self.section == Section::Albums && self.selected.is_none();
+        let albums = self.section == Section::Home
+            || (self.section == Section::Albums && self.selected.is_none());
         let grid = match self.section {
             Section::Albums if albums => Some(self.settings.album_grid),
             Section::Artists => Some(self.settings.artist_grid),
@@ -41,38 +42,41 @@ impl Rap {
             .gap(rems(0.625))
             .border_b_1()
             .border_color(theme.border)
-            .when(albums && self.settings.album_grid, |view| {
-                view.child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .gap(rems(1.))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(rems(0.25))
-                                .child(
-                                    div()
-                                        .text_size(TEXT_SMALL)
-                                        .text_color(theme.muted)
-                                        .child(self.t(Text::Collection)),
-                                )
-                                .child(
-                                    div()
-                                        .text_size(crate::widgets::TEXT_DISPLAY)
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .child(self.t(Text::PickRecord)),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .text_color(theme.muted)
-                                .child(crate::i18n::album_count(self.visible.len())),
-                        ),
-                )
-            })
+            .when(
+                self.section == Section::Albums && albums && self.settings.album_grid,
+                |view| {
+                    view.child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .gap(rems(1.))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(rems(0.25))
+                                    .child(
+                                        div()
+                                            .text_size(TEXT_SMALL)
+                                            .text_color(theme.muted)
+                                            .child(self.t(Text::Collection)),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(crate::widgets::TEXT_DISPLAY)
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .child(self.t(Text::PickRecord)),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .text_color(theme.muted)
+                                    .child(crate::i18n::album_count(self.visible.len())),
+                            ),
+                    )
+                },
+            )
             .child(
                 div()
                     .flex()

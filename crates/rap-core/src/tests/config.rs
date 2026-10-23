@@ -158,3 +158,18 @@ fn repeated_queue_occurrences_and_playlist_views_round_trip() {
         None
     );
 }
+
+#[test]
+fn home_artist_and_album_round_trip() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    let mut settings = Settings::default();
+    settings.last_view = LastView {
+        view: View::Home,
+        artist: Some("Björk".into()),
+        album: Some(42),
+        playlist: None,
+    };
+    settings.save(&path).unwrap();
+    assert_eq!(Settings::load(&path).unwrap().last_view, settings.last_view);
+}

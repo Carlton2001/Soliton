@@ -83,6 +83,7 @@ impl Rap {
     pub fn navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let entries = [
+            (Section::Home, "house", Text::Home),
             (Section::Artists, "users", Text::Artists),
             (Section::Albums, "disc-3", Text::Albums),
             (Section::Playlists, "list", Text::Playlists),

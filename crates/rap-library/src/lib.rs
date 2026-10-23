@@ -4,6 +4,7 @@ mod catalog;
 mod covers;
 mod database;
 mod discovery;
+mod edition_groups;
 mod grouping;
 mod indexer;
 mod metadata;

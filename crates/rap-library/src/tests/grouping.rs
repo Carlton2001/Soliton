@@ -108,3 +108,26 @@ fn edition_identity_ignores_inferred_album_artists() {
         edition_identity(2, "dir", &alpha)
     );
 }
+
+#[test]
+fn partial_album_artist_tags_require_a_single_explicit_artist_and_matching_tracks() {
+    let missing = track("Bleach", "Nirvana", Some(1989));
+    let mut tagged = missing.clone();
+    tagged.inferred.clear();
+    assert_eq!(
+        compatible_album_artist([&missing, &tagged]),
+        Some("nirvana".into())
+    );
+    assert_eq!(compatible_album_artist([&missing]), None);
+    let mut other = tagged.clone();
+    other.album_artist = "Other".into();
+    assert_eq!(compatible_album_artist([&missing, &tagged, &other]), None);
+    let guest = track("Bleach", "Guest", Some(1989));
+    assert_eq!(compatible_album_artist([&tagged, &guest]), None);
+    let mut flagged = missing.clone();
+    flagged.compilation = true;
+    assert_eq!(compatible_album_artist([&tagged, &flagged]), None);
+    let mut inferred = missing.clone();
+    inferred.inferred.push("album".into());
+    assert_eq!(compatible_album_artist([&tagged, &inferred]), None);
+}

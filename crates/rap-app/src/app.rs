@@ -24,6 +24,7 @@ use std::{
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Section {
+    Home,
     Albums,
     Artists,
     Playlists,
@@ -32,6 +33,7 @@ pub enum Section {
 }
 
 pub struct Rap {
+    pub home: crate::home::Home,
     pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
     pub track_menu: Option<(crate::track_list::Selection, bool)>,
     pub playlists: crate::playlists::Playlists,
@@ -123,7 +125,7 @@ impl Rap {
             // The field searches albums on the album pages and filters the
             // list shown elsewhere, which only needs a new render.
             cx.observe(&search, |this, search, cx| {
-                let query = if this.section == Section::Albums {
+                let query = if matches!(this.section, Section::Home | Section::Albums) {
                     search.read(cx).content.to_string()
                 } else {
                     String::new()
@@ -134,7 +136,7 @@ impl Rap {
                     }
                     this.filter.query = query;
                     this.query_pending = true;
-                } else if this.section != Section::Albums {
+                } else if !matches!(this.section, Section::Home | Section::Albums) {
                     cx.notify();
                 }
             }),
@@ -152,10 +154,17 @@ impl Rap {
         let filter = Filter {
             sort: settings.album_sort,
             hide_unavailable: settings.hide_unavailable,
-            artist: last.artist.clone(),
+            artist: (last.view != rap_core::config::View::Home)
+                .then(|| last.artist.clone())
+                .flatten(),
             ..Default::default()
         };
         let mut this = Self {
+            home: crate::home::Home::new(
+                (last.view == rap_core::config::View::Home)
+                    .then(|| last.artist.clone())
+                    .flatten(),
+            ),
             tracks: Arc::default(),
             track_menu: None,
             playlists: crate::playlists::Playlists::new(playlist_name),
@@ -351,6 +360,10 @@ impl Rap {
                     self.visible = view.visible;
                     self.facets = view.facets;
                     self.filter_options = view.options;
+                    self.home.catalog = view.home;
+                    if self.section == Section::Home {
+                        self.reconcile_home();
+                    }
                     self.keyboard_index = self
                         .keyboard_index
                         .min(self.visible.len().saturating_sub(1));
@@ -460,6 +473,9 @@ impl Rap {
         self.selected = None;
         self.track_menu = None;
         self.menu = None;
+        if section == Section::Home {
+            self.reconcile_home();
+        }
         cx.notify();
     }
     /// Shows an album sheet on its best edition.
@@ -608,6 +624,7 @@ impl Render for Rap {
         self.menu_search
             .update(cx, |input, _| input.placeholder = find.into());
         let body = match self.section {
+            Section::Home => self.home_view(cx),
             Section::Queue => self.queue_view(cx),
             Section::Playlists => self.playlists_view(cx),
             Section::Settings => self.settings_view(cx),
@@ -623,8 +640,9 @@ impl Render for Rap {
             .min_h_0()
             .overflow_hidden()
             .when(
-                matches!(self.section, Section::Albums | Section::Artists)
-                    && self.selected.is_none(),
+                self.section == Section::Home
+                    || (matches!(self.section, Section::Albums | Section::Artists)
+                        && self.selected.is_none()),
                 |v| v.child(self.header(cx)),
             )
             .child(body);
