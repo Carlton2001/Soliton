@@ -16,6 +16,7 @@ mod indexing;
 mod input;
 mod keys;
 mod notices;
+mod now_playing;
 mod output_watch;
 mod placement;
 mod playback;

@@ -15,12 +15,17 @@ pub struct Slider {
 }
 
 impl Slider {
+    pub fn is_dragging(&self) -> bool {
+        self.dragging.get()
+    }
+
     /// `value` in 0..=1. The whole element height is the hit area; the rail is
     /// drawn in the middle. Geometry is read at paint time, like the scrollbar.
     pub fn render(
         &self,
         value: f32,
         enabled: bool,
+        midpoint: bool,
         theme: Theme,
         on_change: OnChange,
     ) -> Canvas<Hitbox> {
@@ -47,6 +52,18 @@ impl Slider {
                     )
                     .corner_radii(px(rail_height / 2.)),
                 );
+                if midpoint {
+                    let marker = Bounds::new(
+                        point(
+                            bounds.center().x - px(scaled(0.5)),
+                            bounds.center().y - px(scaled(8.)),
+                        ),
+                        size(px(scaled(1.)), px(scaled(3.))),
+                    );
+                    let mut marker_color = theme.muted;
+                    marker_color.a = 0.4;
+                    window.paint_quad(fill(marker, marker_color));
+                }
                 if active {
                     let thumb = Bounds::new(
                         point(

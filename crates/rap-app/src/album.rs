@@ -312,8 +312,9 @@ impl Rap {
         )
         .track_scroll(self.track_scroll.clone())
         .when(home, |list| {
-            list.px(rems(0.75))
-                .with_horizontal_sizing_behavior(ListHorizontalSizingBehavior::Unconstrained)
+            // GPUI adds horizontal list padding to the item origin twice in
+            // unconstrained mode. Keep insets on rows and rails outside the list.
+            list.with_horizontal_sizing_behavior(ListHorizontalSizingBehavior::Unconstrained)
         })
         .flex_1()
         .min_w_0()
@@ -326,6 +327,11 @@ impl Rap {
                 .min_w_0()
                 .flex()
                 .flex_col()
+                .px(rems(0.75))
+                .when(
+                    self.track_bar.handle.max_offset().width > px(0.5),
+                    |frame| frame.pb(rems(0.75)),
+                )
                 .child(list)
                 .child(self.track_bar.render(self.theme()))
                 .child(self.track_bar.render_horizontal(self.theme()))

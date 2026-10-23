@@ -425,7 +425,7 @@ impl Rap {
         }
     }
 
-    pub fn footer(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn footer(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         div()
             .flex()
@@ -460,7 +460,7 @@ impl Rap {
                         )),
                 )
             })
-            .child(self.player(cx))
+            .child(self.player(window, cx))
     }
 }
 

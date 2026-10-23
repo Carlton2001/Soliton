@@ -534,12 +534,21 @@ Barre de lecture permanente avec :
 
 Simplification retenue le 23 octobre 2026 : la file de lecture possède une page
 dédiée, accessible par la navigation principale. Le tiroir de file et la vue de
-session séparée sont supprimés. F11 affiche la page active en plein écran en
+session séparée avaient été supprimés. La page « Lecture en cours » est rétablie le 24 octobre 2026 : grande pochette centrée, métadonnées et cartouche permanent, accessible par le bouton Agrandir du lecteur ; Retour ou Échap ferme cette page sans perdre la vue précédente. F11 affiche la page active en plein écran en
 conservant la navigation et la barre de lecture. Les actions comportent un libellé,
 sauf les commandes usuelles du lecteur (précédent, lire/pause, suivant, aléatoire,
 répéter et couper/rétablir le son) et Lire/Pause dans les listes de pistes : ces
 icônes disposent d'une infobulle. Les actions secondaires des morceaux sont
 réunies dans un menu « Actions ».
+
+Disposition du cartouche retenue le 24 octobre 2026, inspirée du Lecteur
+multimédia Windows : progression et temps au-dessus, puis pochette et
+métadonnées à gauche, commandes centrées et volume à droite.
+Les commandes suivent l'ordre Aléatoire, Précédent, Lecture/Pause, Suivant,
+Répéter, puis accès à la file ; Lecture/Pause reste au centre horizontal. En fenêtre étroite, le volume devient un bouton ouvrant une barre dans un panneau au-dessus ; clic extérieur ou Échap ferme ce panneau. La pochette s'efface en
+fenêtre étroite pour préserver les métadonnées. L'accès à la file est une icône
+avec infobulle, comme le bouton Lecture en cours, exceptions au libellé des actions ci-dessus. Les valeurs de volume
+et de recherche temporelle apparaissent dans des puces pendant leur réglage.
 
 ## 8.10 Interactions
 

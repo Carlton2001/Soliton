@@ -110,7 +110,10 @@ impl Rap {
 
     pub fn go_back(&mut self, cx: &mut Context<Self>) {
         // An open menu is closed first, like the Escape key does.
-        if self.menu.take().is_some() || self.track_menu.take().is_some() {
+        if std::mem::take(&mut self.now_playing)
+            || self.menu.take().is_some()
+            || self.track_menu.take().is_some()
+        {
             cx.notify();
         } else if let Some(place) = self.history.back() {
             self.restore(place, cx);

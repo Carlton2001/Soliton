@@ -180,6 +180,7 @@ impl Rap {
         &self,
         title: impl Into<SharedString>,
         subtitle: impl Into<SharedString>,
+        counter: bool,
     ) -> Div {
         div()
             .p(rems(0.75))
@@ -187,6 +188,15 @@ impl Rap {
             .flex()
             .flex_col()
             .gap(rems(0.25))
+            .when(counter, |heading| {
+                heading
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .gap(rems(0.75))
+                    .border_b_1()
+                    .border_color(self.theme().border)
+            })
             .child(div().text_size(TEXT_TITLE).child(title.into()))
             .child(
                 div()
@@ -249,6 +259,7 @@ impl Rap {
             .child(self.home_heading(
                 self.t(Text::Artists),
                 self.home.catalog.artists.len().to_string(),
+                true,
             ))
             .when(self.home.catalog.artists.is_empty(), |v| {
                 v.child(
@@ -367,7 +378,7 @@ impl Rap {
             .flex_col()
             .border_r_1()
             .border_color(theme.border)
-            .child(self.home_heading(self.t(Text::Albums), crate::i18n::album_count(count)))
+            .child(self.home_heading(self.t(Text::Albums), crate::i18n::album_count(count), true))
             .when(count == 0, |v| {
                 v.child(
                     div()
@@ -397,7 +408,7 @@ impl Rap {
             .find(|a| Some(a.id) == self.selected)
         else {
             return pane
-                .child(self.home_heading(self.t(Text::Tracks), self.t(Text::ChooseAlbum)))
+                .child(self.home_heading(self.t(Text::Tracks), self.t(Text::ChooseAlbum), false))
                 .into_any_element();
         };
         let index = if self.selected_edition < album.editions.len() {

@@ -62,7 +62,10 @@ impl Rap {
                 return;
             }
             "escape" => {
-                if window.is_fullscreen() {
+                if self.volume_popup {
+                    self.volume_popup = false;
+                    cx.notify();
+                } else if window.is_fullscreen() {
                     window.toggle_fullscreen();
                 } else {
                     self.back(cx);

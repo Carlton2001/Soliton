@@ -33,6 +33,8 @@ pub enum Section {
 }
 
 pub struct Rap {
+    pub now_playing: bool,
+    pub volume_popup: bool,
     pub home: crate::home::Home,
     pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
     pub track_menu: Option<(crate::track_list::Selection, bool)>,
@@ -160,6 +162,8 @@ impl Rap {
             ..Default::default()
         };
         let mut this = Self {
+            now_playing: false,
+            volume_popup: false,
             home: crate::home::Home::new(
                 (last.view == rap_core::config::View::Home)
                     .then(|| last.artist.clone())
@@ -469,6 +473,8 @@ impl Rap {
         cx.notify();
     }
     pub fn navigate(&mut self, section: Section, cx: &mut Context<Self>) {
+        self.volume_popup = false;
+        self.now_playing = false;
         self.section = section;
         self.selected = None;
         self.track_menu = None;
@@ -480,6 +486,8 @@ impl Rap {
     }
     /// Shows an album sheet on its best edition.
     pub fn open_album(&mut self, id: i64, cx: &mut Context<Self>) {
+        self.volume_popup = false;
+        self.now_playing = false;
         self.selected = Some(id);
         self.selected_edition = 0;
         if self.section != Section::Albums {
@@ -517,6 +525,12 @@ impl Rap {
     }
     /// Leaves the innermost view: menu, now playing, album sheet.
     pub fn back(&mut self, cx: &mut Context<Self>) {
+        if self.now_playing && self.menu.is_none() && self.track_menu.is_none() {
+            self.volume_popup = false;
+            self.now_playing = false;
+            cx.notify();
+            return;
+        }
         if self.playlists.dialog.take().is_some() || self.track_menu.take().is_some() {
             cx.notify();
             return;
@@ -623,14 +637,21 @@ impl Render for Rap {
         let find = self.t(Text::Find);
         self.menu_search
             .update(cx, |input, _| input.placeholder = find.into());
-        let body = match self.section {
-            Section::Home => self.home_view(cx),
-            Section::Queue => self.queue_view(cx),
-            Section::Playlists => self.playlists_view(cx),
-            Section::Settings => self.settings_view(cx),
-            _ if self.selected.is_some() => self.album_view(window, cx),
-            Section::Albums => self.albums_view(cx),
-            Section::Artists => self.artists_view(cx),
+        if f32::from(window.viewport_size().width) / f32::from(window.rem_size()) >= 44. {
+            self.volume_popup = false;
+        }
+        let body = if self.now_playing {
+            self.now_playing_view(window, cx)
+        } else {
+            match self.section {
+                Section::Home => self.home_view(cx),
+                Section::Queue => self.queue_view(cx),
+                Section::Playlists => self.playlists_view(cx),
+                Section::Settings => self.settings_view(cx),
+                _ if self.selected.is_some() => self.album_view(window, cx),
+                Section::Albums => self.albums_view(cx),
+                Section::Artists => self.artists_view(cx),
+            }
         };
         let main = div()
             .flex()
@@ -640,9 +661,10 @@ impl Render for Rap {
             .min_h_0()
             .overflow_hidden()
             .when(
-                self.section == Section::Home
-                    || (matches!(self.section, Section::Albums | Section::Artists)
-                        && self.selected.is_none()),
+                !self.now_playing
+                    && (self.section == Section::Home
+                        || (matches!(self.section, Section::Albums | Section::Artists)
+                            && self.selected.is_none())),
                 |v| v.child(self.header(cx)),
             )
             .child(body);
@@ -650,6 +672,15 @@ impl Render for Rap {
         div()
             .relative()
             .track_focus(&self.focus)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    if this.volume_popup {
+                        this.volume_popup = false;
+                        cx.notify();
+                    }
+                }),
+            )
             .on_key_down(cx.listener(Self::key))
             .on_mouse_down(
                 MouseButton::Navigate(NavigationDirection::Back),
@@ -670,7 +701,7 @@ impl Render for Rap {
             .child(self.navigation(cx))
             .child(main)
             .children(notices)
-            .child(self.footer(cx))
+            .child(self.footer(window, cx))
             .children(self.menu_view(cx))
             .children(self.close_dialog(cx))
             .children(self.playlist_dialog(cx))
