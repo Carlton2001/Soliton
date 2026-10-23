@@ -1,5 +1,67 @@
 # Architecture et décisions
 
+## Collection, sessions et playlists — 23 octobre 2026
+
+La bibliothèque conserve sa virtualisation. La grille prend une présentation en
+bacs ; la fiche album place pochette et métadonnées à côté des pistes sur les
+grandes fenêtres. Après le retour utilisateur sur les panneaux, la navigation
+nommée reste visible sous la barre de titre : Artistes, Albums, Playlists, File de
+lecture et Paramètres. La file a une page unique ; tiroir et session distincte
+sont supprimés. Les commandes usuelles du lecteur et Lire/Pause dans les listes
+utilisent une icône avec infobulle. Les autres actions gardent leur libellé ; les
+pistes partagent le bouton Actions et son menu de commandes nommées.
+F11 garde la page active et ses repères de navigation.
+Inter Regular/Italic variable est embarquée ; les valeurs numériques activent
+la fonction OpenType `tnum`, comme les informations chiffrées d'Oxyde.
+JetBrains Mono fournie parmi les assets n'est pas nécessaire à l'interface.
+L'API de chargement des fontes et les chiffres tabulaires ont été examinés dans
+Oxyde et vérifiés contre GPUI 0.2.2. Aucun composant applicatif n'est copié.
+
+Le moteur audio reste propriétaire de la file. Les occurrences ont des
+identifiants stables et non réutilisés pendant la vie du moteur. Le chemin du
+fichier identifie les doublons lors du chargement et de l'ajout ; les versions
+distinctes d'un titre restent séparées. Le chargement conserve le fichier
+sélectionné après dédoublonnage, avec sa provenance associée à la première
+occurrence conservée. Les commandes
+d'ajout, déplacement, retrait et vidage de la suite ne rouvrent pas le flux
+courant. Les instantanés immuables sont partagés via Arc, reconstruits uniquement
+lorsque l'ordre ou la position courante change. La reprise sauvegarde aussi
+l'indice de l'occurrence, avec compatibilité des anciennes configurations.
+Chaque occurrence peut porter l'identifiant de l'entrée de playlist qui l'a
+lancée. Cette provenance est conservée lors des déplacements, de l'aléatoire et
+de la reprise. La surbrillance de la playlist utilise cet identifiant d'entrée.
+
+La migration SQLite 5 ajoute playlists et entrées ordonnées. Les entrées
+conservent les dernières métadonnées et une référence nullable à la piste :
+retirer une source du catalogue ne détruit pas les sélections personnelles.
+La migration 6 mémorise aussi le chemin et impose son unicité dans chaque playlist.
+Elle supprime les doublons existants dont le chemin peut être retrouvé dans le
+catalogue, en gardant la première entrée dans l'ordre enregistré. Les anciennes
+entrées sans référence et sans chemin sont conservées : leurs métadonnées seules
+ne permettent pas de distinguer un doublon d'une autre édition. Les nouveaux
+ajouts conservent leur chemin même après le retrait du catalogue.
+Les modifications sont transactionnelles sur le worker d'écriture existant.
+Le worker de requêtes prépare aussi l'index des pistes, partagé entre les vues
+pour éviter de reconstruire cet index pendant les rendus. Les listes de pistes
+et le sélecteur de playlist sont virtualisés ; les textes nouveaux existent en
+français et en anglais. Les SVG Lucide officiels sont conservés sans modification.
+
+Validation Windows : `cargo fmt --check`, `cargo check --workspace --locked`
+sans avertissement et construction de `rap.exe`. Les suites ciblées application,
+audio et bibliothèque totalisent 58 tests automatiques réussis, dont la migration
+des doublons, les ajouts répétés et la reprise dédoublonnée ; trois tests audio
+de codecs ou d'intégration native restent ignorés par défaut. Les tests HTTP
+locaux ont été exécutés lors de la validation précédente, hors bac à sable après
+un refus de socket ; les tests de configuration utilisent un répertoire
+temporaire dans `target/test-temp`.
+Le scénario `scripts/smoke-windows.ps1 -Collections` vérifie l'ouverture d'une
+playlist enregistrée depuis la file et capture bibliothèque, album, dialogue,
+playlist, lecture surlignée, renommage, menu Actions et file dédiée
+(1180 × 780 et 640 × 600). Les captures ont été
+contrôlées en français/sombre et anglais/clair à 125 % Windows. La base isolée
+confirme cinq entrées sauvegardées et le nom modifié. Ces scénarios lisent les
+signaux synthétiques à volume nul ; Linux n'est pas validé.
+
 ## Phase 0
 
 Workspace Rust 2024 : `rap-core` (domaine, contrats, configuration), `rap-library`

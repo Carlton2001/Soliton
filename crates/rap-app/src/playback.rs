@@ -6,7 +6,6 @@ use rap_core::model::Album;
 
 impl Rap {
     pub fn audio_command(&mut self, command: Command, cx: &mut Context<Self>) {
-        self.resume.played(&command);
         if self.playback.output_changing
             && matches!(
                 &command,
@@ -46,6 +45,26 @@ impl Rap {
             .collect();
         let start = tracks.iter().position(|t| t.id == start_id).unwrap_or(0);
         self.audio_command(Command::Play { tracks, start }, cx);
+    }
+
+    pub fn enqueue_album(&mut self, id: i64, edition: usize, next: bool, cx: &mut Context<Self>) {
+        if let Some(edition) = self
+            .snapshot
+            .albums
+            .iter()
+            .find(|a| a.id == id)
+            .and_then(|a| a.editions.get(edition))
+        {
+            let tracks = edition
+                .tracks
+                .iter()
+                .filter(|t| t.available)
+                .cloned()
+                .collect::<Vec<_>>();
+            if !tracks.is_empty() {
+                self.audio_command(Command::Enqueue { tracks, next }, cx);
+            }
+        }
     }
 
     pub fn play_pause(&mut self, cx: &mut Context<Self>) {

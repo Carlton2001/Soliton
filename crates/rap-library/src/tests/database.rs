@@ -427,6 +427,8 @@ fn accent_variants_merge_and_older_identities_are_rekeyed() {
             "UPDATE editions SET identity=identity||'-v2'||id;
              UPDATE albums SET identity='v2';
              ALTER TABLE files DROP COLUMN added;
+             DROP TABLE playlist_entries;
+             DROP TABLE playlists;
              PRAGMA user_version=2;",
         )
         .unwrap();

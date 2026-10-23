@@ -15,11 +15,14 @@ mod indexing;
 mod input;
 mod keys;
 mod notices;
-mod now_playing;
 mod output_watch;
+mod placement;
 mod playback;
 mod player;
+mod playlist_view;
+mod playlists;
 mod preferences;
+mod queue_view;
 mod resume;
 mod scale;
 mod scrollbar;
@@ -28,6 +31,7 @@ mod slider;
 mod system;
 mod theme;
 mod title_bar;
+mod track_list;
 mod views;
 mod widgets;
 
@@ -53,6 +57,7 @@ fn main() -> anyhow::Result<()> {
     Application::new()
         .with_assets(assets::Assets)
         .run(move |cx| {
+            assets::Assets::load_fonts(cx).expect("Cannot load the bundled Inter fonts");
             input::bind_keys(cx);
             cx.on_window_closed(|cx| {
                 if cx.windows().is_empty() {
@@ -60,11 +65,11 @@ fn main() -> anyhow::Result<()> {
                 }
             })
             .detach();
-            let bounds = Bounds::centered(None, size(px(1180.), px(780.)), cx);
+            let window_bounds = placement::restore(settings.window, cx);
             cx.open_window(
                 WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    window_min_size: Some(size(px(880.), px(600.))),
+                    window_bounds: Some(window_bounds),
+                    window_min_size: Some(placement::MIN_SIZE),
                     titlebar: Some(TitlebarOptions {
                         appears_transparent: true,
                         title: Some("RAP".into()),

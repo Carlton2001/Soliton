@@ -2,7 +2,7 @@
 use crate::{
     app::Rap,
     i18n::Text,
-    widgets::{button, icon_button, plain_paths, tinted_icon},
+    widgets::{button, plain_paths, tinted_icon},
 };
 use gpui::{prelude::*, *};
 
@@ -96,7 +96,15 @@ impl Rap {
                             .flex()
                             .flex_col()
                             .gap(rems(0.25))
-                            .children(self.notices.items.iter().rev().skip(1).map(line)),
+                            // Lines keep their height so the list scrolls instead.
+                            .children(
+                                self.notices
+                                    .items
+                                    .iter()
+                                    .rev()
+                                    .skip(1)
+                                    .map(|notice| line(notice).flex_shrink_0()),
+                            ),
                     )
                 })
                 .child(
@@ -127,7 +135,7 @@ impl Rap {
                             )
                         })
                         .child(
-                            icon_button("notices-dismiss", "x", self.t(Text::DismissAll), theme)
+                            button("notices-dismiss", "x", self.t(Text::DismissAll), theme)
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.notices.clear();
                                     cx.notify();

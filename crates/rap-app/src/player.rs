@@ -1,11 +1,9 @@
-//! Permanent playback bar, and controls shared with the now playing view.
+//! Permanent playback bar and transport controls.
 use crate::{
     app::Rap,
     i18n::Text,
     slider::OnChange,
-    widgets::{
-        CONTROL_HEIGHT, TEXT_CAPTION, TEXT_SMALL, cover, time, tinted_icon, tool, with_tooltip,
-    },
+    widgets::{CONTROL_HEIGHT, TEXT_CAPTION, TEXT_SMALL, cover, time},
 };
 use gpui::{prelude::*, *};
 use rap_audio::{Command, PlaybackState, Repeat};
@@ -16,21 +14,13 @@ impl Rap {
         let theme = self.theme();
         let track = self.playback.track.as_ref();
         let subtitle = track
-            .map(|t| {
-                [&t.metadata.artist, &t.metadata.album]
-                    .into_iter()
-                    .filter(|v| !v.is_empty())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(" · ")
-            })
+            .map(|t| format!("{} · {}", t.metadata.artist, t.metadata.album))
             .unwrap_or_default();
-        let enabled = self.audio.is_some();
         div()
-            .flex_shrink_0()
+            .flex_none()
             .flex()
-            .items_center()
-            .gap(rems(1.))
+            .flex_col()
+            .gap(rems(0.5))
             .px(rems(1.))
             .py(rems(0.625))
             .bg(theme.panel)
@@ -38,127 +28,114 @@ impl Rap {
             .border_color(theme.border)
             .child(
                 div()
-                    .id("current-track")
-                    .w(rems(17.5))
-                    .flex_shrink_0()
-                    .min_w_0()
                     .flex()
                     .items_center()
                     .gap(rems(0.75))
-                    .p(rems(0.25))
-                    .rounded(crate::widgets::RADIUS_LARGE)
-                    .when(track.is_some(), |view| {
-                        view.hover(move |s| s.bg(theme.hover))
-                            .active(move |s| s.bg(theme.pressed))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.now_playing = true;
-                                cx.notify();
-                            }))
-                    })
-                    .child(cover(track.and_then(|t| t.cover.as_ref()), 48., theme))
+                    .flex_wrap()
                     .child(
                         div()
-                            .min_w_0()
+                            .flex_1()
+                            .min_w(rems(10.))
                             .flex()
-                            .flex_col()
-                            .child(div().truncate().font_weight(FontWeight::SEMIBOLD).child(
-                                track.map(|t| t.metadata.title.clone()).unwrap_or_else(|| {
-                                    self.t(if enabled {
-                                        Text::NothingPlaying
-                                    } else {
-                                        Text::AudioUnavailable
-                                    })
-                                    .into()
-                                }),
-                            ))
+                            .items_center()
+                            .gap(rems(0.75))
+                            .child(cover(track.and_then(|t| t.cover.as_ref()), 40., theme))
                             .child(
                                 div()
-                                    .truncate()
-                                    .text_size(TEXT_SMALL)
-                                    .text_color(theme.muted)
-                                    .child(subtitle),
+                                    .flex_1()
+                                    .min_w_0()
+                                    .flex()
+                                    .flex_col()
+                                    .child(
+                                        div().truncate().font_weight(FontWeight::SEMIBOLD).child(
+                                            track.map(|t| t.metadata.title.clone()).unwrap_or_else(
+                                                || {
+                                                    self.t(if self.audio.is_some() {
+                                                        Text::NothingPlaying
+                                                    } else {
+                                                        Text::AudioUnavailable
+                                                    })
+                                                    .into()
+                                                },
+                                            ),
+                                        ),
+                                    )
+                                    .child(
+                                        div()
+                                            .truncate()
+                                            .text_size(TEXT_SMALL)
+                                            .text_color(theme.muted)
+                                            .child(subtitle),
+                                    ),
                             ),
-                    ),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap(rems(0.25))
-                    .child(self.transport(false, cx))
-                    .child(self.progress_row(cx).w_full().max_w(rems(45.))),
-            )
-            .child(
-                div()
-                    .w(rems(15.))
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .gap(rems(0.25))
-                    .child(self.volume_control(110., cx))
+                    )
                     .child(
-                        tool(
-                            "open-now-playing",
-                            "maximize-2",
-                            self.t(Text::NowPlaying),
-                            false,
+                        crate::widgets::button(
+                            "open-queue",
+                            "list-end",
+                            self.t(Text::Queue),
                             theme,
                         )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.now_playing = true;
-                            cx.notify();
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.focus.focus(window);
+                            this.navigate(crate::app::Section::Queue, cx);
                         })),
-                    ),
+                    )
+                    .child(self.volume_control(80., cx)),
             )
+            .child(self.transport(cx))
+            .child(self.progress_row(cx).w_full())
     }
 
-    /// Shuffle, previous, play or pause, next and repeat.
-    pub fn transport(&self, large: bool, cx: &mut Context<Self>) -> Div {
+    pub fn transport(&self, cx: &mut Context<Self>) -> Div {
         let theme = self.theme();
         let p = &self.playback;
-        let (repeat_icon, repeat_label) = match p.repeat {
-            Repeat::Off => ("repeat", Text::RepeatOff),
-            Repeat::All => ("repeat", Text::RepeatAll),
-            Repeat::Track => ("repeat-1", Text::RepeatTrack),
-        };
-        let next_repeat = match p.repeat {
-            Repeat::Off => Repeat::All,
-            Repeat::All => Repeat::Track,
-            Repeat::Track => Repeat::Off,
+        let (repeat_icon, repeat_label, next_repeat) = match p.repeat {
+            Repeat::Off => ("repeat", Text::RepeatOff, Repeat::All),
+            Repeat::All => ("repeat", Text::RepeatAll, Repeat::Track),
+            Repeat::Track => ("repeat-1", Text::RepeatTrack, Repeat::Off),
         };
         let playing = p.state == PlaybackState::Playing;
-        // The main action stands out with the accent fill.
-        let main = with_tooltip(
-            div()
-                .id("play-pause")
-                .size(if large { rems(3.5) } else { rems(2.5) })
-                .flex()
-                .flex_none()
-                .items_center()
-                .justify_center()
-                .rounded_full()
-                .bg(theme.accent)
-                .hover(|s| s.opacity(0.9))
-                .active(|s| s.opacity(0.8))
-                .child(
-                    tinted_icon(if playing { "pause" } else { "play" }, theme.on_accent)
-                        .size(if large { rems(1.5) } else { rems(1.125) }),
-                ),
-            self.t(if playing { Text::Pause } else { Text::Play })
-                .into(),
-            theme,
-        );
         div()
             .flex()
             .items_center()
-            .gap(if large { rems(1.25) } else { rems(0.5) })
-            .when(self.audio.is_none(), |row| row.opacity(0.4))
+            .justify_center()
+            .flex_wrap()
+            .gap(rems(0.5))
+            .when(self.audio.is_none(), |v| v.opacity(0.4))
             .child(
-                tool(
+                crate::widgets::icon_button(
+                    "previous",
+                    "skip-back",
+                    self.t(Text::Previous),
+                    false,
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.audio_command(Command::Previous, cx))),
+            )
+            .child(
+                crate::widgets::icon_button(
+                    "play-pause",
+                    if playing { "pause" } else { "play" },
+                    self.t(if playing { Text::Pause } else { Text::Play }),
+                    true,
+                    theme,
+                )
+                .size(rems(2.5))
+                .on_click(cx.listener(|this, _, _, cx| this.play_pause(cx))),
+            )
+            .child(
+                crate::widgets::icon_button(
+                    "next",
+                    "skip-forward",
+                    self.t(Text::Next),
+                    false,
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.audio_command(Command::Next, cx))),
+            )
+            .child(
+                crate::widgets::icon_button(
                     "shuffle",
                     "shuffle",
                     self.t(Text::Shuffle),
@@ -170,22 +147,7 @@ impl Rap {
                 })),
             )
             .child(
-                tool(
-                    "previous",
-                    "skip-back",
-                    self.t(Text::Previous),
-                    false,
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| this.audio_command(Command::Previous, cx))),
-            )
-            .child(main.on_click(cx.listener(|this, _, _, cx| this.play_pause(cx))))
-            .child(
-                tool("next", "skip-forward", self.t(Text::Next), false, theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.audio_command(Command::Next, cx))),
-            )
-            .child(
-                tool(
+                crate::widgets::icon_button(
                     "repeat",
                     repeat_icon,
                     self.labelled(self.t(Text::Repeat), self.t(repeat_label)),
@@ -222,14 +184,26 @@ impl Rap {
             .gap(rems(0.75))
             .text_size(TEXT_CAPTION)
             .text_color(theme.muted)
-            .child(div().w(rems(2.5)).flex().justify_end().child(time(shown)))
+            .child(
+                div()
+                    .font(crate::widgets::numeric_font())
+                    .w(rems(2.5))
+                    .flex()
+                    .justify_end()
+                    .child(time(shown)),
+            )
             .child(
                 self.seek_slider
                     .render(fraction, enabled, theme, on_change)
                     .flex_1()
                     .h(rems(1.125)),
             )
-            .child(div().w(rems(2.5)).child(time(p.duration_ms)))
+            .child(
+                div()
+                    .font(crate::widgets::numeric_font())
+                    .w(rems(2.5))
+                    .child(time(p.duration_ms)),
+            )
     }
 
     /// Mute toggle and draggable volume.
@@ -247,18 +221,23 @@ impl Rap {
         let on_change: OnChange = Rc::new(move |fraction, released, _, cx| {
             let _ = entity.update(cx, |this, cx| this.set_volume(fraction, released, cx));
         });
+        // The slider narrows before the buttons around it.
         div()
             .flex()
+            .flex_shrink()
+            .min_w_0()
             .items_center()
             .gap(rems(0.25))
             .child(
-                tool("mute", name, self.t(label), false, theme)
+                crate::widgets::icon_button("mute", name, self.t(label), false, theme)
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_mute(cx))),
             )
             .child(
                 self.volume_slider
                     .render(volume, self.audio.is_some(), theme, on_change)
                     .w(rems(width / 16.))
+                    .flex_shrink()
+                    .min_w(rems(2.))
                     .h(CONTROL_HEIGHT),
             )
     }

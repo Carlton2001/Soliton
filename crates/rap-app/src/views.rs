@@ -41,6 +41,38 @@ impl Rap {
             .gap(rems(0.625))
             .border_b_1()
             .border_color(theme.border)
+            .when(albums && self.settings.album_grid, |view| {
+                view.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap(rems(1.))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(rems(0.25))
+                                .child(
+                                    div()
+                                        .text_size(TEXT_SMALL)
+                                        .text_color(theme.muted)
+                                        .child(self.t(Text::Collection)),
+                                )
+                                .child(
+                                    div()
+                                        .text_size(crate::widgets::TEXT_DISPLAY)
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(self.t(Text::PickRecord)),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_color(theme.muted)
+                                .child(crate::i18n::album_count(self.visible.len())),
+                        ),
+                )
+            })
             .child(
                 div()
                     .flex()
@@ -157,7 +189,11 @@ impl Rap {
                             .px(rems(CONTENT_PADDING - 0.5))
                             .gap(rems(TILE_GAP))
                             .when(columns == 1, |row| row.py(rems(0.0625)))
-                            .when(columns > 1, |row| row.py(rems(0.375)))
+                            .when(columns > 1, |row| {
+                                row.py(rems(0.75))
+                                    .border_b_2()
+                                    .border_color(this.theme().border)
+                            })
                             .children(
                                 (row * columns..((row + 1) * columns).min(this.visible.len()))
                                     .map(|index| this.album_tile(index, side, cx)),
@@ -241,6 +277,7 @@ impl Rap {
                 div()
                     .w(rems(3.))
                     .text_color(theme.muted)
+                    .font(crate::widgets::numeric_font())
                     .child(first.year.map(|y| y.to_string()).unwrap_or_default()),
             )
             .child(
@@ -250,11 +287,13 @@ impl Rap {
                     .text_color(theme.muted)
                     .child(first.genre.clone()),
             )
-            .child(div().w(rems(7.)).text_color(theme.muted).child(format!(
-                "{} {}",
-                first.format,
-                time(edition.duration_ms())
-            )))
+            .child(
+                div()
+                    .w(rems(7.))
+                    .font(crate::widgets::numeric_font())
+                    .text_color(theme.muted)
+                    .child(format!("{} {}", first.format, time(edition.duration_ms()))),
+            )
             .when(!available, |row| {
                 row.child(
                     div()

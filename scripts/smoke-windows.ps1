@@ -6,6 +6,7 @@ param(
     [switch]$Taskbar,
     [switch]$AudioOutputs,
     [switch]$NetworkOutputs,
+    [switch]$Collections,
     [ValidateRange(1,16)][int]$LocalOutputCount=1,
     [ValidateRange(0,16)][int]$AudioOutputRow=0,
     [string]$Executable='rap.exe',
@@ -101,6 +102,70 @@ try {
     [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]32,[IntPtr]0) | Out-Null
     Start-Sleep -Milliseconds 500
     Save-RapFrame 'qa-playing'
+    if ($Collections) {
+        $scale = [RapNativeQa]::GetDpiForWindow($handle) / 96.0
+        function Click-RapCollection([double]$x, [double]$y) {
+            $previousDpi = [RapNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
+            try {
+            $point = ([int]($y*$scale) -shl 16) -bor [int]($x*$scale)
+            [RapNativeQa]::PostMessage($handle,0x0200,[IntPtr]0,[IntPtr]$point) | Out-Null
+            Start-Sleep -Milliseconds 80
+            [RapNativeQa]::PostMessage($handle,0x0201,[IntPtr]1,[IntPtr]$point) | Out-Null
+            Start-Sleep -Milliseconds 80
+            [RapNativeQa]::PostMessage($handle,0x0202,[IntPtr]0,[IntPtr]$point) | Out-Null
+            } finally { [RapNativeQa]::SetThreadDpiAwarenessContext($previousDpi) | Out-Null }
+            Start-Sleep -Milliseconds 500
+        }
+        Click-RapCollection 385 60
+        Save-RapFrame 'qa-queue'
+        Click-RapCollection 930 136
+        Save-RapFrame 'qa-playlist-name'
+        [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]13,[IntPtr]0) | Out-Null
+        [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]13,[IntPtr]0) | Out-Null
+        Start-Sleep -Milliseconds 700
+        Click-RapCollection 265 60
+        Save-RapFrame 'qa-playlists'
+        Click-RapCollection 1098 253
+        Save-RapFrame 'qa-playlist-detail'
+        $savedView = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_view
+        if ($savedView.view -ne 'Playlists' -or $null -eq $savedView.playlist) { throw 'Saved queue playlist was not opened' }
+        Click-RapCollection 60 292
+        Start-Sleep -Milliseconds 200
+        [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]32,[IntPtr]0) | Out-Null
+        [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]32,[IntPtr]0) | Out-Null
+        Start-Sleep -Milliseconds 300
+        Save-RapFrame 'qa-playlist-playing'
+        $savedQueue = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_queue
+        if ($savedQueue.playlist_entries.Count -eq 0 -or $null -eq $savedQueue.playlist_entries[$savedQueue.current_index]) { throw 'Playing playlist occurrence was not saved' }
+        # Repeatedly appending the same playlist keeps the queue and paused position.
+        Click-RapCollection 180 292
+        Click-RapCollection 180 292
+        $deduplicatedQueue = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_queue
+        if ($deduplicatedQueue.tracks.Count -ne $savedQueue.tracks.Count -or
+            @($deduplicatedQueue.tracks | Sort-Object -Unique).Count -ne $savedQueue.tracks.Count -or
+            $deduplicatedQueue.position_ms -ne $savedQueue.position_ms) { throw 'Appending an existing playlist duplicated tracks or reset playback' }
+        Click-RapCollection $(if ($Language -eq 'English') { 970 } else { 915 }) 126
+        foreach ($character in '-QA'.ToCharArray()) {
+            [RapNativeQa]::PostMessage($handle,0x0102,[IntPtr][int]$character,[IntPtr]0) | Out-Null
+        }
+        [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]13,[IntPtr]0) | Out-Null
+        [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]13,[IntPtr]0) | Out-Null
+        Start-Sleep -Milliseconds 500
+        Save-RapFrame 'qa-playlist-renamed'
+        Click-RapCollection 385 60
+        Save-RapFrame 'qa-queue-page'
+        Click-RapCollection 1118 342
+        Save-RapFrame 'qa-track-actions'
+        Click-RapCollection 1100 388
+        Save-RapFrame 'qa-playlist-picker'
+        [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]27,[IntPtr]0) | Out-Null
+        [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]27,[IntPtr]0) | Out-Null
+        $previousDpi = [RapNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
+        try { [RapNativeQa]::SetWindowPos($handle,[IntPtr]0,0,0,[int](640*$scale),[int](600*$scale),0x0006) | Out-Null }
+        finally { [RapNativeQa]::SetThreadDpiAwarenessContext($previousDpi) | Out-Null }
+        Start-Sleep -Milliseconds 500
+        Save-RapFrame 'qa-queue-compact'
+    }
     if ($AudioOutputs -or $NetworkOutputs) {
         # Targeted client clicks; the user's pointer is never moved.
         $scale = [RapNativeQa]::GetDpiForWindow($handle) / 96.0

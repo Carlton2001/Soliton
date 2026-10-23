@@ -19,6 +19,18 @@ pub const RADIUS: Rems = Rems(0.3125);
 pub const RADIUS_LARGE: Rems = Rems(0.5);
 const ICON: Rems = Rems(1.);
 
+/// Inter's tabular digits align durations without changing the UI typeface.
+pub fn numeric_font() -> Font {
+    static FEATURES: std::sync::OnceLock<FontFeatures> = std::sync::OnceLock::new();
+    Font {
+        family: "Inter".into(),
+        features: FEATURES
+            .get_or_init(|| FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)])))
+            .clone(),
+        ..gpui::font("Inter")
+    }
+}
+
 pub fn icon(name: &'static str, theme: Theme) -> Svg {
     tinted_icon(name, theme.muted)
 }
@@ -57,6 +69,33 @@ pub fn button(
         .active(move |style| style.bg(theme.control_pressed))
         .child(tinted_icon(name, theme.text))
         .child(label.into())
+}
+
+/// Familiar playback command, named by a tooltip and optionally highlighted.
+pub fn icon_button(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: impl Into<SharedString>,
+    active: bool,
+    theme: Theme,
+) -> Stateful<Div> {
+    let color = if active { theme.accent } else { theme.text };
+    with_tooltip(
+        div()
+            .id(id)
+            .size(CONTROL_HEIGHT)
+            .flex()
+            .flex_none()
+            .items_center()
+            .justify_center()
+            .rounded(RADIUS)
+            .when(active, |v| v.bg(theme.selected))
+            .hover(move |style| style.bg(theme.control_hover))
+            .active(move |style| style.bg(theme.control_pressed))
+            .child(tinted_icon(name, color)),
+        label.into(),
+        theme,
+    )
 }
 
 /// Main action of a page, filled with the accent.
@@ -390,41 +429,6 @@ impl Render for Tip {
 
 pub fn with_tooltip(element: Stateful<Div>, label: SharedString, theme: Theme) -> Stateful<Div> {
     element.tooltip(move |_, cx| cx.new(|_| Tip(label.clone(), theme)).into())
-}
-
-pub fn icon_button(
-    id: impl Into<ElementId>,
-    name: &'static str,
-    label: impl Into<SharedString>,
-    theme: Theme,
-) -> Stateful<Div> {
-    tool(id, name, label, false, theme)
-}
-
-/// Icon-only control with a tooltip; `active` tints it with the accent color.
-pub fn tool(
-    id: impl Into<ElementId>,
-    name: &'static str,
-    label: impl Into<SharedString>,
-    active: bool,
-    theme: Theme,
-) -> Stateful<Div> {
-    let color = if active { theme.accent } else { theme.muted };
-    with_tooltip(
-        div()
-            .id(id)
-            .size(CONTROL_HEIGHT)
-            .flex()
-            .flex_none()
-            .items_center()
-            .justify_center()
-            .rounded(RADIUS)
-            .hover(move |style| style.bg(theme.hover))
-            .active(move |style| style.bg(theme.pressed))
-            .child(tinted_icon(name, color)),
-        label.into(),
-        theme,
-    )
 }
 
 pub fn cover(path: Option<&PathBuf>, side: f32, theme: Theme) -> AnyElement {

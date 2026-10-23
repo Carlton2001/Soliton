@@ -21,8 +21,33 @@ pub enum PlaybackState {
     Failed,
 }
 
+/// An occurrence, so the same track may appear several times in a session.
+#[derive(Clone, Debug)]
+pub struct QueueEntry {
+    pub id: u64,
+    pub track: Track,
+    /// Saved playlist occurrence that started this entry, if any.
+    pub playlist_entry: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct QueueSnapshot {
+    pub entries: Vec<QueueEntry>,
+    pub current: Option<u64>,
+}
+
+impl QueueSnapshot {
+    pub fn current_playlist_entry(&self) -> Option<i64> {
+        self.entries
+            .iter()
+            .find(|e| Some(e.id) == self.current)
+            .and_then(|e| e.playlist_entry)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Playback {
+    pub queue: std::sync::Arc<QueueSnapshot>,
     pub state: PlaybackState,
     pub track: Option<Track>,
     pub position_ms: u64,
@@ -47,6 +72,26 @@ pub struct Playback {
 }
 
 pub enum Command {
+    PlayPlaylist {
+        entries: Vec<(i64, Track)>,
+        start: usize,
+    },
+    LoadSelection {
+        entries: Vec<(Option<i64>, Track)>,
+        start: usize,
+        position_ms: u64,
+    },
+    Enqueue {
+        tracks: Vec<Track>,
+        next: bool,
+    },
+    RemoveQueued(u64),
+    MoveQueued {
+        id: u64,
+        before: Option<u64>,
+    },
+    PlayQueued(u64),
+    ClearUpcoming,
     Play {
         tracks: Vec<Track>,
         start: usize,

@@ -12,8 +12,6 @@ const SAVE_STEP_MS: u64 = 10_000;
 
 #[derive(Default)]
 pub struct Resume {
-    /// Library tracks of the queue, in the order sent to the engine.
-    queue: Vec<i64>,
     /// The saved queue still has to be loaded once the library is read.
     pending: bool,
     /// Track being loaded: engine updates older than the load are not saved.
@@ -23,42 +21,35 @@ pub struct Resume {
 impl Resume {
     pub fn new() -> Self {
         Self {
-            queue: Vec::new(),
             pending: true,
             loading: None,
-        }
-    }
-
-    /// Notes the queue of a new playback.
-    pub fn played(&mut self, command: &Command) {
-        if let Command::Play { tracks, .. } = command {
-            self.queue = tracks.iter().map(|t| t.id).filter(|&id| id > 0).collect();
-            self.pending = false;
-            self.loading = None;
         }
     }
 }
 
 impl Rap {
     fn current_queue(&self) -> LastQueue {
-        let current = self
+        let entries: Vec<_> = self
             .playback
-            .track
-            .as_ref()
-            .map(|t| t.id)
-            .filter(|id| self.resume.queue.contains(id));
+            .queue
+            .entries
+            .iter()
+            .filter(|e| e.track.id > 0)
+            .collect();
+        let current_index = entries
+            .iter()
+            .position(|e| Some(e.id) == self.playback.queue.current);
+        let current = current_index.map(|i| entries[i].track.id);
         LastQueue {
+            playlist_entries: entries.iter().map(|e| e.playlist_entry).collect(),
             position_ms: if current.is_some() {
                 self.playback.position_ms
             } else {
                 0
             },
-            tracks: if current.is_some() {
-                self.resume.queue.clone()
-            } else {
-                Vec::new()
-            },
+            tracks: entries.iter().map(|e| e.track.id).collect(),
             current,
+            current_index,
         }
     }
 
@@ -78,7 +69,9 @@ impl Rap {
         let saved = &self.settings.last_queue;
         let moved = queue.position_ms.abs_diff(saved.position_ms);
         let worth = queue.current != saved.current
+            || queue.current_index != saved.current_index
             || queue.tracks != saved.tracks
+            || queue.playlist_entries != saved.playlist_entries
             || (moved > 0 && self.playback.state != PlaybackState::Playing)
             || moved >= SAVE_STEP_MS;
         if worth {
@@ -112,19 +105,40 @@ impl Rap {
             .flat_map(|album| album.tracks())
             .map(|track| (track.id, track))
             .collect();
-        let tracks: Vec<_> = saved
+        let entries: Vec<_> = saved
             .tracks
             .iter()
-            .filter_map(|id| known.get(id).map(|track| (*track).clone()))
+            .enumerate()
+            .filter_map(|(index, id)| {
+                known.get(id).map(|track| {
+                    (
+                        saved.playlist_entries.get(index).copied().flatten(),
+                        (*track).clone(),
+                    )
+                })
+            })
             .collect();
-        let Some(start) = tracks.iter().position(|t| t.id == current) else {
+        let start = saved
+            .current_index
+            .filter(|&i| saved.tracks.get(i) == Some(&current))
+            .and_then(|i| {
+                let known_before = saved.tracks[..i]
+                    .iter()
+                    .filter(|id| known.contains_key(id))
+                    .count();
+                entries
+                    .get(known_before)
+                    .filter(|(_, t)| t.id == current)
+                    .map(|_| known_before)
+            })
+            .or_else(|| entries.iter().position(|(_, t)| t.id == current));
+        let Some(start) = start else {
             return;
         };
-        self.resume.queue = tracks.iter().map(|t| t.id).collect();
         self.resume.loading = Some(current);
         self.audio_command(
-            Command::Load {
-                tracks,
+            Command::LoadSelection {
+                entries,
                 start,
                 position_ms: saved.position_ms,
             },

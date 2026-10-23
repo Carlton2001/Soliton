@@ -7,6 +7,7 @@ mod discovery;
 mod grouping;
 mod indexer;
 mod metadata;
+mod playlists;
 mod schema;
 mod watch;
 

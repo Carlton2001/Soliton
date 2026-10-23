@@ -3,6 +3,94 @@ use super::*;
 mod support;
 
 #[test]
+fn restored_playlist_deduplicates_without_losing_position_or_provenance() {
+    let track = rap_core::model::Track {
+        id: 7,
+        source_id: 1,
+        path: "unopened.flac".into(),
+        metadata: rap_core::model::Metadata {
+            duration_ms: 60_000,
+            ..Default::default()
+        },
+        cover: None,
+        available: true,
+    };
+    let mut worker = Worker::default();
+    worker
+        .command(Command::LoadSelection {
+            entries: vec![(Some(20), track.clone()), (Some(21), track.clone())],
+            start: 1,
+            position_ms: 12_000,
+        })
+        .unwrap();
+    assert_eq!(worker.snapshot().queue.entries.len(), 1);
+    assert_eq!(worker.snapshot().queue.current_playlist_entry(), Some(20));
+    assert_eq!(worker.playback.position_ms, 12_000);
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
+    assert!(worker.session.is_none());
+    worker
+        .command(Command::Load {
+            tracks: vec![track],
+            start: 0,
+            position_ms: 0,
+        })
+        .unwrap();
+    assert_eq!(worker.snapshot().queue.current_playlist_entry(), None);
+}
+
+#[test]
+fn editing_a_loaded_queue_does_not_open_outputs_or_reset_position() {
+    let track = rap_core::model::Track {
+        id: 1,
+        source_id: 1,
+        path: "unopened.flac".into(),
+        metadata: rap_core::model::Metadata {
+            duration_ms: 60_000,
+            ..Default::default()
+        },
+        cover: None,
+        available: true,
+    };
+    let mut worker = Worker::default();
+    worker
+        .command(Command::Enqueue {
+            tracks: vec![track.clone()],
+            next: false,
+        })
+        .unwrap();
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
+    assert!(worker.session.is_none());
+    worker.command(Command::Seek(12_000)).unwrap();
+    let current = worker.snapshot().queue.current;
+    let mut second = track.clone();
+    second.id = 2;
+    second.path = "second.flac".into();
+    let mut third = track.clone();
+    third.id = 3;
+    third.path = "third.flac".into();
+    worker
+        .command(Command::Enqueue {
+            tracks: vec![track, second, third],
+            next: true,
+        })
+        .unwrap();
+    let last = worker.snapshot().queue.entries[2].id;
+    worker
+        .command(Command::MoveQueued {
+            id: last,
+            before: Some(worker.snapshot().queue.entries[1].id),
+        })
+        .unwrap();
+    worker.command(Command::RemoveQueued(last)).unwrap();
+    worker.command(Command::ClearUpcoming).unwrap();
+    assert_eq!(worker.snapshot().queue.current, current);
+    assert_eq!(worker.snapshot().queue.entries.len(), 1);
+    assert_eq!(worker.playback.position_ms, 12_000);
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
+    assert!(worker.session.is_none());
+}
+
+#[test]
 fn commands_without_a_device_preserve_stopped_state_and_validate_volume() {
     let mut worker = Worker {
         queue: Queue::default(),

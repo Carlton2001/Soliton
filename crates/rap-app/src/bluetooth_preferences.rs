@@ -33,10 +33,7 @@ pub struct BluetoothState {
 
 impl Rap {
     pub fn poll_bluetooth(&mut self, cx: &mut Context<Self>) {
-        let visible = Bluetooth::SUPPORTED
-            && self.section == Section::Settings
-            && !self.now_playing
-            && !self.quitting;
+        let visible = Bluetooth::SUPPORTED && self.section == Section::Settings && !self.quitting;
         if !visible {
             // Leaving the page stops the native watchers; reopening starts fresh.
             self.bluetooth.watch = None;

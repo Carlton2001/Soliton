@@ -2,6 +2,14 @@ use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
 
 pub struct Assets;
+impl Assets {
+    pub fn load_fonts(cx: &gpui::App) -> anyhow::Result<()> {
+        cx.text_system().add_fonts(vec![
+            Cow::Borrowed(include_bytes!("../../../assets/fonts/Inter-Regular.ttf").as_slice()),
+            Cow::Borrowed(include_bytes!("../../../assets/fonts/Inter-Italic.ttf").as_slice()),
+        ])
+    }
+}
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
         macro_rules! icons {
@@ -26,8 +34,11 @@ impl AssetSource for Assets {
             "refresh-cw",
             "layout-grid",
             "list",
+            "list-plus",
+            "list-end",
             "search",
             "arrow-left",
+            "arrow-up",
             "play",
             "pause",
             "square",

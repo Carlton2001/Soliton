@@ -7,12 +7,14 @@ use rap_platform::AppPaths;
 use std::{path::PathBuf, sync::Arc};
 
 pub enum Work {
+    Playlist(rap_core::playlist::PlaylistChange),
     Scan(Vec<PathBuf>, Cancellation),
     Save(Settings),
     SaveAndFlush(Settings, Sender<anyhow::Result<()>>),
     RemoveSource(i64),
 }
 pub struct View {
+    pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
     pub snapshot: Arc<LibrarySnapshot>,
     pub visible: Vec<usize>,
     pub filter: Filter,
@@ -20,6 +22,7 @@ pub struct View {
     pub options: Arc<catalog::FilterOptions>,
 }
 pub enum Event {
+    Playlists(Vec<rap_core::playlist::Playlist>),
     Progress(ScanProgress),
     Finished(bool),
     Removed,
@@ -72,6 +75,7 @@ impl Services {
                         }
                         let catalog = &cached.as_ref().unwrap().1;
                         Ok(View {
+                            tracks: catalog.tracks.clone(),
                             snapshot: catalog.snapshot.clone(),
                             visible: catalog.matches(&filter),
                             options: Arc::new(catalog.options(&filter)),

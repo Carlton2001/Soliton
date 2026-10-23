@@ -275,6 +275,13 @@ impl TextInput {
             .unwrap_or(self.content.len())
     }
 
+    pub fn set_text(&mut self, text: String) {
+        self.reset();
+        let end = text.len();
+        self.content = text.into();
+        self.selected_range = end..end;
+    }
+
     pub fn reset(&mut self) {
         self.content = "".into();
         self.selected_range = 0..0;

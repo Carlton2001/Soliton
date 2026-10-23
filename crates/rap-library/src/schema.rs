@@ -9,7 +9,7 @@ use rap_core::model::Metadata;
 use rusqlite::{Connection, TransactionBehavior, params};
 use std::{collections::BTreeSet, path::Path};
 
-pub(crate) const VERSION: i64 = 4;
+pub(crate) const VERSION: i64 = 6;
 
 pub(crate) fn version(connection: &Connection) -> Result<i64> {
     Ok(connection.query_row("PRAGMA user_version", [], |row| row.get(0))?)
@@ -38,6 +38,35 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
              ALTER TABLE files ADD COLUMN added INTEGER NOT NULL DEFAULT 0;
              UPDATE files SET added=CAST(modified AS INTEGER)/1000000000;
              PRAGMA user_version=4;
+             COMMIT;",
+        )?;
+    }
+    if version < 5 {
+        connection.execute_batch(
+            "BEGIN IMMEDIATE;
+             CREATE TABLE playlists(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+             CREATE TABLE playlist_entries(
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               playlist_id INTEGER NOT NULL REFERENCES playlists ON DELETE CASCADE,
+               track_id INTEGER REFERENCES tracks ON DELETE SET NULL,
+               position INTEGER NOT NULL,
+               metadata TEXT NOT NULL);
+             CREATE INDEX playlist_order ON playlist_entries(playlist_id,position,id);
+             PRAGMA user_version=5;
+             COMMIT;",
+        )?;
+    }
+    if version < 6 {
+        connection.execute_batch(
+            "BEGIN IMMEDIATE;
+             ALTER TABLE playlist_entries ADD COLUMN path TEXT;
+             UPDATE playlist_entries SET path=(SELECT path FROM files WHERE track_id=playlist_entries.track_id);
+             DELETE FROM playlist_entries AS later WHERE path IS NOT NULL AND EXISTS(
+               SELECT 1 FROM playlist_entries AS earlier
+               WHERE earlier.playlist_id=later.playlist_id AND earlier.path=later.path
+               AND (earlier.position<later.position OR (earlier.position=later.position AND earlier.id<later.id)));
+             CREATE UNIQUE INDEX playlist_file ON playlist_entries(playlist_id,path) WHERE path IS NOT NULL;
+             PRAGMA user_version=6;
              COMMIT;",
         )?;
     }

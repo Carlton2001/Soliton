@@ -143,7 +143,7 @@ La base conserve notamment :
 
 La base doit être versionnée avec un système de migrations.
 
-Les données peuvent être reconstruites à partir des fichiers musicaux, à l'exception des paramètres propres à RAP.
+Les données peuvent être reconstruites à partir des fichiers musicaux, à l'exception des paramètres propres à RAP et des playlists personnelles.
 
 ## 3.4 Lecture seule
 
@@ -397,7 +397,7 @@ Direction graphique :
 
 L'interface principale comporte :
 
-- Une navigation dans la barre de titre.
+- Une navigation explicite et toujours visible sous la barre de titre, avec icônes et libellés.
 - Une zone centrale de bibliothèque.
 - Une recherche globale.
 - Des filtres contextuels.
@@ -407,6 +407,8 @@ Sections principales :
 
 - Albums.
 - Artistes.
+- Playlists manuelles.
+- File de lecture.
 - Paramètres.
 
 Genres et années sont accessibles par les filtres de la vue Albums.
@@ -506,7 +508,14 @@ Barre de lecture permanente avec :
 - Aléatoire.
 - Répétition.
 
-Un mode de lecture plein écran doit afficher une grande pochette et les commandes essentielles.
+Simplification retenue le 23 octobre 2026 : la file de lecture possède une page
+dédiée, accessible par la navigation principale. Le tiroir de file et la vue de
+session séparée sont supprimés. F11 affiche la page active en plein écran en
+conservant la navigation et la barre de lecture. Les actions comportent un libellé,
+sauf les commandes usuelles du lecteur (précédent, lire/pause, suivant, aléatoire,
+répéter et couper/rétablir le son) et Lire/Pause dans les listes de pistes : ces
+icônes disposent d'une infobulle. Les actions secondaires des morceaux sont
+réunies dans un menu « Actions ».
 
 ## 8.10 Interactions
 
@@ -637,6 +646,18 @@ Fonctions :
 - Navigation entre pistes.
 
 Pas de système complexe de playlists dans la V1.
+
+Ajout retenu le 23 octobre 2026 : playlists manuelles nommées, création,
+renommage, suppression, ajout de pistes ou d'une édition d'album, retrait et
+réorganisation. La file de lecture est consultable et modifiable, avec ajout
+après la piste courante ou en fin de file et enregistrement en playlist.
+Une playlist et une file ne contiennent qu'une occurrence de chaque fichier :
+les ajouts répétés sont ignorés sans déplacer la piste existante. Les fichiers
+distincts d'un même titre ou d'une autre édition restent séparés. La reprise
+d'une ancienne file supprime ses doublons en conservant le fichier sélectionné.
+Les playlists résident dans SQLite, hors des sources musicales ; une piste
+indisponible ou retirée du catalogue reste visible dans sa playlist.
+Les playlists automatiques et l'import/export ne font pas partie de cet ajout.
 
 La lecture gapless n'est pas prioritaire.
 
@@ -1221,7 +1242,7 @@ Objectifs :
 
 Objectifs :
 
-- Vue de lecture plein écran.
+- Plein écran de la page active, sans vue de lecture distincte.
 - Barre de lecture finalisée.
 - Filtres combinables.
 - Préférences d'affichage.

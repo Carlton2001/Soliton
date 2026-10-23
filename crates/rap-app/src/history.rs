@@ -14,9 +14,9 @@ const DEPTH: usize = 50;
 /// display settings.
 #[derive(Clone, PartialEq)]
 pub struct Place {
+    playlist: Option<i64>,
     section: Section,
     album: Option<(i64, usize)>,
-    now_playing: bool,
     filter: Filter,
 }
 
@@ -65,9 +65,13 @@ impl History {
 impl Rap {
     fn place(&self) -> Place {
         Place {
+            playlist: if self.section == Section::Playlists {
+                self.playlists.selected
+            } else {
+                None
+            },
             section: self.section,
             album: self.selected.map(|id| (id, self.selected_edition)),
-            now_playing: self.now_playing,
             filter: Filter {
                 query: String::new(),
                 sort: Default::default(),
@@ -85,6 +89,7 @@ impl Rap {
             return;
         }
         let last = LastView {
+            playlist: self.playlists.selected,
             view: self.section.into(),
             album: self.selected,
             artist: self.filter.artist.clone(),
@@ -97,7 +102,7 @@ impl Rap {
 
     pub fn go_back(&mut self, cx: &mut Context<Self>) {
         // An open menu is closed first, like the Escape key does.
-        if self.menu.take().is_some() {
+        if self.menu.take().is_some() || self.track_menu.take().is_some() {
             cx.notify();
         } else if let Some(place) = self.history.back() {
             self.restore(place, cx);
@@ -113,10 +118,11 @@ impl Rap {
 
     fn restore(&mut self, place: Place, cx: &mut Context<Self>) {
         let filter_changed = self.place().filter != place.filter;
+        self.track_menu = None;
         self.section = place.section;
+        self.playlists.selected = place.playlist;
         self.selected = place.album.map(|(id, _)| id);
         self.selected_edition = place.album.map_or(0, |(_, edition)| edition);
-        self.now_playing = place.now_playing;
         if filter_changed {
             // The search text and display settings stay as they are.
             self.filter = Filter {
@@ -136,6 +142,8 @@ impl From<View> for Section {
         match view {
             View::Artists => Section::Artists,
             View::Albums => Section::Albums,
+            View::Playlists => Section::Playlists,
+            View::Queue => Section::Queue,
             View::Settings => Section::Settings,
         }
     }
@@ -146,6 +154,8 @@ impl From<Section> for View {
         match section {
             Section::Artists => View::Artists,
             Section::Albums => View::Albums,
+            Section::Playlists => View::Playlists,
+            Section::Queue => View::Queue,
             Section::Settings => View::Settings,
         }
     }

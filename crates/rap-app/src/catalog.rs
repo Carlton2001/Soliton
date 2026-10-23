@@ -1,7 +1,7 @@
 use crate::i18n::{Text, text};
 use rap_core::{
     config::{AlbumSort, Language},
-    model::{Album, LibrarySnapshot, Metadata},
+    model::{Album, LibrarySnapshot, Metadata, Track},
     text::fold,
 };
 use std::{
@@ -214,6 +214,7 @@ pub struct FilterOptions {
 /// change so that each keystroke only compares prepared strings. Case, accent and
 /// spacing differences between tags never hide an album.
 pub struct Catalog {
+    pub tracks: Arc<HashMap<i64, Track>>,
     pub snapshot: Arc<LibrarySnapshot>,
     pub facets: Arc<Facets>,
     albums: Vec<AlbumText>,
@@ -240,6 +241,14 @@ impl Catalog {
     pub fn new(snapshot: LibrarySnapshot) -> Self {
         let albums = snapshot.albums.iter().map(album_text).collect();
         Self {
+            tracks: Arc::new(
+                snapshot
+                    .albums
+                    .iter()
+                    .flat_map(|a| a.tracks())
+                    .map(|t| (t.id, t.clone()))
+                    .collect(),
+            ),
             facets: Arc::new(Facets::collect(&snapshot)),
             snapshot: Arc::new(snapshot),
             albums,

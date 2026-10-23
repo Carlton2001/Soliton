@@ -26,10 +26,17 @@ use std::{
 pub enum Section {
     Albums,
     Artists,
+    Playlists,
+    Queue,
     Settings,
 }
 
 pub struct Rap {
+    pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
+    pub track_menu: Option<(crate::track_list::Selection, bool)>,
+    pub playlists: crate::playlists::Playlists,
+    pub queue_scroll: UniformListScrollHandle,
+    pub queue_bar: Scrollbar,
     pub desktop: Option<rap_platform::Desktop>,
     pub autostart: Option<bool>,
     pub startup_pending: bool,
@@ -76,7 +83,6 @@ pub struct Rap {
     pub facets: Arc<Facets>,
     pub filter_options: Arc<FilterOptions>,
     pub menu: Option<Menu>,
-    pub now_playing: bool,
     pub seek_slider: Slider,
     pub volume_slider: Slider,
     /// Position shown while the seek slider is dragged; sent on release.
@@ -106,7 +112,14 @@ impl Rap {
         };
         let search = cx.new(TextInput::new);
         let menu_search = cx.new(TextInput::new);
+        let playlist_name = cx.new(TextInput::new);
         let subscriptions = vec![
+            // Kept in memory and written with the other settings at exit.
+            cx.observe_window_bounds(window, |this, window, _| {
+                if let Some(placement) = crate::placement::capture(window) {
+                    this.settings.window = Some(placement);
+                }
+            }),
             // The field searches albums on the album pages and filters the
             // list shown elsewhere, which only needs a new render.
             cx.observe(&search, |this, search, cx| {
@@ -126,6 +139,7 @@ impl Rap {
                 }
             }),
             cx.observe(&menu_search, |_, _, cx| cx.notify()),
+            cx.observe(&playlist_name, |_, _, cx| cx.notify()),
             cx.observe_window_appearance(window, |this, window, cx| {
                 this.system_dark = is_dark(window.appearance());
                 cx.notify();
@@ -142,6 +156,11 @@ impl Rap {
             ..Default::default()
         };
         let mut this = Self {
+            tracks: Arc::default(),
+            track_menu: None,
+            playlists: crate::playlists::Playlists::new(playlist_name),
+            queue_scroll: UniformListScrollHandle::new(),
+            queue_bar: Scrollbar::default(),
             desktop: None,
             autostart: None,
             startup_pending: false,
@@ -184,7 +203,6 @@ impl Rap {
             facets: Default::default(),
             filter_options: Default::default(),
             menu: None,
-            now_playing: false,
             seek_slider: Slider::default(),
             volume_slider: Slider::default(),
             seek_preview: None,
@@ -196,6 +214,8 @@ impl Rap {
             let text = this.labelled(this.t(Text::AudioUnavailable), &error);
             this.report_error(text);
         }
+        this.playlists.selected = last.playlist;
+        this.queue_bar = bar(&this.queue_scroll);
         this.start_desktop(window);
         this.scan(Vec::new(), cx);
         cx.spawn_in(window, async move |this, cx| {
@@ -225,7 +245,18 @@ impl Rap {
         self.poll_outputs(cx);
         let mut changed = false;
         if let Some(playback) = self.audio.as_ref().and_then(|a| a.events.try_iter().last()) {
+            if playback.queue.current != self.playback.queue.current
+                && let Some(index) = playback
+                    .queue
+                    .entries
+                    .iter()
+                    .position(|e| Some(e.id) == playback.queue.current)
+            {
+                self.queue_scroll
+                    .scroll_to_item(index, ScrollStrategy::Center);
+            }
             changed |= playback.state != self.playback.state
+                || !Arc::ptr_eq(&playback.queue, &self.playback.queue)
                 || playback.position_ms != self.playback.position_ms
                 || playback.volume != self.playback.volume
                 || playback.shuffle != self.playback.shuffle
@@ -273,6 +304,17 @@ impl Rap {
         }
         for event in self.services.events.try_iter().collect::<Vec<_>>() {
             match event {
+                Event::Playlists(lists) => {
+                    self.playlists.lists = lists;
+                    self.playlists.pending = false;
+                    if self
+                        .playlists
+                        .selected
+                        .is_some_and(|id| !self.playlists.lists.iter().any(|p| p.id == id))
+                    {
+                        self.playlists.selected = None;
+                    }
+                }
                 Event::Progress(progress) => self.progress = progress,
                 Event::Finished(cancelled) => {
                     self.scanning = false;
@@ -296,6 +338,7 @@ impl Rap {
         for result in self.services.views.try_iter().collect::<Vec<_>>() {
             match result {
                 Ok(view) if view.filter == self.filter => {
+                    self.tracks = view.tracks;
                     self.snapshot = view.snapshot;
                     self.restore_queue(cx);
                     // A restored or open album may have left the library.
@@ -415,7 +458,7 @@ impl Rap {
     pub fn navigate(&mut self, section: Section, cx: &mut Context<Self>) {
         self.section = section;
         self.selected = None;
-        self.now_playing = false;
+        self.track_menu = None;
         self.menu = None;
         cx.notify();
     }
@@ -423,8 +466,7 @@ impl Rap {
     pub fn open_album(&mut self, id: i64, cx: &mut Context<Self>) {
         self.selected = Some(id);
         self.selected_edition = 0;
-        self.now_playing = false;
-        if self.section == Section::Settings {
+        if self.section != Section::Albums {
             self.section = Section::Albums;
         }
         self.track_scroll.scroll_to_item(0, ScrollStrategy::Top);
@@ -438,7 +480,6 @@ impl Rap {
         self.filter.artist = Some(artist);
         self.section = Section::Albums;
         self.selected = None;
-        self.now_playing = false;
         self.refresh(cx);
     }
     /// Displayed album artist, with a translated label for compilations.
@@ -460,7 +501,15 @@ impl Rap {
     }
     /// Leaves the innermost view: menu, now playing, album sheet.
     pub fn back(&mut self, cx: &mut Context<Self>) {
-        if self.menu.take().is_none() && !std::mem::take(&mut self.now_playing) {
+        if self.playlists.dialog.take().is_some() || self.track_menu.take().is_some() {
+            cx.notify();
+            return;
+        }
+        if self.section == Section::Playlists && self.playlists.selected.take().is_some() {
+            cx.notify();
+            return;
+        }
+        if self.menu.take().is_none() {
             self.selected = None;
         }
         cx.notify();
@@ -558,34 +607,27 @@ impl Render for Rap {
         let find = self.t(Text::Find);
         self.menu_search
             .update(cx, |input, _| input.placeholder = find.into());
-        let main = if self.now_playing {
-            self.now_playing_view(window, cx)
-        } else {
-            let body = match self.section {
-                Section::Settings => self.settings_view(cx),
-                _ if self.selected.is_some() => self.album_view(cx),
-                Section::Albums => self.albums_view(cx),
-                Section::Artists => self.artists_view(cx),
-            };
-            div()
-                .flex()
-                .flex_1()
-                .min_h_0()
-                .overflow_hidden()
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .flex_1()
-                        .min_w_0()
-                        .min_h_0()
-                        .when(self.section != Section::Settings, |column| {
-                            column.child(self.header(cx))
-                        })
-                        .child(body),
-                )
-                .into_any_element()
+        let body = match self.section {
+            Section::Queue => self.queue_view(cx),
+            Section::Playlists => self.playlists_view(cx),
+            Section::Settings => self.settings_view(cx),
+            _ if self.selected.is_some() => self.album_view(window, cx),
+            Section::Albums => self.albums_view(cx),
+            Section::Artists => self.artists_view(cx),
         };
+        let main = div()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .overflow_hidden()
+            .when(
+                matches!(self.section, Section::Albums | Section::Artists)
+                    && self.selected.is_none(),
+                |v| v.child(self.header(cx)),
+            )
+            .child(body);
         let notices = self.notices_view(cx);
         div()
             .relative()
@@ -604,13 +646,15 @@ impl Render for Rap {
             .flex_col()
             .bg(theme.background)
             .text_color(theme.text)
-            .font_family("Segoe UI")
+            .font_family("Inter")
             .text_size(crate::widgets::TEXT_BODY)
-            .child(self.title_bar(window, cx))
+            .child(self.title_bar(window))
+            .child(self.navigation(cx))
             .child(main)
             .children(notices)
-            .when(!self.now_playing, |view| view.child(self.footer(cx)))
+            .child(self.footer(cx))
             .children(self.menu_view(cx))
             .children(self.close_dialog(cx))
+            .children(self.playlist_dialog(cx))
     }
 }

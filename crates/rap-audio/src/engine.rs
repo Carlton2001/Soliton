@@ -121,16 +121,17 @@ impl Engine {
                                             &command,
                                             Command::SelectOutput(_)
                                                 | Command::Play { .. }
+                                                | Command::PlayPlaylist { .. }
                                                 | Command::Resume
                                         ));
                             if worker.playback.output_changing {
-                                let _ = events.try_send(worker.playback.clone());
+                                let _ = events.try_send(worker.snapshot());
                             }
                             if let Err(error) = worker.command(command) {
                                 worker.fail(error);
                             }
                             worker.playback.output_changing = false;
-                            let _ = events.try_send(worker.playback.clone());
+                            let _ = events.try_send(worker.snapshot());
                         }
                         Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
                         Err(_) => {}
@@ -139,7 +140,7 @@ impl Engine {
                         worker.fail(error);
                     }
                     if last.elapsed() >= Duration::from_millis(200) {
-                        let _ = events.try_send(worker.playback.clone());
+                        let _ = events.try_send(worker.snapshot());
                         last = Instant::now();
                     }
                 }
@@ -239,6 +240,12 @@ struct Worker {
 }
 
 impl Worker {
+    fn snapshot(&self) -> Playback {
+        Playback {
+            queue: self.queue.snapshot.clone(),
+            ..self.playback.clone()
+        }
+    }
     fn fail(&mut self, error: anyhow::Error) {
         if self.remote_generation.take().is_some()
             && let Some(network) = &self.network
@@ -294,18 +301,24 @@ impl Worker {
 
     fn command(&mut self, command: Command) -> Result<()> {
         match command {
-            Command::Play { tracks, start } => {
-                self.queue.set(tracks, start);
+            Command::PlayPlaylist { entries, start } => {
+                self.queue.set_entries(
+                    entries
+                        .into_iter()
+                        .map(|(id, track)| (Some(id), track))
+                        .collect(),
+                    start,
+                );
                 self.start_current()?;
             }
-            Command::Load {
-                tracks,
+            Command::LoadSelection {
+                entries,
                 start,
                 position_ms,
             } => {
                 self.stop_remote()?;
                 self.session = None;
-                self.queue.set(tracks, start);
+                self.queue.set_entries(entries, start);
                 let track = self.queue.current().cloned();
                 self.playback.duration_ms = track.as_ref().map_or(0, |t| t.metadata.duration_ms);
                 self.playback.position_ms = position_ms.min(self.playback.duration_ms);
@@ -318,6 +331,40 @@ impl Worker {
                 self.playback.output = None;
                 self.playback.error = None;
                 self.resume_at = Some(self.playback.position_ms);
+            }
+            Command::Enqueue { tracks, next } => {
+                let empty = self.queue.current().is_none();
+                self.queue.enqueue(tracks, next);
+                if empty && let Some(track) = self.queue.current().cloned() {
+                    self.playback.duration_ms = track.metadata.duration_ms;
+                    self.playback.track = Some(track);
+                    self.playback.position_ms = 0;
+                    self.playback.state = PlaybackState::Paused;
+                    self.resume_at = Some(0);
+                }
+            }
+            Command::RemoveQueued(id) => self.queue.remove(id),
+            Command::MoveQueued { id, before } => self.queue.move_before(id, before),
+            Command::ClearUpcoming => self.queue.clear_upcoming(),
+            Command::PlayQueued(id) => {
+                if self.queue.select(id) {
+                    self.start_current()?;
+                }
+            }
+            Command::Play { tracks, start } => {
+                self.queue.set(tracks, start);
+                self.start_current()?;
+            }
+            Command::Load {
+                tracks,
+                start,
+                position_ms,
+            } => {
+                self.command(Command::LoadSelection {
+                    entries: tracks.into_iter().map(|track| (None, track)).collect(),
+                    start,
+                    position_ms,
+                })?;
             }
             Command::Resume => {
                 if self.remote_generation.is_some() {

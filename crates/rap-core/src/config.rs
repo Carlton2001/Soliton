@@ -71,6 +71,8 @@ pub enum View {
     #[default]
     #[serde(alias = "Genres", alias = "Years")]
     Albums,
+    Playlists,
+    Queue,
     Settings,
 }
 
@@ -78,6 +80,7 @@ pub enum View {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LastView {
+    pub playlist: Option<i64>,
     pub view: View,
     /// Open album sheet, when it still exists in the library.
     pub album: Option<i64>,
@@ -89,9 +92,23 @@ pub struct LastView {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LastQueue {
+    /// Parallel to tracks; absent in configurations saved before playlist playback.
+    pub playlist_entries: Vec<Option<i64>>,
     pub tracks: Vec<i64>,
     pub current: Option<i64>,
+    /// Occurrence index distinguishes repeated tracks in a manual queue.
+    pub current_index: Option<usize>,
     pub position_ms: u64,
+}
+
+/// Window size and position in logical pixels; the restored size when maximized.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct WindowPlacement {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub maximized: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,6 +138,7 @@ pub struct Settings {
     pub ui_rem_size: u32,
     pub last_view: LastView,
     pub last_queue: LastQueue,
+    pub window: Option<WindowPlacement>,
 }
 
 impl Settings {
@@ -150,6 +168,7 @@ impl Default for Settings {
             ui_rem_size: Self::DEFAULT_REM_SIZE,
             last_view: LastView::default(),
             last_queue: LastQueue::default(),
+            window: None,
         }
     }
 }

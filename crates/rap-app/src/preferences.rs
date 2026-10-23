@@ -6,7 +6,7 @@ use crate::{
     views::scroll_area,
     widgets::{
         RADIUS, TEXT_SMALL, TEXT_SUBTITLE, TEXT_TITLE, button, checkbox, display_path, list_box,
-        list_row, segment, segments, tinted_icon, tool, with_tooltip,
+        list_row, segment, segments, tinted_icon, with_tooltip,
     },
 };
 use gpui::{prelude::*, *};
@@ -117,9 +117,12 @@ impl Rap {
             .flex()
             .flex_col()
             .child(
+                // A definite width lets wrapped hints be measured at their real width;
+                // otherwise the scroll range stops short of the last section.
                 div()
-                    .w_full()
-                    .max_w(rems(52.))
+                    .w(rems(52.))
+                    .flex_shrink_0()
+                    .max_w_full()
                     .px(rems(2.))
                     .pt(rems(1.5))
                     .pb(rems(3.))
@@ -175,7 +178,7 @@ impl Rap {
                     .border_color(theme.control_border)
                     .bg(theme.control)
                     .child(
-                        tool("ui-smaller", "minus", self.t(Text::Smaller), false, theme)
+                        button("ui-smaller", "minus", self.t(Text::Smaller), theme)
                             .when(size <= Settings::MIN_REM_SIZE, |tool| tool.opacity(0.4))
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.set_ui_rem_size(size.saturating_sub(1), cx)
@@ -188,7 +191,7 @@ impl Rap {
                             .child(format!("{} %", size * 100 / Settings::DEFAULT_REM_SIZE)),
                     )
                     .child(
-                        tool("ui-larger", "plus", self.t(Text::Larger), false, theme)
+                        button("ui-larger", "plus", self.t(Text::Larger), theme)
                             .when(size >= Settings::MAX_REM_SIZE, |tool| tool.opacity(0.4))
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.set_ui_rem_size(size + 1, cx)

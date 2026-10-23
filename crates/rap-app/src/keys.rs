@@ -17,10 +17,26 @@ impl Rap {
             }
             return;
         }
+        if self.playlists.dialog.is_some() {
+            match key {
+                "escape" => {
+                    self.playlists.dialog = None;
+                    self.focus.focus(window);
+                    cx.notify();
+                }
+                "enter" => {
+                    self.submit_playlist_dialog(cx);
+                    if self.playlists.dialog.is_none() {
+                        self.focus.focus(window);
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
         match key {
             "f" if control => {
-                self.now_playing = false;
-                if self.section == Section::Settings {
+                if !matches!(self.section, Section::Albums | Section::Artists) {
                     self.navigate(Section::Albums, cx);
                 }
                 self.search.read(cx).focus_handle(cx).focus(window);
@@ -53,7 +69,7 @@ impl Rap {
             }
             _ => {}
         }
-        let typing = [&self.search, &self.menu_search]
+        let typing = [&self.search, &self.menu_search, &self.playlists.name]
             .iter()
             .any(|input| input.read(cx).focus_handle(cx).is_focused(window));
         if typing {
@@ -72,10 +88,8 @@ impl Rap {
             }
             _ => {}
         }
-        let browsing = self.section == Section::Albums
-            && self.selected.is_none()
-            && !self.now_playing
-            && self.menu.is_none();
+        let browsing =
+            self.section == Section::Albums && self.selected.is_none() && self.menu.is_none();
         if !browsing || self.visible.is_empty() {
             return;
         }

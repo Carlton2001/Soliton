@@ -1,7 +1,7 @@
 use crate::{
     app::{Rap, Section},
     i18n::Text,
-    widgets::{nav_item, tool},
+    widgets::nav_item,
 };
 use gpui::{prelude::*, *};
 
@@ -12,7 +12,7 @@ const CLOSE_HOVER: u32 = 0xc42b1c;
 
 impl Rap {
     /// Title bar drawn in the application theme; the native one is transparent.
-    pub fn title_bar(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn title_bar(&self, window: &Window) -> impl IntoElement {
         let theme = self.theme();
         let hover = theme.card;
         let caption = |id: &'static str, area: WindowControlArea, icon: &'static str| {
@@ -41,10 +41,6 @@ impl Rap {
                 .window_control_area(WindowControlArea::Drag)
                 .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window())
         };
-        let entries = [
-            (Section::Artists, "users", Text::Artists),
-            (Section::Albums, "disc-3", Text::Albums),
-        ];
         div()
             .id("title-bar")
             .w_full()
@@ -69,50 +65,7 @@ impl Rap {
                             .child("RAP"),
                     ),
             )
-            // Outside the drag areas so that Windows lets the clicks through.
-            .child(
-                div()
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .gap(px(2.))
-                    .children(entries.into_iter().enumerate().map(
-                        |(index, (section, icon, label))| {
-                            nav_item(
-                                ("nav", index),
-                                icon,
-                                self.t(label),
-                                !self.now_playing && self.section == section,
-                                theme,
-                            )
-                            .h(px(TITLE_BAR_HEIGHT - 8.))
-                            .on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    this.focus.focus(window);
-                                    this.now_playing = false;
-                                    this.navigate(section, cx);
-                                },
-                            ))
-                        },
-                    )),
-            )
             .child(drag("title-bar-drag").flex_1())
-            .child(
-                tool(
-                    "nav-settings",
-                    "settings",
-                    self.t(Text::Settings),
-                    !self.now_playing && self.section == Section::Settings,
-                    theme,
-                )
-                .size(px(TITLE_BAR_HEIGHT - 8.))
-                .mr_1()
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.focus.focus(window);
-                    this.now_playing = false;
-                    this.navigate(Section::Settings, cx);
-                })),
-            )
             // Windows handles these clicks natively through their control areas.
             .child(
                 caption("title-minimize", WindowControlArea::Min, "icons/minus.svg")
@@ -125,6 +78,50 @@ impl Rap {
             .child(
                 caption("title-close", WindowControlArea::Close, "icons/x.svg")
                     .hover(|style| style.bg(rgb(CLOSE_HOVER))),
+            )
+    }
+    pub fn navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = self.theme();
+        let entries = [
+            (Section::Artists, "users", Text::Artists),
+            (Section::Albums, "disc-3", Text::Albums),
+            (Section::Playlists, "list", Text::Playlists),
+            (Section::Queue, "list-end", Text::Queue),
+            (Section::Settings, "settings", Text::Settings),
+        ];
+        div()
+            .flex()
+            .flex_wrap()
+            .flex_none()
+            .items_center()
+            .gap(rems(0.25))
+            .px(rems(1.))
+            .py(rems(0.5))
+            .bg(theme.panel)
+            .border_b_1()
+            .border_color(theme.border)
+            .children(
+                entries
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (section, icon, label))| {
+                        nav_item(
+                            ("nav", index),
+                            icon,
+                            self.t(label),
+                            self.section == section,
+                            theme,
+                        )
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
+                                this.focus.focus(window);
+                                if section == Section::Playlists {
+                                    this.playlists.selected = None;
+                                }
+                                this.navigate(section, cx);
+                            },
+                        ))
+                    }),
             )
     }
 }

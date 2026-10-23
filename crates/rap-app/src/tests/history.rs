@@ -2,9 +2,9 @@ use super::{DEPTH, Filter, History, Place, Section};
 
 fn place(section: Section, album: Option<i64>) -> Place {
     Place {
+        playlist: None,
         section,
         album: album.map(|id| (id, 0)),
-        now_playing: false,
         filter: Filter::default(),
     }
 }
@@ -42,4 +42,21 @@ fn keeps_a_bounded_depth() {
         steps += 1;
     }
     assert_eq!(steps, DEPTH);
+}
+
+#[test]
+fn queue_is_a_named_history_destination() {
+    let mut history = History::default();
+    let albums = place(Section::Albums, None);
+    let queue = place(Section::Queue, None);
+    history.observe(albums.clone());
+    history.observe(queue.clone());
+    history.observe(place(Section::Playlists, None));
+    assert!(history.back() == Some(queue));
+    assert!(history.back() == Some(albums));
+    assert!(Section::from(rap_core::config::View::Queue) == Section::Queue);
+    assert_eq!(
+        rap_core::config::View::from(Section::Queue),
+        rap_core::config::View::Queue
+    );
 }

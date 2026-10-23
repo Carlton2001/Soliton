@@ -42,6 +42,14 @@ pub fn run(paths: AppPaths, work: Receiver<Work>, events: Sender<Event>, backgro
         }
     };
     let (notify_tx, notify_rx) = bounded(256);
+    match library.playlists() {
+        Ok(lists) => {
+            let _ = events.send(Event::Playlists(lists));
+        }
+        Err(error) => {
+            let _ = events.send(Event::Error(format!("{error:#}")));
+        }
+    }
     let watcher = match SourceWatcher::new(notify_tx) {
         Ok(watcher) => Some(watcher),
         Err(error) => {
@@ -109,6 +117,15 @@ impl Worker {
 
     fn handle(&mut self, work: Work) {
         match work {
+            Work::Playlist(change) => {
+                if let Err(error) = self.library.change_playlist(change) {
+                    self.error(format_args!("{error:#}"));
+                }
+                match self.library.playlists() {
+                    Ok(lists) => self.send(Event::Playlists(lists)),
+                    Err(error) => self.error(format_args!("{error:#}")),
+                }
+            }
             Work::Save(settings) => {
                 if let Err(error) = settings.save(&self.paths.settings) {
                     self.error(format_args!("{error:#}"));
@@ -123,6 +140,10 @@ impl Worker {
                 }
                 self.sync_watcher();
                 self.send(Event::Removed);
+                match self.library.playlists() {
+                    Ok(lists) => self.send(Event::Playlists(lists)),
+                    Err(error) => self.error(format_args!("{error:#}")),
+                }
             }
             Work::Scan(paths, cancellation) => self.user_scan(paths, &cancellation),
         }
