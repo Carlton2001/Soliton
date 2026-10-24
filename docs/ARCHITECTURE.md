@@ -13,7 +13,8 @@
 
 SQLite reste un module de `rap-library`. Paramètres, base et pochettes sont dans
 le dossier local RAP (`RAP_DATA_DIR` pour isoler le développement), jamais dans
-une source. Un fichier de configuration invalide est signalé, pas écrasé.
+une source. Un fichier de configuration invalide est signalé, pas écrasé ; chaque
+écriture est synchronisée sur le disque avant de remplacer la précédente.
 
 GPUI 0.2.2 et proc-macro-error2 2.0.1 sont conservés localement avec des correctifs
 ciblés : voir [vendor/README.md](../vendor/README.md). Oxyde a servi de référence

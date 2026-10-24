@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{fs, io::Write, path::Path};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Language {
@@ -245,7 +245,12 @@ impl Settings {
             fs::create_dir_all(parent)?;
         }
         let temporary = path.with_extension("json.tmp");
-        fs::write(&temporary, serde_json::to_vec_pretty(self)?)?;
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(&serde_json::to_vec_pretty(self)?)?;
+        // On disk before it replaces the previous document: a power loss leaves
+        // one complete version rather than an empty file.
+        file.sync_all()?;
+        drop(file);
         fs::rename(temporary, path)?;
         Ok(())
     }
