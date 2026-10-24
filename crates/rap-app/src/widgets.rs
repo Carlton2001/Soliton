@@ -52,6 +52,13 @@ pub fn button(
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(CONTROL_HEIGHT)
         .flex()
         .flex_none()
@@ -83,6 +90,13 @@ pub fn icon_button(
     with_tooltip(
         div()
             .id(id)
+            .tab_index(0)
+            .focus(move |style| {
+                style
+                    .bg(theme.selected)
+                    .border_2()
+                    .border_color(theme.accent)
+            })
             .size(CONTROL_HEIGHT)
             .flex()
             .flex_none()
@@ -107,6 +121,13 @@ pub fn accent_button(
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(CONTROL_HEIGHT)
         .flex()
         .flex_none()
@@ -138,6 +159,13 @@ pub fn toggle_button(
     }
     div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(CONTROL_HEIGHT)
         .flex()
         .flex_none()
@@ -165,6 +193,13 @@ pub fn menu_item(
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(CONTROL_HEIGHT)
         .flex()
         .flex_none()
@@ -202,6 +237,13 @@ pub fn ghost(
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(CONTROL_HEIGHT)
         .flex()
         .flex_none()
@@ -226,6 +268,13 @@ pub fn nav_item(
 ) -> Stateful<Div> {
     let entry = div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(rems(2.25))
         .flex()
         .flex_none()
@@ -277,6 +326,13 @@ pub fn segment(
     let color = if selected { theme.accent } else { theme.muted };
     let option = div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .h(rems(1.5))
         .flex()
         .items_center()
@@ -327,6 +383,13 @@ pub fn checkbox(
     };
     div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .group("checkbox")
         .min_h(CONTROL_HEIGHT)
         .flex()
@@ -361,6 +424,13 @@ pub fn radio_row(
     let color = if selected { theme.accent } else { theme.muted };
     let row = div()
         .id(id)
+        .tab_index(0)
+        .focus(move |style| {
+            style
+                .bg(theme.selected)
+                .border_2()
+                .border_color(theme.accent)
+        })
         .min_h(ROW_HEIGHT)
         .flex()
         .items_center()
@@ -382,6 +452,7 @@ pub fn list_row() -> Div {
     div()
         .min_h(ROW_HEIGHT)
         .flex()
+        .flex_wrap()
         .items_center()
         .gap(rems(0.75))
         .px(rems(0.75))

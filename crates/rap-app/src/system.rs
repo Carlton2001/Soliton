@@ -269,6 +269,8 @@ impl Rap {
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     div()
+                        .track_focus(&self.modal_focus)
+                        .max_w_full()
                         .p(rems(0.75))
                         .rounded(RADIUS_LARGE)
                         .border_1()
@@ -286,6 +288,7 @@ impl Rap {
                         .child(
                             div()
                                 .flex()
+                                .flex_wrap()
                                 .gap(rems(0.5))
                                 .child(
                                     button("close-quit", "x", self.t(Text::QuitApp), theme)

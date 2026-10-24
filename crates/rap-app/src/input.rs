@@ -39,7 +39,7 @@ pub struct TextInput {
 impl TextInput {
     pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
-            focus_handle: cx.focus_handle(),
+            focus_handle: cx.focus_handle().tab_stop(true),
             content: "".into(),
             placeholder: "".into(),
             selected_range: 0..0,

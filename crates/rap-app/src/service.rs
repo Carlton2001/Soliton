@@ -14,7 +14,6 @@ pub enum Work {
     RemoveSource(i64),
 }
 pub struct View {
-    pub home: Arc<crate::home::HomeCatalog>,
     pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
     pub snapshot: Arc<LibrarySnapshot>,
     pub visible: Vec<usize>,
@@ -62,7 +61,7 @@ impl Services {
             .name("rap-query".into())
             .spawn(move || {
                 let mut library = None;
-                let mut cached: Option<(i64, Catalog, Arc<crate::home::HomeMetrics>)> = None;
+                let mut cached: Option<(i64, Catalog)> = None;
                 while let Ok(next) = query_rx.recv() {
                     let filter = query_rx.try_iter().last().unwrap_or(next);
                     let result = (|| {
@@ -71,27 +70,13 @@ impl Services {
                         }
                         let library = library.as_ref().unwrap();
                         let version = library.data_version()?;
-                        if cached
-                            .as_ref()
-                            .is_none_or(|(known, _, _)| *known != version)
-                        {
+                        if cached.as_ref().is_none_or(|(known, _)| *known != version) {
                             let catalog = Catalog::new(library.snapshot()?);
-                            let metrics = Arc::new(crate::home::HomeMetrics::measure(
-                                &catalog.snapshot,
-                                &catalog.facets,
-                            ));
-                            cached = Some((version, catalog, metrics));
+                            cached = Some((version, catalog));
                         }
                         let catalog = &cached.as_ref().unwrap().1;
                         let visible = catalog.matches(&filter);
-                        let mut home = crate::home::HomeCatalog::collect(
-                            &catalog.snapshot,
-                            &catalog.facets,
-                            &visible,
-                        );
-                        home.set_metrics(&catalog.snapshot, cached.as_ref().unwrap().2.clone());
                         Ok(View {
-                            home: Arc::new(home),
                             tracks: catalog.tracks.clone(),
                             snapshot: catalog.snapshot.clone(),
                             visible,

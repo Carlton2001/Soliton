@@ -11,7 +11,7 @@ use gpui::{prelude::*, *};
 use rap_core::{config::CoverSize, text::fold};
 
 /// Horizontal padding of the album list and grid, in rems.
-pub const CONTENT_PADDING: f32 = 1.5;
+pub const CONTENT_PADDING: f32 = 0.75;
 /// Gap between grid tiles, in rems.
 pub const TILE_GAP: f32 = 1.;
 
@@ -42,7 +42,7 @@ impl Rap {
 
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
-        let albums = matches!(self.section, Section::Home | Section::Albums);
+        let albums = self.section == Section::Albums;
         let grid = match self.section {
             Section::Albums => Some(self.settings.album_grid),
             Section::Artists => Some(self.settings.artist_grid),
@@ -61,28 +61,7 @@ impl Rap {
                     .flex_wrap()
                     .items_center()
                     .gap(rems(0.75))
-                    .when(self.section == Section::Albums, |row| {
-                        row.child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .flex()
-                                .flex_col()
-                                .gap(rems(0.25))
-                                .child(
-                                    div()
-                                        .text_size(crate::widgets::TEXT_DISPLAY)
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .child(self.t(Text::Discography)),
-                                )
-                                .child(
-                                    div()
-                                        .text_size(TEXT_SMALL)
-                                        .text_color(theme.muted)
-                                        .child(crate::i18n::album_count(self.visible.len())),
-                                ),
-                        )
-                    })
+                    .child(self.search_field().w(rems(19.)).max_w_full())
                     .when(albums, |row| row.child(self.sort_button(cx)))
                     .when_some(grid, |row, grid| {
                         row.child(segments(
@@ -104,7 +83,7 @@ impl Rap {
                         ))
                     }),
             )
-            .child(self.filter_bar(cx))
+            .when(albums, |view| view.child(self.filter_bar(cx)))
     }
     fn empty_state(
         &self,
@@ -198,6 +177,8 @@ impl Rap {
         let available = album.editions.iter().any(|e| e.available());
         let frame = div()
             .id(("album", id as usize))
+            .tab_index(0)
+            .focus(move |s| s.bg(theme.selected).border_2().border_color(theme.accent))
             .rounded(RADIUS)
             .when(Some(id) == self.selected, |view| view.bg(theme.selected))
             .when(
@@ -248,46 +229,59 @@ impl Rap {
             .child(cover(album.cover(), 40., theme))
             .child(
                 div()
-                    .w(rems(14.))
-                    .truncate()
-                    .font_weight(FontWeight::MEDIUM)
-                    .child(album.title.clone()),
-            )
-            .child(
-                div()
                     .flex_1()
-                    .truncate()
-                    .text_color(theme.muted)
-                    .child(self.album_artist(album)),
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(rems(0.25))
+                    .child(
+                        div()
+                            .truncate()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(album.title.clone()),
+                    )
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(TEXT_SMALL)
+                            .text_color(theme.muted)
+                            .child(self.album_artist(album)),
+                    )
+                    .when(!available, |v| {
+                        v.child(
+                            div()
+                                .text_size(TEXT_SMALL)
+                                .text_color(theme.muted)
+                                .child(self.t(Text::Unavailable)),
+                        )
+                    }),
             )
             .child(
                 div()
-                    .w(rems(3.))
+                    .max_w(rems(11.))
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(rems(0.25))
+                    .text_right()
+                    .text_size(TEXT_SMALL)
                     .text_color(theme.muted)
-                    .font(crate::widgets::numeric_font())
-                    .child(first.year.map(|y| y.to_string()).unwrap_or_default()),
+                    .child(div().truncate().child(format!(
+                        "{} · {}",
+                        first.year.map(|y| y.to_string()).unwrap_or_default(),
+                        first.genre
+                    )))
+                    .child(
+                        div()
+                            .truncate()
+                            .font(crate::widgets::numeric_font())
+                            .child(format!(
+                                "{} · {}",
+                                first.format,
+                                time(edition.duration_ms())
+                            )),
+                    ),
             )
-            .child(
-                div()
-                    .w(rems(7.))
-                    .truncate()
-                    .text_color(theme.muted)
-                    .child(first.genre.clone()),
-            )
-            .child(
-                div()
-                    .w(rems(7.))
-                    .font(crate::widgets::numeric_font())
-                    .text_color(theme.muted)
-                    .child(format!("{} {}", first.format, time(edition.duration_ms()))),
-            )
-            .when(!available, |row| {
-                row.child(
-                    div()
-                        .text_color(theme.muted)
-                        .child(self.t(Text::Unavailable)),
-                )
-            })
             .into_any_element()
     }
 
@@ -302,6 +296,20 @@ impl Rap {
             .cloned()
             .collect();
         if cards.is_empty() {
+            if self.snapshot.albums.is_empty() {
+                let add = button(
+                    "artists-empty-add",
+                    "folder-plus",
+                    self.t(Text::AddSource),
+                    self.theme(),
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.choose_source(cx)));
+                return self.empty_state(
+                    self.t(Text::Empty),
+                    self.t(Text::EmptyHint),
+                    Some(add.into_any_element()),
+                );
+            }
             return self.facet_empty(&query);
         }
         let theme = self.theme();
@@ -311,7 +319,7 @@ impl Rap {
         let list = uniform_list(
             "artists",
             cards.len().div_ceil(columns),
-            cx.processor(move |_this, range: std::ops::Range<usize>, _, cx| {
+            cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
                 range
                     .map(|row| {
                         div()
@@ -329,6 +337,15 @@ impl Rap {
                                     if !grid {
                                         return div()
                                             .id(("artist", index))
+                                            .when(index == this.keyboard_index, |v| {
+                                                v.bg(theme.hover)
+                                            })
+                                            .tab_index(0)
+                                            .focus(move |s| {
+                                                s.bg(theme.selected)
+                                                    .border_2()
+                                                    .border_color(theme.accent)
+                                            })
                                             .flex_1()
                                             .p(rems(0.5))
                                             .rounded(RADIUS)
@@ -351,12 +368,20 @@ impl Rap {
                                                     .text_color(theme.muted)
                                                     .child(crate::i18n::album_count(card.albums)),
                                             )
-                                            .on_click(cx.listener(move |this, _, _, cx| {
+                                            .on_click(cx.listener(move |this, _, window, cx| {
+                                                this.focus.focus(window);
                                                 this.show_artist(name.clone(), cx)
                                             }));
                                     }
                                     div()
                                         .id(("artist", index))
+                                        .when(index == this.keyboard_index, |v| v.bg(theme.hover))
+                                        .tab_index(0)
+                                        .focus(move |s| {
+                                            s.bg(theme.selected)
+                                                .border_2()
+                                                .border_color(theme.accent)
+                                        })
                                         .w(rems(side / 16. + 1.))
                                         .min_w_0()
                                         .p(rems(0.5))
@@ -380,7 +405,8 @@ impl Rap {
                                                 .text_color(theme.muted)
                                                 .child(crate::i18n::album_count(card.albums)),
                                         )
-                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                        .on_click(cx.listener(move |this, _, window, cx| {
+                                            this.focus.focus(window);
                                             this.show_artist(name.clone(), cx)
                                         }))
                                 },

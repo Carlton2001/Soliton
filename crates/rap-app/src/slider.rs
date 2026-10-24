@@ -6,6 +6,17 @@ use std::{cell::Cell, rc::Rc};
 const RAIL: f32 = 4.;
 const KNOB: f32 = 12.;
 
+/// Shared keyboard behavior for seek and volume, independent of pointer geometry.
+pub(super) fn keyboard_value(key: &str, value: f32, step: f32) -> Option<f32> {
+    Some(match key {
+        "left" | "down" => (value - step).clamp(0., 1.),
+        "right" | "up" => (value + step).clamp(0., 1.),
+        "home" => 0.,
+        "end" => 1.,
+        _ => return None,
+    })
+}
+
 /// Called with the pointer fraction and whether the drag just ended.
 pub type OnChange = Rc<dyn Fn(f32, bool, &mut Window, &mut App)>;
 
@@ -13,6 +24,10 @@ pub type OnChange = Rc<dyn Fn(f32, bool, &mut Window, &mut App)>;
 pub struct Slider {
     dragging: Rc<Cell<bool>>,
 }
+
+#[cfg(test)]
+#[path = "tests/slider.rs"]
+mod tests;
 
 impl Slider {
     pub fn is_dragging(&self) -> bool {

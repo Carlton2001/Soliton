@@ -11,7 +11,6 @@ fn album_panel_requires_room_for_both_the_collection_and_record() {
 fn other_pages_and_empty_selection_keep_their_existing_layout() {
     assert!(!split_collection(90., Section::Albums, false));
     for section in [
-        Section::Home,
         Section::Artists,
         Section::Queue,
         Section::Playlists,

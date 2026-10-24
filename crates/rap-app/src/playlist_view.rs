@@ -89,10 +89,13 @@ impl Rap {
                                 self.t(Text::Playlists),
                                 theme,
                             )
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.playlists.selected = None;
-                                cx.notify();
-                            })),
+                            .on_click(cx.listener(
+                                |this, _, window, cx| {
+                                    this.focus.focus(window);
+                                    this.playlists.selected = None;
+                                    cx.notify();
+                                },
+                            )),
                         )
                         .child(div().flex_1())
                         .child(
@@ -121,7 +124,6 @@ impl Rap {
                         .flex()
                         .flex_col()
                         .gap(rems(0.5))
-                        .child(div().text_color(theme.muted).child(self.t(Text::Playlists)))
                         .child(div().text_size(TEXT_DISPLAY).child(list.name.clone()))
                         .child(
                             div()
@@ -204,6 +206,14 @@ impl Rap {
                         let id = p.id;
                         div()
                             .id(("playlist", id as usize))
+                            .tab_index(0)
+                            .focus(move |s| {
+                                s.bg(theme.selected).border_2().border_color(theme.accent)
+                            })
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.focus.focus(window);
+                                this.open_playlist(id, cx);
+                            }))
                             .h(rems(5.5))
                             .px(rems(0.75))
                             .child(
@@ -252,16 +262,14 @@ impl Rap {
                                         button(
                                             ("playlist-open", id as usize),
                                             "list",
-                                            this.t(Text::ShowAll),
+                                            this.t(Text::OpenPlaylist),
                                             theme,
                                         )
                                         .on_click(
-                                            cx.listener(move |this, _, _, cx| {
-                                                this.playlists.selected = Some(id);
-                                                this.playlists
-                                                    .scroll
-                                                    .scroll_to_item(0, ScrollStrategy::Top);
-                                                cx.notify();
+                                            cx.listener(move |this, _, window, cx| {
+                                                this.focus.focus(window);
+                                                cx.stop_propagation();
+                                                this.open_playlist(id, cx);
                                             }),
                                         ),
                                     ),
@@ -286,18 +294,6 @@ impl Rap {
                     .justify_between()
                     .gap(rems(0.75))
                     .flex_wrap()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(rems(0.375))
-                            .child(
-                                div()
-                                    .text_color(theme.muted)
-                                    .child(self.t(Text::Collection)),
-                            )
-                            .child(div().text_size(TEXT_DISPLAY).child(self.t(Text::Playlists))),
-                    )
                     .child(
                         accent_button("new-playlist", "plus", self.t(Text::NewPlaylist), theme)
                             .on_click(cx.listener(|this, _, window, cx| {

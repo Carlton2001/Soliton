@@ -4,7 +4,7 @@ use crate::{
     i18n::Text,
     playlists::Dialog,
     track_list::{Selection, TrackRow},
-    widgets::{TEXT_DISPLAY, TEXT_SMALL, button, cover, quality, time},
+    widgets::{TEXT_SMALL, button, cover, quality},
 };
 use gpui::{prelude::*, *};
 use rap_audio::Command;
@@ -12,13 +12,6 @@ impl Rap {
     pub fn queue_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         let count = self.playback.queue.entries.len();
-        let total = self
-            .playback
-            .queue
-            .entries
-            .iter()
-            .map(|e| e.track.metadata.duration_ms)
-            .sum();
         let rows = uniform_list(
             "queue",
             count,
@@ -65,26 +58,6 @@ impl Rap {
                     .items_center()
                     .gap(rems(0.75))
                     .flex_wrap()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .gap(rems(0.25))
-                            .child(div().text_size(TEXT_DISPLAY).child(self.t(Text::Queue)))
-                            .child(
-                                div()
-                                    .text_size(TEXT_SMALL)
-                                    .text_color(theme.muted)
-                                    .font(crate::widgets::numeric_font())
-                                    .child(format!(
-                                        "{count} {} · {}",
-                                        self.t(Text::Tracks),
-                                        time(total)
-                                    )),
-                            ),
-                    )
                     .child(
                         button("save-queue", "list-plus", self.t(Text::SaveQueue), theme)
                             .opacity(if count > 0 { 1. } else { 0.4 })
@@ -168,9 +141,10 @@ impl Rap {
                         .when_some(album, |v, id| {
                             v.child(
                                 button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
-                                    .on_click(
-                                        cx.listener(move |this, _, _, cx| this.open_album(id, cx)),
-                                    ),
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        this.focus.focus(window);
+                                        this.open_album(id, cx);
+                                    })),
                             )
                         }),
                 )

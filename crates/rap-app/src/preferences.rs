@@ -5,8 +5,8 @@ use crate::{
     theme::Theme,
     views::scroll_area,
     widgets::{
-        RADIUS, TEXT_SMALL, TEXT_SUBTITLE, TEXT_TITLE, button, checkbox, display_path, list_box,
-        list_row, segment, segments, tinted_icon, with_tooltip,
+        RADIUS, TEXT_SMALL, TEXT_SUBTITLE, button, checkbox, display_path, list_box, list_row,
+        segment, segments, tinted_icon, with_tooltip,
     },
 };
 use gpui::{prelude::*, *};
@@ -27,6 +27,7 @@ pub fn section(
             div()
                 .min_h(rems(2.))
                 .flex()
+                .flex_wrap()
                 .items_center()
                 .justify_between()
                 .gap(rems(0.75))
@@ -129,12 +130,6 @@ impl Rap {
                     .flex()
                     .flex_col()
                     .gap(rems(0.75))
-                    .child(
-                        div()
-                            .text_size(TEXT_TITLE)
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.t(Text::Settings)),
-                    )
                     .child(self.general_section(theme, cx))
                     .child(self.display_section(theme, cx))
                     .child(self.audio_preferences(cx))
@@ -306,6 +301,8 @@ impl Rap {
         with_tooltip(
             div()
                 .id(("accent", accent as usize))
+                .tab_index(0)
+                .focus(move |s| s.border_2().border_color(theme.accent))
                 .size(rems(1.75))
                 .rounded_full()
                 .flex()
@@ -347,7 +344,12 @@ impl Rap {
                     this.scan(Vec::new(), cx)
                 }
             }));
-        let actions = div().flex().gap(rems(0.5)).child(rescan).child(add);
+        let actions = div()
+            .flex()
+            .flex_wrap()
+            .gap(rems(0.5))
+            .child(rescan)
+            .child(add);
         let rows: Vec<AnyElement> = if self.snapshot.sources.is_empty() {
             vec![
                 list_row()

@@ -10,6 +10,7 @@ impl Rap {
     pub fn now_playing_view(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         let track = self.playback.track.as_ref();
+        let album_id = self.current_album().map(|album| album.id);
         let rem = f32::from(window.rem_size());
         // Leave room for navigation, the persistent player, the return action and metadata.
         let side = ((f32::from(window.viewport_size().height) / rem - 26.)
@@ -81,6 +82,22 @@ impl Rap {
                                             .truncate()
                                             .text_center()
                                             .text_color(theme.accent)
+                                            .id("now-artist")
+                                            .tab_index(0)
+                                            .hover(move |s| s.bg(theme.hover))
+                                            .focus(move |s| {
+                                                s.bg(theme.selected)
+                                                    .border_2()
+                                                    .border_color(theme.accent)
+                                            })
+                                            .on_click({
+                                                let artist = track.metadata.artist.clone();
+                                                cx.listener(move |this, _, window, cx| {
+                                                    this.focus.focus(window);
+                                                    this.now_playing = false;
+                                                    this.show_artist(artist.clone(), cx);
+                                                })
+                                            })
                                             .child(track.metadata.artist.clone()),
                                     )
                                     .child(
@@ -89,6 +106,24 @@ impl Rap {
                                             .truncate()
                                             .text_center()
                                             .text_color(theme.muted)
+                                            .id("now-album")
+                                            .tab_index(0)
+                                            .tab_stop(album_id.is_some())
+                                            .when(album_id.is_some(), |v| {
+                                                v.text_color(theme.accent)
+                                                    .hover(move |s| s.bg(theme.hover))
+                                            })
+                                            .focus(move |s| {
+                                                s.bg(theme.selected)
+                                                    .border_2()
+                                                    .border_color(theme.accent)
+                                            })
+                                            .on_click(cx.listener(move |this, _, window, cx| {
+                                                this.focus.focus(window);
+                                                if let Some(id) = album_id {
+                                                    this.open_album(id, cx);
+                                                }
+                                            }))
                                             .child(track.metadata.album.clone()),
                                     )
                                     .child(

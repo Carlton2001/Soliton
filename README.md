@@ -83,10 +83,13 @@ Après construction, l'exécutable est `target/debug/rap.exe`.
   qu'elle n'a pas été activée. Le réglage concerne l'utilisateur courant et le
   chemin de l'exécutable ; réactiver l'option après avoir déplacé RAP.
 
-Clavier : `Ctrl+F` recherche, flèches pour les albums,
+Clavier : `Ctrl+F` affiche la recherche, flèches pour les artistes et albums,
 `Entrée` pour ouvrir une fiche, `Espace` lecture/pause, `Ctrl+←/→` ±10 s, `F11`
 plein écran, `Échap` ou bouton Précédent de la souris pour revenir. Le champ de
 recherche prend en charge sélection, copier/coller et saisie IME.
+`Tab`/`Maj+Tab` parcourent les contrôles, `Entrée`/`Espace` les activent.
+`Alt+←/→` parcourt l’historique. Les curseurs de volume et de position acceptent
+les flèches et `Début`/`Fin` ; `Ctrl+↑/↓` règle le volume depuis la bibliothèque.
 
 ## Données et fichiers sources
 

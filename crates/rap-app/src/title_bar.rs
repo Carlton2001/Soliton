@@ -81,9 +81,8 @@ impl Rap {
     pub fn navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let entries = [
-            (Section::Home, "house", Text::Home),
-            (Section::Albums, "disc-3", Text::Albums),
             (Section::Artists, "users", Text::Artists),
+            (Section::Albums, "disc-3", Text::Albums),
             (Section::Playlists, "list", Text::Playlists),
             (Section::Queue, "list-end", Text::Queue),
             (Section::Settings, "settings", Text::Settings),
@@ -97,6 +96,24 @@ impl Rap {
             .px(rems(0.75))
             .py(rems(0.5))
             .bg(theme.background)
+            .child(
+                crate::widgets::icon_button(
+                    "history-back",
+                    "arrow-left",
+                    self.t(Text::BackToLibrary),
+                    false,
+                    theme,
+                )
+                .opacity(if self.history.can_go_back() || self.now_playing {
+                    1.
+                } else {
+                    0.4
+                })
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.focus.focus(window);
+                    this.go_back(cx);
+                })),
+            )
             .children(
                 entries
                     .into_iter()
@@ -119,14 +136,6 @@ impl Rap {
                             },
                         ))
                     }),
-            )
-            .child(div().flex_1())
-            .when(
-                matches!(
-                    self.section,
-                    Section::Home | Section::Albums | Section::Artists
-                ),
-                |nav| nav.child(self.search_field().w(rems(19.)).max_w_full()),
             )
     }
 }

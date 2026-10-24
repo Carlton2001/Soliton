@@ -413,38 +413,38 @@ L'interface principale comporte :
 Disposition validée le 24 octobre 2026 à partir de la proposition Figma
 « Collection » : la barre de titre, la navigation et le lecteur partagent le
 fond de l'application, sans séparateur autour de la barre de titre. La recherche
-rejoint la navigation. Dans Albums, une sélection ouvre sa fiche dans un panneau
+rejoint les contrôles de tri et d’affichage. Dans Albums, une sélection ouvre sa fiche dans un panneau
 à droite sur les fenêtres larges ; la grille ou liste reste visible et adapte
 son nombre de colonnes. En fenêtre étroite, la fiche conserve une page dédiée.
-Accueil conserve ses trois colonnes. Les pochettes restent celles de la
-bibliothèque ; les illustrations de la maquette ne sont pas des ressources RAP.
+Les pochettes restent celles de la bibliothèque ; les illustrations de la maquette ne sont pas des ressources RAP.
 
 Sections principales :
 
-- Accueil.
-- Albums.
 - Artistes.
+- Albums.
 - Playlists manuelles.
 - File de lecture.
 - Paramètres.
 
 Genres et années sont accessibles par les filtres de la vue Albums.
 
-La vue Accueil, placée avant Artistes dans la navigation, propose trois panneaux
-simultanés : artistes, albums de l’artiste sélectionné, puis pistes de l’album
-sélectionné. Les listes défilent indépendamment. Les actions de lecture, les
-éditions, la recherche et les filtres réutilisent les contrôles existants. La
-navigation principale et le lecteur restent visibles. Les couleurs et les
-contrôles ne changent pas. La dernière sélection est restaurée au redémarrage.
-Les colonnes Artistes et Albums sont dimensionnées automatiquement au contenu
-pour afficher les noms complets sur une ligne. La largeur des albums s’adapte
-aux albums visibles de l’artiste sélectionné, y compris après filtrage.
-Elles sont incompressibles et
-ne disposent pas de redimensionnement manuel. La colonne des pistes occupe
-l’espace restant et permet un défilement horizontal indépendant si nécessaire.
-Les ascenseurs verticaux restent au bord droit de chaque colonne. Les sélections
-occupent la largeur disponible entre les marges intérieures. L’en-tête décoratif
-« Votre collection / Choisir un disque » n’est pas affiché sur Accueil.
+La vue Accueil a été supprimée. Les anciennes sessions Accueil sont rouvertes
+sur Artistes. Artistes précède Albums dans la navigation. Les deux pages partagent
+le cartouche compact Grille/Liste ; Albums conserve ses critères de tri. Les champs
+de recherche figurent à gauche des contrôles de tri et Grille/Liste. Les pages
+Playlists, File de lecture et Paramètres n’affichent pas de titre ou sous-titre de
+page redondant avec la navigation ; leurs actions et les noms des playlists restent visibles.
+
+Les filtres de métadonnées sont réservés à Albums. Les deux vues de bibliothèque
+proposent l’ajout d’un dossier lorsqu’elles sont vides. Ctrl+F affiche la recherche
+avant de lui donner le focus, y compris depuis une fiche ou Lecture en cours.
+Le bouton Retour et Alt+Gauche/Alt+Droite parcourent l’historique ; une fiche
+album revient au contexte d’origine. Les contrôles acceptent Tab/Maj+Tab et
+Entrée/Espace, avec un focus visible ; les dialogues retiennent la tabulation.
+Les fiches album partagent les mêmes actions Lire et Actions quelle que soit la
+largeur. Les lignes d’albums et barres d’actions s’adaptent aux petites fenêtres.
+Une playlist s’ouvre au clic sur sa ligne ou sur Ouvrir. Dans Lecture en cours,
+l’artiste et l’album de bibliothèque donnent accès à leur vue correspondante.
 
 ## 8.4 Vue Albums
 

@@ -53,6 +53,12 @@ impl Playlists {
 }
 
 impl Rap {
+    pub fn open_playlist(&mut self, id: i64, cx: &mut Context<Self>) {
+        self.record_place(cx);
+        self.playlists.selected = Some(id);
+        self.playlists.scroll.scroll_to_item(0, ScrollStrategy::Top);
+        cx.notify();
+    }
     pub fn change_playlist(&mut self, change: PlaylistChange, cx: &mut Context<Self>) -> bool {
         if self.playlists.pending {
             return false;
@@ -178,6 +184,7 @@ impl Rap {
         let naming = matches!(dialog, Dialog::New(_) | Dialog::Rename(_));
         let valid = !naming || valid_name(self.playlists.name.read(cx).content.trim());
         let mut panel = div()
+            .track_focus(&self.modal_focus)
             .w(rems(29.))
             .max_w_full()
             .p(rems(0.75))

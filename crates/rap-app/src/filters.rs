@@ -156,7 +156,7 @@ impl Rap {
             }
         }
         self.selected = None;
-        if !matches!(self.section, Section::Settings | Section::Home) {
+        if self.section != Section::Settings {
             self.section = Section::Albums;
         }
         self.album_scroll.scroll_to_item(0, ScrollStrategy::Top);

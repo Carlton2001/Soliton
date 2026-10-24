@@ -155,15 +155,12 @@ impl Rap {
                     self.volume_popup,
                     theme,
                 )
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(|this, _, window, cx| {
-                        this.volume_popup = !this.volume_popup;
-                        this.focus.focus(window);
-                        cx.stop_propagation();
-                        cx.notify();
-                    }),
-                ),
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.volume_popup = !this.volume_popup;
+                    cx.stop_propagation();
+                    cx.notify();
+                })),
             )
             .when(self.volume_popup, |anchor| {
                 anchor.child(
@@ -317,6 +314,21 @@ impl Rap {
             .child(
                 div()
                     .relative()
+                    .id("seek-keyboard")
+                    .tab_index(0)
+                    .tab_stop(enabled)
+                    .focus(move |s| s.border_1().border_color(theme.accent))
+                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                        if !enabled {
+                            return;
+                        }
+                        if let Some(value) =
+                            crate::slider::keyboard_value(&event.keystroke.key, fraction, 0.02)
+                        {
+                            this.seek_fraction(value, true, cx);
+                            cx.stop_propagation();
+                        }
+                    }))
                     .flex_1()
                     .min_w_0()
                     .h(rems(1.125))
@@ -367,6 +379,20 @@ impl Rap {
             .child(
                 div()
                     .relative()
+                    .id("volume-keyboard")
+                    .tab_index(0)
+                    .tab_stop(self.audio.is_some())
+                    .focus(move |s| s.border_1().border_color(theme.accent))
+                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                        if let Some(value) = crate::slider::keyboard_value(
+                            &event.keystroke.key,
+                            this.settings.volume,
+                            0.05,
+                        ) {
+                            this.set_volume(value, true, cx);
+                            cx.stop_propagation();
+                        }
+                    }))
                     .w(rems(width / 16.))
                     .flex_shrink()
                     .min_w(rems(2.))

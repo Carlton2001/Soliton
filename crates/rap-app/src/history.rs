@@ -14,7 +14,7 @@ const DEPTH: usize = 50;
 /// display settings.
 #[derive(Clone, PartialEq)]
 pub struct Place {
-    home_artist: Option<String>,
+    search: String,
     playlist: Option<i64>,
     section: Section,
     album: Option<(i64, usize)>,
@@ -29,12 +29,23 @@ pub struct History {
 }
 
 impl History {
+    pub fn can_go_back(&self) -> bool {
+        !self.back.is_empty()
+    }
     /// Records `place` when it differs from the current one. A new place
     /// discards the forward path, as in a browser.
     /// Returns whether the place changed.
     pub fn observe(&mut self, place: Place) -> bool {
         if self.current.as_ref() == Some(&place) {
             return false;
+        }
+        if let Some(current) = self.current.as_mut() {
+            let mut destination = place.clone();
+            destination.search = current.search.clone();
+            if *current == destination {
+                current.search = place.search;
+                return false;
+            }
         }
         if let Some(previous) = self.current.replace(place) {
             self.back.push(previous);
@@ -64,11 +75,18 @@ impl History {
 }
 
 impl Rap {
-    fn place(&self) -> Place {
+    pub fn return_from_album(&mut self, cx: &mut Context<Self>) {
+        if let Some(place) = self.history.back() {
+            self.restore(place, cx);
+        } else {
+            self.selected = None;
+            cx.notify();
+        }
+    }
+
+    fn place(&self, cx: &App) -> Place {
         Place {
-            home_artist: (self.section == Section::Home)
-                .then(|| self.home.artist.clone())
-                .flatten(),
+            search: self.search.read(cx).content.to_string(),
             playlist: if self.section == Section::Playlists {
                 self.playlists.selected
             } else {
@@ -87,8 +105,8 @@ impl Rap {
 
     /// Called before each render, so every way of moving is recorded. The
     /// page is also saved, to reopen the application where it was left.
-    pub fn record_place(&mut self) {
-        let place = self.place();
+    pub fn record_place(&mut self, cx: &App) {
+        let place = self.place(cx);
         if !self.history.observe(place) {
             return;
         }
@@ -96,11 +114,7 @@ impl Rap {
             playlist: self.playlists.selected,
             view: self.section.into(),
             album: self.selected,
-            artist: if self.section == Section::Home {
-                self.home.artist.clone()
-            } else {
-                self.filter.artist.clone()
-            },
+            artist: self.filter.artist.clone(),
         };
         if last != self.settings.last_view {
             self.settings.last_view = last;
@@ -128,19 +142,29 @@ impl Rap {
     }
 
     fn restore(&mut self, place: Place, cx: &mut Context<Self>) {
-        let filter_changed = self.place().filter != place.filter;
+        let filter_changed = self.place(cx).filter != place.filter
+            || self.search.read(cx).content.as_ref() != place.search;
         self.track_menu = None;
+        self.menu = None;
+        self.now_playing = false;
+        self.volume_popup = false;
         self.section = place.section;
-        if self.section == Section::Home {
-            self.home.artist = place.home_artist;
-        }
+        self.search_section = place.section;
+        self.search.update(cx, |input, cx| {
+            input.set_text(place.search.clone());
+            cx.notify();
+        });
         self.playlists.selected = place.playlist;
         self.selected = place.album.map(|(id, _)| id);
         self.selected_edition = place.album.map_or(0, |(_, edition)| edition);
         if filter_changed {
-            // The search text and display settings stay as they are.
+            // Restore the search context; display settings keep their current values.
             self.filter = Filter {
-                query: std::mem::take(&mut self.filter.query),
+                query: if self.section == Section::Albums {
+                    place.search
+                } else {
+                    String::new()
+                },
                 sort: self.filter.sort,
                 hide_unavailable: self.filter.hide_unavailable,
                 ..place.filter
@@ -154,7 +178,7 @@ impl Rap {
 impl From<View> for Section {
     fn from(view: View) -> Self {
         match view {
-            View::Home => Section::Home,
+            View::Home => Section::Artists,
             View::Artists => Section::Artists,
             View::Albums => Section::Albums,
             View::Playlists => Section::Playlists,
@@ -167,7 +191,6 @@ impl From<View> for Section {
 impl From<Section> for View {
     fn from(section: Section) -> Self {
         match section {
-            Section::Home => View::Home,
             Section::Artists => View::Artists,
             Section::Albums => View::Albums,
             Section::Playlists => View::Playlists,

@@ -4,7 +4,7 @@ use rap_platform::AppPaths;
 use std::time::Duration;
 
 #[test]
-fn home_catalogue_loads_on_the_query_worker_without_any_window_or_ui_event_loop() {
+fn catalogue_loads_on_the_query_worker_without_any_window_or_ui_event_loop() {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("music");
     let album = source.join("Nirvana/Bleach");
@@ -34,12 +34,12 @@ fn home_catalogue_loads_on_the_query_worker_without_any_window_or_ui_event_loop(
         let view = services
             .views
             .recv_timeout(Duration::from_secs(10))
-            .expect("Query worker did not publish the Home catalogue")
+            .expect("Query worker did not publish the catalogue")
             .unwrap();
         assert_eq!(view.visible.len(), 1);
         assert_eq!(view.tracks.len(), 1);
-        assert_eq!(view.home.artists.len(), 1);
-        assert_eq!(view.home.artists[0].name, "Nirvana");
-        assert_eq!(view.home.artists[0].albums, vec![0]);
+        assert_eq!(view.facets.artist_cards.len(), 1);
+        assert_eq!(view.facets.artist_cards[0].name, "Nirvana");
+        assert_eq!(view.facets.artist_cards[0].albums, 1);
     }
 }

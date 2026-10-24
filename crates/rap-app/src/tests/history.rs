@@ -2,7 +2,7 @@ use super::{DEPTH, Filter, History, Place, Section};
 
 fn place(section: Section, album: Option<i64>) -> Place {
     Place {
-        home_artist: None,
+        search: String::new(),
         playlist: None,
         section,
         album: album.map(|id| (id, 0)),
@@ -63,16 +63,45 @@ fn queue_is_a_named_history_destination() {
 }
 
 #[test]
-fn home_keeps_its_artist_and_album_in_navigation_history() {
+fn former_home_destination_reopens_artists() {
+    assert!(Section::from(rap_core::config::View::Home) == Section::Artists);
+}
+
+#[test]
+fn album_returns_to_queue_and_keeps_forward_navigation() {
     let mut history = History::default();
-    let mut home = place(Section::Home, Some(42));
-    home.home_artist = Some("Björk".into());
-    history.observe(home.clone());
-    history.observe(place(Section::Artists, None));
-    assert!(history.back() == Some(home));
-    assert!(Section::from(rap_core::config::View::Home) == Section::Home);
-    assert_eq!(
-        rap_core::config::View::from(Section::Home),
-        rap_core::config::View::Home
-    );
+    let queue = place(Section::Queue, None);
+    let album = place(Section::Albums, Some(42));
+    history.observe(queue.clone());
+    assert!(!history.can_go_back());
+    history.observe(album.clone());
+    assert!(history.can_go_back());
+    assert!(history.back() == Some(queue));
+    assert!(history.forward() == Some(album));
+}
+
+#[test]
+fn contextual_back_preserves_playlist_selection_and_album_filters() {
+    let mut history = History::default();
+    let mut playlist = place(Section::Playlists, None);
+    playlist.playlist = Some(12);
+    let mut albums = place(Section::Albums, None);
+    albums.filter.artist = Some("Björk".into());
+    history.observe(playlist.clone());
+    history.observe(albums.clone());
+    history.observe(place(Section::Albums, Some(42)));
+    assert!(history.back() == Some(albums));
+    assert!(history.back() == Some(playlist));
+}
+
+#[test]
+fn search_is_restored_without_recording_every_keystroke_as_a_destination() {
+    let mut history = History::default();
+    let mut artists = place(Section::Artists, None);
+    history.observe(artists.clone());
+    artists.search = "Björk".into();
+    assert!(!history.observe(artists.clone()));
+    assert!(!history.can_go_back());
+    history.observe(place(Section::Albums, Some(42)));
+    assert!(history.back() == Some(artists));
 }

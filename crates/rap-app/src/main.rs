@@ -11,7 +11,6 @@ mod catalog;
 mod collection;
 mod filters;
 mod history;
-mod home;
 mod i18n;
 mod indexing;
 mod input;

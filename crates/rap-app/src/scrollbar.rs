@@ -30,10 +30,6 @@ impl Scrollbar {
         self.render_axis(theme, false)
     }
 
-    pub fn render_horizontal(&self, theme: Theme) -> impl IntoElement {
-        self.render_axis(theme, true)
-    }
-
     fn render_axis(&self, theme: Theme, horizontal: bool) -> impl IntoElement {
         let handle = self.handle.clone();
         let grab = if horizontal {

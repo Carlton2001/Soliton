@@ -24,7 +24,6 @@ use std::{
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Section {
-    Home,
     Albums,
     Artists,
     Playlists,
@@ -35,7 +34,6 @@ pub enum Section {
 pub struct Rap {
     pub now_playing: bool,
     pub volume_popup: bool,
-    pub home: crate::home::Home,
     pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
     pub track_menu: Option<(crate::track_list::Selection, bool)>,
     pub playlists: crate::playlists::Playlists,
@@ -53,6 +51,7 @@ pub struct Rap {
     pub audio: Option<rap_audio::Engine>,
     pub playback: rap_audio::Playback,
     pub focus: FocusHandle,
+    pub modal_focus: FocusHandle,
     pub keyboard_index: usize,
     pub album_scroll: UniformListScrollHandle,
     pub album_bar: Scrollbar,
@@ -71,7 +70,7 @@ pub struct Rap {
     pub filter: Filter,
     pub section: Section,
     /// Page the search text was typed on.
-    search_section: Section,
+    pub(super) search_section: Section,
     pub selected: Option<i64>,
     /// Index into the selected album's editions.
     pub selected_edition: usize,
@@ -127,7 +126,7 @@ impl Rap {
             // The field searches albums on the album pages and filters the
             // list shown elsewhere, which only needs a new render.
             cx.observe(&search, |this, search, cx| {
-                let query = if matches!(this.section, Section::Home | Section::Albums) {
+                let query = if this.section == Section::Albums {
                     search.read(cx).content.to_string()
                 } else {
                     String::new()
@@ -138,7 +137,7 @@ impl Rap {
                     }
                     this.filter.query = query;
                     this.query_pending = true;
-                } else if !matches!(this.section, Section::Home | Section::Albums) {
+                } else if this.section != Section::Albums {
                     cx.notify();
                 }
             }),
@@ -152,23 +151,21 @@ impl Rap {
         let lists = [(); 3].map(|_| UniformListScrollHandle::new());
         let bar =
             |list: &UniformListScrollHandle| Scrollbar::new(list.0.borrow().base_handle.clone());
-        let last = settings.last_view.clone();
+        let mut last = settings.last_view.clone();
+        // Compatibility with settings written before the Home page was removed.
+        if last.view == rap_core::config::View::Home {
+            last.view = rap_core::config::View::Artists;
+            last.album = None;
+        }
         let filter = Filter {
             sort: settings.album_sort,
             hide_unavailable: settings.hide_unavailable,
-            artist: (last.view != rap_core::config::View::Home)
-                .then(|| last.artist.clone())
-                .flatten(),
+            artist: last.artist.clone(),
             ..Default::default()
         };
         let mut this = Self {
             now_playing: false,
             volume_popup: false,
-            home: crate::home::Home::new(
-                (last.view == rap_core::config::View::Home)
-                    .then(|| last.artist.clone())
-                    .flatten(),
-            ),
             tracks: Arc::default(),
             track_menu: None,
             playlists: crate::playlists::Playlists::new(playlist_name),
@@ -186,6 +183,7 @@ impl Rap {
             audio,
             playback,
             focus: cx.focus_handle(),
+            modal_focus: cx.focus_handle(),
             keyboard_index: 0,
             album_bar: bar(&lists[0]),
             album_scroll: lists[0].clone(),
@@ -364,10 +362,6 @@ impl Rap {
                     self.visible = view.visible;
                     self.facets = view.facets;
                     self.filter_options = view.options;
-                    self.home.catalog = view.home;
-                    if self.section == Section::Home {
-                        self.reconcile_home();
-                    }
                     self.keyboard_index = self
                         .keyboard_index
                         .min(self.visible.len().saturating_sub(1));
@@ -473,19 +467,19 @@ impl Rap {
         cx.notify();
     }
     pub fn navigate(&mut self, section: Section, cx: &mut Context<Self>) {
+        self.record_place(cx);
         self.volume_popup = false;
         self.now_playing = false;
         self.section = section;
+        self.keyboard_index = 0;
         self.selected = None;
         self.track_menu = None;
         self.menu = None;
-        if section == Section::Home {
-            self.reconcile_home();
-        }
         cx.notify();
     }
     /// Shows an album sheet on its best edition.
     pub fn open_album(&mut self, id: i64, cx: &mut Context<Self>) {
+        self.record_place(cx);
         self.volume_popup = false;
         self.track_menu = None;
         self.menu = None;
@@ -503,6 +497,10 @@ impl Rap {
         if artist.is_empty() {
             return;
         }
+        self.record_place(cx);
+        self.now_playing = false;
+        self.menu = None;
+        self.track_menu = None;
         self.filter.artist = Some(artist);
         self.section = Section::Albums;
         self.selected = None;
@@ -542,7 +540,9 @@ impl Rap {
             return;
         }
         if self.menu.take().is_none() {
-            self.selected = None;
+            if self.selected.is_some() {
+                self.return_from_album(cx);
+            }
         }
         cx.notify();
     }
@@ -613,7 +613,6 @@ impl Drop for Rap {
 impl Render for Rap {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::scale::apply(self.settings.ui_rem_size, window);
-        self.record_place();
         // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
@@ -628,9 +627,6 @@ impl Render for Rap {
         } else {
             0.
         };
-        if !split && self.menu == Some(Menu::AlbumActions) {
-            self.menu = None;
-        }
         self.columns = ((f32::from(window.viewport_size().width) - panel_width - reserved + gap)
             / (tile + gap))
             .floor()
@@ -650,6 +646,7 @@ impl Render for Rap {
                 cx.notify();
             }
         });
+        self.record_place(cx);
         let find = self.t(Text::Find);
         self.menu_search
             .update(cx, |input, _| input.placeholder = find.into());
@@ -660,7 +657,6 @@ impl Render for Rap {
             self.now_playing_view(window, cx)
         } else {
             match self.section {
-                Section::Home => self.home_view(cx),
                 Section::Queue => self.queue_view(cx),
                 Section::Playlists => self.playlists_view(cx),
                 Section::Settings => self.settings_view(cx),
@@ -677,9 +673,7 @@ impl Render for Rap {
             .min_h_0()
             .overflow_hidden()
             .when(
-                !self.now_playing
-                    && (self.section == Section::Home
-                        || (matches!(self.section, Section::Artists) && self.selected.is_none())),
+                !self.now_playing && self.section == Section::Artists && self.selected.is_none(),
                 |v| v.child(self.header(cx)),
             )
             .child(body);
