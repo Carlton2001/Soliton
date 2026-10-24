@@ -411,13 +411,7 @@ impl Rap {
         cx.notify();
     }
     pub fn save(&mut self) {
-        if let Err(error) = self
-            .services
-            .work
-            .try_send(Work::Save(self.settings.clone()))
-        {
-            self.report_error(error.to_string());
-        }
+        self.services.settings.save(self.settings.clone());
     }
     pub fn scan(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
         if self.scanning {

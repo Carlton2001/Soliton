@@ -1,13 +1,15 @@
 //! The single library writer: user scans, folder notifications, availability probes
-//! and periodic incremental scans, all serialised on one worker thread.
+//! and periodic incremental scans, all serialised on one worker thread. Playlist
+//! edits pass between scan batches; other work waits for the scan.
 use crate::service::{Event, Work};
 use crossbeam_channel::{Receiver, Sender, bounded};
+use rap_core::playlist::PlaylistChange;
 use rap_library::{
-    Cancellation, Coalescer, Library, Prober, ScanProgress, SourceWatcher, WatchEvent,
+    Cancellation, Coalescer, Interlude, Library, Prober, ScanProgress, SourceWatcher, WatchEvent,
 };
-use rap_platform::AppPaths;
 use std::{
-    path::PathBuf,
+    collections::VecDeque,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
@@ -20,8 +22,10 @@ const QUIET: Duration = Duration::from_secs(2);
 const LONGEST: Duration = Duration::from_secs(15);
 
 struct Worker {
-    paths: AppPaths,
     library: Library,
+    work: Receiver<Work>,
+    /// Work received during a scan that could not pass between its batches.
+    deferred: VecDeque<Work>,
     events: Sender<Event>,
     watcher: Option<SourceWatcher>,
     changes: Coalescer,
@@ -32,8 +36,8 @@ struct Worker {
     next_periodic: Instant,
 }
 
-pub fn run(paths: AppPaths, work: Receiver<Work>, events: Sender<Event>, background: Cancellation) {
-    let library = match Library::open(&paths.root) {
+pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background: Cancellation) {
+    let library = match Library::open(root) {
         Ok(library) => library,
         Err(error) => {
             let _ = events.send(Event::Error(format!("{error:#}")));
@@ -60,8 +64,9 @@ pub fn run(paths: AppPaths, work: Receiver<Work>, events: Sender<Event>, backgro
     };
     let now = Instant::now();
     let mut worker = Worker {
-        paths,
         library,
+        work,
+        deferred: VecDeque::new(),
         events,
         watcher,
         changes: Coalescer::new(QUIET, LONGEST),
@@ -74,6 +79,11 @@ pub fn run(paths: AppPaths, work: Receiver<Work>, events: Sender<Event>, backgro
         if worker.background.is_cancelled() {
             break;
         }
+        if let Some(message) = worker.deferred.pop_front() {
+            worker.handle(message);
+            worker.timers();
+            continue;
+        }
         let deadline = [worker.next_probe, worker.next_periodic]
             .into_iter()
             .chain(worker.changes.deadline())
@@ -81,7 +91,7 @@ pub fn run(paths: AppPaths, work: Receiver<Work>, events: Sender<Event>, backgro
             .unwrap_or_else(Instant::now);
         let timeout = deadline.saturating_duration_since(Instant::now());
         crossbeam_channel::select! {
-            recv(work) -> message => match message {
+            recv(worker.work) -> message => match message {
                 Ok(message) => worker.handle(message),
                 Err(_) => break,
             },
@@ -117,23 +127,7 @@ impl Worker {
 
     fn handle(&mut self, work: Work) {
         match work {
-            Work::Playlist(change) => {
-                if let Err(error) = self.library.change_playlist(change) {
-                    self.error(format_args!("{error:#}"));
-                }
-                match self.library.playlists() {
-                    Ok(lists) => self.send(Event::Playlists(lists)),
-                    Err(error) => self.error(format_args!("{error:#}")),
-                }
-            }
-            Work::Save(settings) => {
-                if let Err(error) = settings.save(&self.paths.settings) {
-                    self.error(format_args!("{error:#}"));
-                }
-            }
-            Work::SaveAndFlush(settings, reply) => {
-                let _ = reply.try_send(settings.save(&self.paths.settings));
-            }
+            Work::Playlist(change) => change_playlist(&mut self.library, &self.events, change),
             Work::RemoveSource(id) => {
                 if let Err(error) = self.library.remove_source(id) {
                     self.error(format_args!("{error:#}"));
@@ -170,12 +164,22 @@ impl Worker {
             }
             let mut last = Instant::now() - Duration::from_secs(1);
             let events = self.events.clone();
-            let result = self.library.scan(id, cancellation, |progress| {
-                if last.elapsed() > Duration::from_millis(100) {
-                    let _ = events.try_send(Event::Progress(progress.clone()));
-                    last = Instant::now();
-                }
-            });
+            let result = self.library.scan_scope(
+                id,
+                &[],
+                cancellation,
+                |progress| {
+                    if last.elapsed() > Duration::from_millis(100) {
+                        let _ = events.try_send(Event::Progress(progress.clone()));
+                        last = Instant::now();
+                    }
+                },
+                &mut Passage {
+                    work: &self.work,
+                    deferred: &mut self.deferred,
+                    events: &self.events,
+                },
+            );
             match result {
                 Ok(report) => {
                     self.send(Event::Progress(report.progress));
@@ -200,15 +204,23 @@ impl Worker {
         let mut last = Instant::now();
         let mut shown = 0;
         let events = self.events.clone();
-        let result =
-            self.library
-                .scan_scope(id, dirs, &self.background, |progress: &ScanProgress| {
-                    if progress.indexed > shown && last.elapsed() > Duration::from_secs(1) {
-                        shown = progress.indexed;
-                        last = Instant::now();
-                        let _ = events.try_send(Event::Changed);
-                    }
-                });
+        let result = self.library.scan_scope(
+            id,
+            dirs,
+            &self.background,
+            |progress: &ScanProgress| {
+                if progress.indexed > shown && last.elapsed() > Duration::from_secs(1) {
+                    shown = progress.indexed;
+                    last = Instant::now();
+                    let _ = events.try_send(Event::Changed);
+                }
+            },
+            &mut Passage {
+                work: &self.work,
+                deferred: &mut self.deferred,
+                events: &self.events,
+            },
+        );
         let report = match result {
             Ok(report) => report,
             Err(error) => {
@@ -320,5 +332,37 @@ impl Worker {
             self.error(format_args!("{error:#}"));
             Vec::new()
         })
+    }
+}
+
+fn change_playlist(library: &mut Library, events: &Sender<Event>, change: PlaylistChange) {
+    if let Err(error) = library.change_playlist(change) {
+        let _ = events.send(Event::Error(format!("{error:#}")));
+    }
+    let event = match library.playlists() {
+        Ok(lists) => Event::Playlists(lists),
+        Err(error) => Event::Error(format!("{error:#}")),
+    };
+    let _ = events.send(event);
+}
+
+/// Lets playlist edits through a running scan; scans and source changes wait.
+struct Passage<'a> {
+    work: &'a Receiver<Work>,
+    deferred: &'a mut VecDeque<Work>,
+    events: &'a Sender<Event>,
+}
+
+impl Interlude for Passage<'_> {
+    fn waiting(&self) -> bool {
+        !self.work.is_empty()
+    }
+    fn run(&mut self, library: &mut Library) {
+        for message in self.work.try_iter() {
+            match message {
+                Work::Playlist(change) => change_playlist(library, self.events, change),
+                other => self.deferred.push_back(other),
+            }
+        }
     }
 }

@@ -390,6 +390,7 @@ fn folder_scans_only_forget_entries_inside_their_scope() {
             &[root.join("Artist").join("Gone")],
             &Cancellation::default(),
             |_| {},
+            &mut (),
         )
         .unwrap();
     assert!(report.complete);
@@ -570,4 +571,55 @@ fn accent_variants_merge_and_older_identities_are_rekeyed() {
     let mut tracks = tracks;
     tracks.sort();
     assert_eq!(again, tracks);
+}
+
+/// Lets one playlist write through, at the first check of the scan.
+struct PlaylistWrite {
+    waiting: bool,
+    runs: usize,
+}
+
+impl crate::Interlude for PlaylistWrite {
+    fn waiting(&self) -> bool {
+        self.waiting
+    }
+    fn run(&mut self, library: &mut Library) {
+        assert!(
+            library.connection.is_autocommit(),
+            "Interlude ran inside the scan transaction"
+        );
+        library
+            .change_playlist(rap_core::playlist::PlaylistChange::Create {
+                name: "During scan".into(),
+                tracks: Vec::new(),
+            })
+            .unwrap();
+        self.waiting = false;
+        self.runs += 1;
+    }
+}
+
+#[test]
+fn waiting_writes_pass_between_batches_and_the_scan_completes() {
+    let dir = tempfile::tempdir().unwrap();
+    let music = dir.path().join("music");
+    for index in 1..=3 {
+        wav(&music.join(format!("Artist/Album/{index:02} - Track.wav")));
+    }
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    let id = library.add_source(&music).unwrap();
+    let mut interlude = PlaylistWrite {
+        waiting: true,
+        runs: 0,
+    };
+    let report = library
+        .scan_scope(id, &[], &Cancellation::default(), |_| {}, &mut interlude)
+        .unwrap();
+    assert_eq!(interlude.runs, 1);
+    assert!(report.complete);
+    assert_eq!(report.progress.indexed, 3);
+    assert_eq!(library.playlists().unwrap().len(), 1);
+    let albums = library.snapshot().unwrap().albums;
+    assert_eq!(albums.len(), 1);
+    assert_eq!(albums[0].editions[0].tracks.len(), 3);
 }

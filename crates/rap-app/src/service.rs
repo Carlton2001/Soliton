@@ -1,7 +1,10 @@
 //! Fixed background workers own all filesystem, SQLite and filtering work.
-use crate::catalog::{self, Catalog, Filter};
+use crate::{
+    catalog::{self, Catalog, Filter},
+    settings_writer::SettingsWriter,
+};
 use crossbeam_channel::{Receiver, Sender, bounded};
-use rap_core::{config::Settings, model::LibrarySnapshot};
+use rap_core::model::LibrarySnapshot;
 use rap_library::{Cancellation, Library, ScanProgress};
 use rap_platform::AppPaths;
 use std::{path::PathBuf, sync::Arc};
@@ -9,8 +12,6 @@ use std::{path::PathBuf, sync::Arc};
 pub enum Work {
     Playlist(rap_core::playlist::PlaylistChange),
     Scan(Vec<PathBuf>, Cancellation),
-    Save(Settings),
-    SaveAndFlush(Settings, Sender<anyhow::Result<()>>),
     RemoveSource(i64),
 }
 pub struct View {
@@ -39,6 +40,7 @@ pub struct Services {
     pub events: Receiver<Event>,
     pub query: Sender<Filter>,
     pub views: Receiver<anyhow::Result<View>>,
+    pub settings: SettingsWriter,
     background: Cancellation,
 }
 
@@ -50,10 +52,11 @@ impl Services {
         let (views_tx, views_rx) = bounded(2);
         let background = Cancellation::default();
         let reader_root = paths.root.clone();
+        let settings = SettingsWriter::start(paths.settings.clone(), events_tx.clone());
         let worker_background = background.clone();
         std::thread::Builder::new()
             .name("rap-library".into())
-            .spawn(move || crate::indexing::run(paths, work_rx, events_tx, worker_background))
+            .spawn(move || crate::indexing::run(&paths.root, work_rx, events_tx, worker_background))
             .expect("Cannot start the library worker");
         // The WAL reader stays usable while indexing commits batches. Typing is
         // coalesced to the newest filter; the catalogue is rebuilt only after commits.
@@ -99,8 +102,14 @@ impl Services {
             events: events_rx,
             query: query_tx,
             views: views_rx,
+            settings,
             background,
         }
+    }
+
+    /// Stops automatic scans, which otherwise only end with the application.
+    pub fn stop_background(&self) {
+        self.background.cancel();
     }
 }
 

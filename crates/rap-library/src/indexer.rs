@@ -57,6 +57,23 @@ impl ScanReport {
 /// Number of stored files between commits; each commit makes progress visible.
 const BATCH: usize = 64;
 
+/// Short writes a scan lets through on its connection, between two batches, so
+/// they wait for one batch rather than a whole scan.
+pub trait Interlude {
+    /// Whether writes are waiting; the scan then commits its batch early.
+    fn waiting(&self) -> bool;
+    /// Runs outside any scan transaction. Must not scan.
+    fn run(&mut self, library: &mut Library);
+}
+
+/// No write to let through.
+impl Interlude for () {
+    fn waiting(&self) -> bool {
+        false
+    }
+    fn run(&mut self, _: &mut Library) {}
+}
+
 impl Library {
     /// Synchronous service API. Invoke from a background worker, never GPUI.
     pub fn scan(
@@ -65,7 +82,7 @@ impl Library {
         cancel: &Cancellation,
         progress: impl FnMut(&ScanProgress),
     ) -> Result<ScanReport> {
-        self.scan_scope(source_id, &[], cancel, progress)
+        self.scan_scope(source_id, &[], cancel, progress, &mut ())
     }
 
     /// Scans directories of a source, or the whole source when `dirs` is empty.
@@ -76,6 +93,7 @@ impl Library {
         dirs: &[PathBuf],
         cancel: &Cancellation,
         mut progress: impl FnMut(&ScanProgress),
+        interlude: &mut dyn Interlude,
     ) -> Result<ScanReport> {
         let source = self
             .sources()?
@@ -206,9 +224,14 @@ impl Library {
                         },
                         default(std::time::Duration::from_millis(30)) => {},
                     }
-                    if batched >= BATCH {
+                    let waiting = interlude.waiting();
+                    if batched >= BATCH || waiting {
                         regroup(&self.connection, &std::mem::take(&mut dirty))?;
-                        self.connection.execute_batch("COMMIT; BEGIN IMMEDIATE")?;
+                        self.connection.execute_batch("COMMIT")?;
+                        if waiting {
+                            interlude.run(self);
+                        }
+                        self.connection.execute_batch("BEGIN IMMEDIATE")?;
                         batched = 0;
                     }
                     progress(&report.progress);

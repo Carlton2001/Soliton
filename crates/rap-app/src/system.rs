@@ -3,7 +3,6 @@ use crate::{
     app::Rap,
     i18n::Text,
     preferences::{section, setting_row},
-    service::Work,
     widgets::{RADIUS_LARGE, TEXT_SUBTITLE, button, checkbox, list_box, segment, segments},
 };
 use gpui::{prelude::*, *};
@@ -173,10 +172,11 @@ impl Rap {
         self.quitting = true;
         self.confirm_close = false;
         self.cancellation.cancel();
+        self.services.stop_background();
         self.final_queue();
         let audio = self.audio.take();
         let desktop = self.desktop.take();
-        let work = self.services.work.clone();
+        let writer = self.services.settings.clone();
         let settings = self.settings.clone();
         let task = cx.background_executor().spawn(async move {
             if let Some(audio) = audio {
@@ -185,11 +185,7 @@ impl Rap {
             if let Some(desktop) = desktop {
                 desktop.shutdown();
             }
-            let (reply, saved) = crossbeam_channel::bounded(1);
-            work.send_timeout(Work::SaveAndFlush(settings, reply), Duration::from_secs(2))
-                .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-            saved.recv_timeout(Duration::from_secs(3))??;
-            anyhow::Ok(())
+            writer.flush(settings, Duration::from_secs(5))
         });
         cx.spawn(async move |this, cx| {
             let result = task.await;

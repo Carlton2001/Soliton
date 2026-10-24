@@ -23,8 +23,11 @@ de code applicatif.
 ## Bibliothèque
 
 **Threads.** Un worker unique d'écriture SQLite reçoit commandes, événements de
-surveillance et échéances. Un lecteur WAL prépare instantanés, facettes, index de
-pistes et recherches ; il ne reconstruit qu'au changement de `PRAGMA data_version`.
+surveillance et échéances ; entre deux lots d'un parcours, il laisse passer les
+modifications de playlists, les autres travaux attendent la fin du parcours. Les
+paramètres ont leur propre worker, qui n'écrit que la dernière valeur. Un lecteur
+WAL prépare instantanés, facettes, index de pistes et recherches ; il ne
+reconstruit qu'au changement de `PRAGMA data_version`.
 Pendant l'indexation, l'interface relit l'instantané toutes les 750 ms.
 
 **Parcours.** `dua-core` (isolé dans `discovery.rs`) : deux workers, deux lots en

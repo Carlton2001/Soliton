@@ -14,5 +14,5 @@ mod watch;
 
 pub use availability::Prober;
 pub use database::Library;
-pub use indexer::{Cancellation, ScanProgress, ScanReport};
+pub use indexer::{Cancellation, Interlude, ScanProgress, ScanReport};
 pub use watch::{Coalescer, SourceWatcher, WatchEvent, scopes};
