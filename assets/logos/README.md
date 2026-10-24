@@ -3,10 +3,14 @@
 Onde continue inversée horizontalement, d’après la référence fournie par
 l’utilisateur le 24 octobre 2026. Les six SVG sont les sources de production :
 interface, icônes Windows à sept tailles et repli de la zone de notification.
+Le trait a été réduit de 37 à 28 unités dans le repère du tracé pour mieux
+séparer les boucles en petite taille.
 
 Horizontally mirrored continuous waveform, based on the reference supplied by
 the user on 24 October 2026. These six SVGs are the production sources for the
 interface, seven-size Windows icons and notification icon fallback.
+The stroke was reduced from 37 to 28 units in the path coordinate system to
+keep the loops better separated at small sizes.
 
 | Fichier / File | Palette | Fond / Background | Onde / Wave |
 | --- | --- | --- | --- |

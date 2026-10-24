@@ -1,0 +1,227 @@
+# RAP — Rust Audio Player
+## Spécifications
+
+**Licence :** GPL-3.0-only · **Langage :** Rust · **Interface :** GPUI ·
+**Plateformes :** Windows (cible V1), Linux ensuite
+
+Ce document fixe le périmètre, les règles produit et les phases restantes.
+L'état fonctionnel actuel est décrit dans le [README](../README.md), les choix
+techniques dans [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+# 1. Objectif et principes
+
+Lecteur audio de bureau pour une bibliothèque musicale locale structurée :
+interface moderne, rapide et sobre, inspirée de la richesse de MusicBee sans sa
+complexité visuelle. Qualité d'exécution avant quantité de fonctionnalités.
+
+- Application native, fonctionnement local, sans compte ni cloud obligatoire.
+  Google Cast peut dépendre des services Google du récepteur.
+- Bibliothèque strictement en lecture seule ; métadonnées et pochettes issues
+  uniquement des fichiers locaux, sans enrichissement en ligne.
+- Interface indépendante du moteur audio ; intégrations système isolées.
+- Dépendances Rust pures privilégiées. Pas de télémétrie, de fonctions sociales,
+  d'achats ni de streaming commercial.
+- Interface en français et en anglais.
+
+---
+
+# 2. État d'avancement
+
+Implémenté et validé sous Windows : workspace et paramètres, bibliothèque et
+indexation incrémentale, interface de bibliothèque, lecture locale, éditions et
+compilations, cache des pochettes, surveillance des sources, interface finalisée,
+playlists et file, intégration Windows (SMTC, barre des tâches, notification,
+fermeture, démarrage automatique), sorties audio locales et Bluetooth, sorties
+DLNA / UPnP et Google Cast.
+
+Reste à faire : distribution (phase 10), validations matérielles (phase 11).
+
+---
+
+# 3. Règles produit
+
+Ces règles restent en vigueur pour toute évolution.
+
+## 3.1 Bibliothèque
+
+- Plusieurs dossiers sources : disques internes ou externes, partages SMB et NAS
+  traités comme des chemins ordinaires. Pas de client SMB intégré.
+- RAP ne modifie, déplace, renomme ou supprime jamais fichiers, tags ou pochettes
+  intégrées. Bases, caches et temporaires restent hors des dossiers sources.
+- Cible initiale inférieure à 10 000 pistes, sans limite artificielle ; listes et
+  grilles virtualisées ; aucune opération lourde sur le thread GPUI.
+- SQLite versionné par migrations. Seuls les paramètres et playlists ne peuvent
+  pas être reconstruits depuis les fichiers.
+- Une source inaccessible conserve ses albums, métadonnées et pochettes en cache ;
+  ses pistes sont signalées indisponibles et non lisibles. Une disparition n'est
+  établie qu'après un parcours complet d'une source accessible.
+- Indexation en arrière-plan, incrémentale, annulable, tolérante aux fichiers
+  corrompus, avec progression. Surveillance temps réel complétée par une analyse
+  au démarrage et périodique.
+
+## 3.2 Métadonnées, éditions et pochettes
+
+- Tags intégrés (`lofty`) ; à défaut, déduction depuis l'arborescence
+  `Artiste/Album/01 - Titre`, stockée seulement dans RAP et distinguée des tags.
+- Modèle distinct : fichier, piste, édition, album regroupé, artiste.
+- Plusieurs éditions d'un album (par exemple 16/44,1 et 24/96) sont présentées
+  ensemble, avec choix de l'édition. Regroupement prudent : en cas d'ambiguïté,
+  deux albums plutôt qu'une fusion incorrecte.
+- Dans un même dossier et pour un même titre, un artiste d'album manquant ne crée
+  pas d'édition supplémentaire si un seul artiste d'album explicite existe et que
+  les morceaux sans ce tag portent ce même artiste. Compilations et cas
+  contradictoires ou déduits restent séparés.
+- Compilations : artiste d'album distinct de l'artiste de piste, album unique.
+- Pochettes uniquement intégrées aux fichiers (pas de `folder.jpg`, pas de
+  téléchargement), cache local invalidé quand l'image change, visuel neutre à défaut.
+
+## 3.3 Interface
+
+- Minimaliste, proche du natif, pochettes mises en valeur, animations discrètes.
+  Éviter panneaux inutiles et options excessives.
+- Les contrôles d'un même type partagent dimensions, typographie et états. La
+  sélection utilise un fond teinté sans changement de graisse ni de bordure.
+  Focus visible au clavier. Espacements : 0,75 rem sous la navigation, entre la
+  rangée de contrôles et le contenu, et entre sections (sans cumul) ; 0,5 rem entre
+  actions liées.
+- Navigation toujours visible sous la barre de titre, icônes et libellés :
+  Artistes, Albums, Playlists, File de lecture, Paramètres. Pas de bouton Retour ;
+  `Alt+←/→` parcourent l'historique. Pas de titre de page redondant.
+- Barre de titre, navigation et lecteur partagent le fond de l'application.
+  Recherche à gauche des contrôles de tri et Grille/Liste ; filtres de métadonnées
+  réservés à Albums ; genres et années par filtres.
+- Albums : grille ou liste, choix mémorisé ; sur fenêtre large la fiche s'ouvre dans
+  un panneau à droite, sur fenêtre étroite dans une page dédiée.
+- Fiche album : grande pochette, métadonnées, durée, pistes, formats, éditions ;
+  qualité par piste si elle diffère. Numéros disque.piste toujours affichés.
+- Boutons avec icône : libellé si la place le permet, sinon icône seule avec
+  infobulle. Actions secondaires des morceaux dans un menu « Actions ».
+- Lecteur : progression au-dessus ; pochette et métadonnées à gauche ; Aléatoire,
+  Précédent, Lecture/Pause (centré), Suivant, Répéter, File ; volume à droite,
+  dans un panneau en fenêtre étroite. « Lecture en cours » par le bouton Agrandir,
+  fermée par Échap. F11 : plein écran de la page active.
+- Thèmes clair, sombre et système, accent configurable, système de design centralisé.
+- Icône : onde continue sur carré arrondi, six palettes au choix (Graphite et
+  menthe par défaut), appliquée sans redémarrage, indépendante du thème. Titre de
+  fenêtre « rap ».
+- Pas de lecture de fichiers hors bibliothèque ni de glisser-déposer ; les
+  dossiers s'ajoutent depuis les paramètres ou une vue vide.
+
+## 3.4 Lecture
+
+- Moteur indépendant de GPUI, piloté par commandes et événements ; callback audio
+  sans allocation, E/S, journalisation ni verrou bloquant.
+- Album, sélection, aléatoire, répétition piste/album, navigation. Gapless non
+  prioritaire.
+- Playlists manuelles nommées et file modifiable. Une occurrence par fichier :
+  les ajouts répétés sont ignorés. Une piste indisponible reste visible dans sa
+  playlist. Pas de playlists automatiques ni d'import/export.
+- Session persistée (piste, position, volume, sortie, modes) sans historique ni
+  statistiques d'écoute.
+
+## 3.5 Sorties et réseau
+
+- Sortie partagée locale (`cpal`), sélection persistée, changement sans perte de
+  piste ni de position, aucun repli silencieux vers une autre sortie.
+- Bluetooth via les paramètres Windows et les sorties exposées par le système.
+  RAP ne prétend pas établir la connexion, n'annonce ni lossless ni bit-perfect et
+  ne change pas la sortie par défaut de Windows.
+- DLNA / UPnP et Google Cast : couches de contrôle distinctes, sélection commune,
+  serveur HTTP limité au média actif et au récepteur choisi, aucun chemin accepté
+  depuis le réseau. Formats non acceptés signalés, pas de transcodage. Une seule
+  sortie active, pas de multiroom.
+
+## 3.6 Intégration système
+
+- Windows : SMTC avec pochette, touches multimédias, vignette de barre des tâches
+  avec commandes, icône de notification (Afficher, Lecture/Pause, Précédent,
+  Suivant, Quitter), fermeture configurable (quitter, masquer, demander) avec
+  commande Quitter explicite, démarrage automatique optionnel.
+- La notification ne doit pas être le seul moyen de retrouver une fenêtre masquée.
+- Linux ultérieurement : MPRIS / D-Bus, notification, démarrage automatique.
+
+---
+
+# 4. Hors V1
+
+- API locale de contrôle (ancienne phase 8) : HTTP sur `127.0.0.1` uniquement,
+  service distinct du serveur de diffusion, authentification obligatoire en cas
+  d'accès distant.
+- Mode exclusif, bit-perfect, égaliseur.
+- Opus, WMA, APE et autres formats demandant des décodeurs complémentaires.
+- Transcodage réseau, multiroom, Alexa Wi-Fi.
+- Linux.
+
+---
+
+# 5. Phases restantes
+
+Chaque phase aboutit à un état compilable et vérifiable. Présenter les choix
+d'architecture avant implémentation.
+
+## Phase 10 — Distribution Windows
+
+**10.1 Build Release**
+- Profil `release` (optimisations, symboles séparés), sans console.
+- Métadonnées de l'exécutable : version, éditeur, icône.
+
+**10.2 Mode portable**
+- Données à côté de l'exécutable lorsque celui-ci est lancé depuis une archive
+  portable (marqueur à définir) ; sinon `%LOCALAPPDATA%\RAP`.
+- Démarrage automatique et chemins cohérents dans les deux modes.
+
+**10.3 Installateur**
+- Choix du format (décision ouverte 1), installation par utilisateur sans
+  élévation si possible, raccourcis, désinstallation propre qui conserve les
+  données de l'utilisateur sauf demande explicite.
+- Aucun runtime séparé à installer.
+
+**10.4 Vérification des mises à jour**
+- Désactivable, hors thread UI, sans installation automatique.
+- Notification avec la version disponible et ouverture de la page de téléchargement.
+
+**10.5 Documentation et licences**
+- Guide utilisateur court (FR/EN).
+- Inventaire des licences des dépendances livrées et attributions intégrées
+  à la distribution.
+
+**Livrable :** archive portable et installateur Windows publiables.
+
+## Phase 11 — Validation matérielle
+
+- Collection réelle de plusieurs milliers de pistes : indexation initiale,
+  redémarrage, performances SSD/NAS.
+- NAS/SMB réel : déconnexion et retour, notifications, analyse périodique.
+- Déconnexion physique d'un disque et d'une sortie audio pendant la lecture.
+- Écoute prolongée.
+- Touches multimédias physiques, survol et clics de la vignette de barre des
+  tâches, redémarrage d'Explorer, lancement à l'ouverture de session.
+- Récepteur DLNA physique ; coupure Wi-Fi en diffusion Cast.
+
+**Livrable :** limitations connues mises à jour dans le README, correctifs des
+défauts trouvés.
+
+---
+
+# 6. Décisions ouvertes
+
+1. Format de l'installateur Windows.
+2. Fournisseur des mises à jour (GitHub Releases envisagé) et format de version.
+3. Signature de l'exécutable.
+4. Périmètre multi-appareils réseau au-delà d'une sortie active.
+
+Ne pas trancher ces points sans les présenter.
+
+---
+
+# 7. Risques
+
+- **GPUI** : pré-1.0, API instable ; correctifs locaux dans `vendor/`.
+- **Réseau** : comportements variables selon les appareils ; Cast sans SDK
+  officiel Rust, testé seulement sur la NVIDIA SHIELD.
+- **NAS** : notifications et performances variables ; l'analyse périodique sert
+  de repli.
+- **Linux** : intégrations différentes ; aucune API Windows dans le code commun.
+- **Distribution** : antivirus et SmartScreen sans signature de l'exécutable.

@@ -15,7 +15,7 @@ Les versions exactes restent à valider. Une fois le workspace initialisé, les 
 
 ## Références
 
-- [Spécifications de RAP](RAP_SPECIFICATIONS.md) : périmètre fonctionnel, contraintes et phases de développement. Ce fichier `AGENTS.md` porte les consignes de travail ; éviter de dupliquer les spécifications. Signaler les contradictions avant d'implémenter le comportement concerné.
+- [Spécifications de RAP](docs/RAP_SPECIFICATIONS.md) : périmètre fonctionnel, contraintes et phases de développement. Ce fichier `AGENTS.md` porte les consignes de travail ; éviter de dupliquer les spécifications. Signaler les contradictions avant d'implémenter le comportement concerné.
 - Lire intégralement les spécifications avant l'initialisation du projet, puis consulter les sections pertinentes pour chaque changement. Présenter les choix ayant un impact important sur l'architecture avant implémentation.
 - **Référence GPUI :** examiner le projet voisin `../Oxyde-GPUI` pour les composants, conventions visuelles et usages GPUI pertinents, notamment les closures `cx.listener`. Vérifier leur compatibilité avec la version retenue dans RAP. Réutiliser sélectivement après examen du code, en respectant licences et attributions, sans dépendance directe à l'application Oxyde.
 

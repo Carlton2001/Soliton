@@ -1,20 +1,9 @@
 //! Application icon picker. Its palette is independent of the interface theme.
-use crate::{app::Rap, assets::Assets, i18n::Text, preferences::hint, widgets::TEXT_SMALL};
+use crate::{app::Rap, assets::Assets, i18n::Text};
 use gpui::{prelude::*, *};
 use rap_core::config::AppIcon;
 
 impl Rap {
-    fn icon_name(&self, icon: AppIcon) -> &'static str {
-        self.t(match icon {
-            AppIcon::Blue => Text::ElectricBlue,
-            AppIcon::Teal => Text::DeepTeal,
-            AppIcon::Violet => Text::Violet,
-            AppIcon::Copper => Text::Copper,
-            AppIcon::GraphiteMint => Text::GraphiteMint,
-            AppIcon::IvoryInk => Text::IvoryInk,
-        })
-    }
-
     fn set_app_icon(&mut self, icon: AppIcon, cx: &mut Context<Self>) {
         if self.settings.app_icon != icon {
             self.settings.app_icon = icon;
@@ -67,13 +56,6 @@ impl Rap {
                             .justify_center()
                             .gap(rems(0.5))
                             .child(img(Assets::logo_path(icon)).size(rems(2.5)).flex_none())
-                            .child(
-                                div()
-                                    .w_full()
-                                    .text_center()
-                                    .text_size(TEXT_SMALL)
-                                    .child(self.icon_name(icon)),
-                            )
                             .on_click(
                                 cx.listener(move |this, _, _, cx| this.set_app_icon(icon, cx)),
                             )
@@ -85,7 +67,6 @@ impl Rap {
                             }))
                     })),
             )
-            .child(hint(self.t(Text::AppIconHint), theme))
             .into_any_element()
     }
 }
