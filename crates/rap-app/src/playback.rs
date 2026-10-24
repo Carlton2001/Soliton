@@ -104,6 +104,19 @@ impl Rap {
         self.audio_command(Command::Volume(self.settings.volume), cx);
     }
 
+    /// Kept for the next sessions, like the volume.
+    pub fn set_shuffle(&mut self, value: bool, cx: &mut Context<Self>) {
+        self.settings.shuffle = value;
+        self.save();
+        self.audio_command(Command::Shuffle(value), cx);
+    }
+
+    pub fn set_repeat(&mut self, value: rap_audio::Repeat, cx: &mut Context<Self>) {
+        self.settings.repeat = value;
+        self.save();
+        self.audio_command(Command::Repeat(value), cx);
+    }
+
     pub fn toggle_mute(&mut self, cx: &mut Context<Self>) {
         let restored = self.muted_volume.take();
         match restored {

@@ -3,6 +3,7 @@
 use crate::theme::Theme;
 use gpui::{prelude::*, *};
 use std::path::PathBuf;
+use std::rc::Rc;
 mod adaptive;
 
 /// Type scale at the 16 px reference: body text is 13 px.
@@ -179,28 +180,56 @@ pub fn icon_button(
     active: bool,
     theme: Theme,
 ) -> Stateful<Div> {
+    with_tooltip(icon_control(id, name, active, theme), label.into(), theme)
+}
+
+/// [`icon_button`] filled with the accent, as the Play/Pause command. Its
+/// tooltip reads `label` at each frame, so it follows the command while shown.
+pub fn accent_icon_button(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: impl Fn(&App) -> SharedString + 'static,
+    theme: Theme,
+) -> Stateful<Div> {
+    let accent = Theme {
+        text: theme.on_accent,
+        accent: theme.on_accent,
+        control_hover: theme.accent,
+        control_pressed: theme.accent,
+        selected: theme.accent,
+        ..theme
+    };
+    // The tooltip keeps the regular colours: on_accent text is unreadable on a panel.
+    with_live_tooltip(icon_control(id, name, true, accent), label, theme)
+        .rounded_full()
+        .border_1()
+        .border_color(theme.accent)
+}
+
+fn icon_control(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    active: bool,
+    theme: Theme,
+) -> Stateful<Div> {
     let color = theme.text;
-    with_tooltip(
-        div()
-            .id(id)
-            .tab_index(0)
-            .capture_any_mouse_down(keyboard_focus_only)
-            .border_1()
-            .border_color(gpui::transparent_black())
-            .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
-            .size(CONTROL_HEIGHT)
-            .flex()
-            .flex_none()
-            .items_center()
-            .justify_center()
-            .rounded(RADIUS)
-            .when(active, |v| v.bg(theme.selected))
-            .hover(move |style| style.bg(theme.control_hover))
-            .active(move |style| style.bg(theme.control_pressed))
-            .child(tinted_icon(name, color)),
-        label.into(),
-        theme,
-    )
+    div()
+        .id(id)
+        .tab_index(0)
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
+        .size(CONTROL_HEIGHT)
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .rounded(RADIUS)
+        .when(active, |v| v.bg(theme.selected))
+        .hover(move |style| style.bg(theme.control_hover))
+        .active(move |style| style.bg(theme.control_pressed))
+        .child(tinted_icon(name, color))
 }
 
 /// Main action of a page, filled with the accent.
@@ -559,9 +588,10 @@ pub fn list_box(rows: impl IntoIterator<Item = AnyElement>, theme: Theme) -> Div
         }))
 }
 
-struct Tip(SharedString, Theme);
+/// GPUI keeps the tooltip view while the pointer stays, so its text is read at render.
+struct Tip(Rc<dyn Fn(&App) -> SharedString>, Theme);
 impl Render for Tip {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .px(rems(0.5))
             .py(rems(0.25))
@@ -571,11 +601,20 @@ impl Render for Tip {
             .bg(self.1.panel)
             .text_color(self.1.text)
             .text_size(TEXT_SMALL)
-            .child(self.0.clone())
+            .child((self.0)(cx))
     }
 }
 
 pub fn with_tooltip(element: Stateful<Div>, label: SharedString, theme: Theme) -> Stateful<Div> {
+    with_live_tooltip(element, move |_| label.clone(), theme)
+}
+
+pub fn with_live_tooltip(
+    element: Stateful<Div>,
+    label: impl Fn(&App) -> SharedString + 'static,
+    theme: Theme,
+) -> Stateful<Div> {
+    let label: Rc<dyn Fn(&App) -> SharedString> = Rc::new(label);
     element.tooltip(move |_, cx| cx.new(|_| Tip(label.clone(), theme)).into())
 }
 

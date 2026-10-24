@@ -228,6 +228,16 @@ impl Rap {
             Repeat::All => ("repeat", Text::RepeatAll, Repeat::Track),
             Repeat::Track => ("repeat-1", Text::RepeatTrack, Repeat::Off),
         };
+        let rap = cx.weak_entity();
+        let play_pause_label = move |cx: &App| -> SharedString {
+            rap.upgrade()
+                .map(|rap| {
+                    let rap = rap.read(cx);
+                    let playing = rap.playback.state == PlaybackState::Playing;
+                    rap.t(if playing { Text::Pause } else { Text::Play }).into()
+                })
+                .unwrap_or_default()
+        };
         // Equal controls on either side keep Play/Pause at the cartouche midpoint.
         div()
             .relative()
@@ -246,9 +256,9 @@ impl Rap {
                     theme,
                 )
                 .when(compact, |button| button.size(rems(1.75)))
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.audio_command(Command::Shuffle(!this.playback.shuffle), cx)
-                })),
+                .on_click(
+                    cx.listener(|this, _, _, cx| this.set_shuffle(!this.playback.shuffle, cx)),
+                ),
             )
             .child(
                 crate::widgets::icon_button(
@@ -262,24 +272,13 @@ impl Rap {
                 .on_click(cx.listener(|this, _, _, cx| this.audio_command(Command::Previous, cx))),
             )
             .child(
-                crate::widgets::icon_button(
+                crate::widgets::accent_icon_button(
                     "play-pause",
                     if playing { "pause" } else { "play" },
-                    self.t(if playing { Text::Pause } else { Text::Play }),
-                    true,
-                    crate::theme::Theme {
-                        text: theme.on_accent,
-                        accent: theme.on_accent,
-                        control_hover: theme.accent,
-                        control_pressed: theme.accent,
-                        selected: theme.accent,
-                        ..theme
-                    },
+                    play_pause_label,
+                    theme,
                 )
                 .size(rems(if compact { 2.5 } else { 3. }))
-                .rounded_full()
-                .border_1()
-                .border_color(theme.accent)
                 .on_click(cx.listener(|this, _, _, cx| this.play_pause(cx))),
             )
             .child(
@@ -302,9 +301,7 @@ impl Rap {
                     theme,
                 )
                 .when(compact, |button| button.size(rems(1.75)))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.audio_command(Command::Repeat(next_repeat), cx)
-                })),
+                .on_click(cx.listener(move |this, _, _, cx| this.set_repeat(next_repeat, cx))),
             )
             .child(
                 crate::widgets::icon_button(

@@ -55,6 +55,24 @@ fn output_preference_roundtrips_and_older_settings_use_system_default() {
 }
 
 #[test]
+fn playback_modes_round_trip_and_older_settings_turn_them_off() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, br#"{"volume":0.4}"#).unwrap();
+    let mut settings = Settings::load(&path).unwrap();
+    assert!(!settings.shuffle);
+    assert_eq!(settings.repeat, Repeat::Off);
+    for repeat in [Repeat::Track, Repeat::All] {
+        settings.shuffle = true;
+        settings.repeat = repeat;
+        settings.save(&path).unwrap();
+        let loaded = Settings::load(&path).unwrap();
+        assert!(loaded.shuffle);
+        assert_eq!(loaded.repeat, repeat);
+    }
+}
+
+#[test]
 fn invalid_settings_are_reported() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");

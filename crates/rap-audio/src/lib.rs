@@ -12,7 +12,7 @@ mod test_support;
 
 pub use devices::{OutputDevice, OutputInfo};
 pub use engine::Engine;
-pub use queue::Repeat;
+pub use rap_core::config::Repeat;
 use rap_core::{failure::Failure, model::Track};
 pub use rap_network::{Device as NetworkDevice, Protocol as NetworkProtocol};
 
@@ -82,6 +82,7 @@ pub enum Command {
         entries: Vec<(i64, Track)>,
         start: usize,
     },
+    /// Restores a saved queue paused, in its saved order even with shuffle on.
     LoadSelection {
         entries: Vec<(Option<i64>, Track)>,
         start: usize,

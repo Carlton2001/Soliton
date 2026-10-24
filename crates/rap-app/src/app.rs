@@ -113,8 +113,15 @@ impl Rap {
                 Ok(engine) => (Some(engine), None),
                 Err(error) => (None, Some(error.to_string())),
             };
+        // Sent before the saved queue is loaded, so that it keeps its order.
+        if let Some(engine) = &audio {
+            let _ = engine.send(rap_audio::Command::Shuffle(settings.shuffle));
+            let _ = engine.send(rap_audio::Command::Repeat(settings.repeat));
+        }
         let playback = rap_audio::Playback {
             volume: settings.volume,
+            shuffle: settings.shuffle,
+            repeat: settings.repeat,
             selected_output: settings.output_device.clone(),
             ..Default::default()
         };

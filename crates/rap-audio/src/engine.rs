@@ -325,7 +325,7 @@ impl Worker {
             } => {
                 self.stop_remote()?;
                 self.session = None;
-                self.queue.set_entries(entries, start);
+                self.queue.restore_entries(entries, start);
                 let track = self.queue.current().cloned();
                 self.playback.duration_ms = track.as_ref().map_or(0, |t| t.metadata.duration_ms);
                 self.playback.position_ms = position_ms.min(self.playback.duration_ms);

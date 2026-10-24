@@ -15,6 +15,24 @@ fn tracks() -> Vec<Track> {
 }
 
 #[test]
+fn restored_queue_keeps_its_saved_order_with_shuffle_on() {
+    let mut queue = Queue::default();
+    queue.shuffle(true);
+    let mut saved = tracks();
+    saved.reverse();
+    queue.restore_entries(saved.into_iter().map(|t| (None, t)).collect(), 2);
+    let ids: Vec<_> = queue.snapshot.entries.iter().map(|e| e.track.id).collect();
+    assert_eq!(ids, (0..8).rev().collect::<Vec<_>>());
+    assert_eq!(queue.current().unwrap().id, 5);
+    assert!(queue.shuffle);
+    // The saved order is the base that turning shuffle off goes back to.
+    queue.shuffle(false);
+    let ids: Vec<_> = queue.snapshot.entries.iter().map(|e| e.track.id).collect();
+    assert_eq!(ids, (0..8).rev().collect::<Vec<_>>());
+    assert_eq!(queue.current().unwrap().id, 5);
+}
+
+#[test]
 fn shuffle_is_a_permutation_and_preserves_the_current_track() {
     let mut queue = Queue::default();
     queue.set(tracks(), 3);

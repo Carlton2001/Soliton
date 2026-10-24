@@ -147,6 +147,14 @@ pub struct WindowPlacement {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Repeat {
+    #[default]
+    Off,
+    Track,
+    All,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CloseBehavior {
     #[default]
     Quit,
@@ -169,6 +177,8 @@ pub struct Settings {
     pub volume: f32,
     /// Local CPAL device name; None uses the system default.
     pub output_device: Option<String>,
+    pub shuffle: bool,
+    pub repeat: Repeat,
     pub close_behavior: CloseBehavior,
     /// Pixels per rem; every interface dimension scales with it.
     pub ui_rem_size: u32,
@@ -201,6 +211,8 @@ impl Default for Settings {
             hide_unavailable: false,
             volume: 0.7,
             output_device: None,
+            shuffle: false,
+            repeat: Repeat::Off,
             close_behavior: CloseBehavior::Quit,
             ui_rem_size: Self::DEFAULT_REM_SIZE,
             last_view: LastView::default(),

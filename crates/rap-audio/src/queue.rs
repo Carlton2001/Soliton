@@ -1,15 +1,8 @@
 use crate::{QueueEntry, QueueSnapshot};
+use rap_core::config::Repeat;
 use rap_core::model::Track;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Repeat {
-    #[default]
-    Off,
-    Track,
-    All,
-}
 
 #[derive(Default)]
 pub(crate) struct Queue {
@@ -62,6 +55,14 @@ impl Queue {
             self.shuffle_order();
         }
         self.publish();
+    }
+
+    /// Saved queue, already in its played order: shuffle mode stays as it is
+    /// but only reorders from the next round or toggle.
+    pub fn restore_entries(&mut self, entries: Vec<(Option<i64>, Track)>, start: usize) {
+        let shuffle = std::mem::take(&mut self.shuffle);
+        self.set_entries(entries, start);
+        self.shuffle = shuffle;
     }
     fn publish(&mut self) {
         // Manual edits are the new base order; toggling shuffle off restores them.
