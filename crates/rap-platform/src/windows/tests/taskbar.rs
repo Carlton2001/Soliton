@@ -1,6 +1,6 @@
 use super::*;
 use windows::Win32::{
-    Foundation::{LPARAM, WPARAM},
+    Foundation::{LPARAM, LRESULT, WPARAM},
     System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize},
     UI::WindowsAndMessaging::*,
 };
@@ -13,6 +13,61 @@ fn toolbar_commands_do_not_confuse_other_window_commands() {
     assert_eq!(command(NEXT), Some(MediaCommand::Next));
     assert_eq!(command(STOP), Some(MediaCommand::Stop));
     assert_eq!(command(1), None);
+}
+
+#[test]
+fn peek_reaches_the_window_procedure_with_and_without_a_music_thumbnail() {
+    const PEEK_RESULT: isize = 0x524150;
+    unsafe extern "system" fn window_preview(
+        window: HWND,
+        message: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+        _: usize,
+        _: usize,
+    ) -> LRESULT {
+        if message == WM_DWMSENDICONICLIVEPREVIEWBITMAP {
+            return LRESULT(PEEK_RESULT);
+        }
+        unsafe { DefSubclassProc(window, message, wparam, lparam) }
+    }
+
+    let window = unsafe {
+        CreateWindowExW(
+            WINDOW_EX_STYLE::default(),
+            w!("STATIC"),
+            w!("RAP Peek routing test"),
+            WS_OVERLAPPEDWINDOW,
+            0,
+            0,
+            320,
+            200,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap()
+    };
+    // Install the underlying window handler first, below RAP's taskbar hook.
+    assert!(unsafe { SetWindowSubclass(window, Some(window_preview), 1, 0) }.as_bool());
+    let (events, _received) = crossbeam_channel::bounded(1);
+    let shared = install(window, events).unwrap();
+    let request_peek =
+        || unsafe { SendMessageW(window, WM_DWMSENDICONICLIVEPREVIEWBITMAP, None, None).0 };
+    assert_eq!(request_peek(), PEEK_RESULT);
+    let frame = Renderer::default()
+        .render(&MediaState::default(), Language::French)
+        .unwrap();
+    *shared.frame.lock().unwrap() = Some(Arc::new(frame));
+    assert_eq!(request_peek(), PEEK_RESULT);
+    assert_eq!(shared.thumbnails.load(Ordering::Relaxed), 0);
+    detach(window, &shared);
+    assert!(!shared.enabled.load(Ordering::Acquire));
+    unsafe {
+        let _ = RemoveWindowSubclass(window, Some(window_preview), 1);
+        DestroyWindow(window).unwrap();
+    }
 }
 
 #[test]
@@ -69,7 +124,7 @@ fn native_toolbar_buttons_thumbnail_restart_and_detach() {
     for id in [PREVIOUS, TOGGLE, NEXT, STOP] {
         unsafe {
             SendMessageW(
-                window,
+                taskbar.proxy.window(),
                 WM_COMMAND,
                 Some(WPARAM(((THBN_CLICKED as usize) << 16) | id as usize)),
                 Some(LPARAM(0)),
@@ -84,7 +139,7 @@ fn native_toolbar_buttons_thumbnail_restart_and_detach() {
     // dimensions come from DWM's own request, not from a synthetic message.
     unsafe {
         SendMessageW(
-            window,
+            taskbar.proxy.window(),
             WM_DWMSENDICONICTHUMBNAIL,
             None,
             Some(LPARAM((64 << 16) | 36)),
@@ -109,7 +164,11 @@ fn native_toolbar_buttons_thumbnail_restart_and_detach() {
         SendMessageW(window, shared.created, None, None);
     }
     assert!(shared.generation.load(Ordering::Acquire) > before);
+    taskbar.update(&state, Language::English).unwrap();
+    assert!(shared.toolbar_ready.load(Ordering::Acquire));
+    let proxy_window = taskbar.proxy.window();
     drop(taskbar);
+    assert!(!unsafe { IsWindow(Some(proxy_window)) }.as_bool());
     detach(window, &shared);
     assert!(!shared.enabled.load(Ordering::Acquire));
     assert_eq!(

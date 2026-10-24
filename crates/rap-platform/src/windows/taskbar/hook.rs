@@ -38,33 +38,9 @@ pub(super) fn install(window: HWND, events: Sender<DesktopEvent>) -> Result<Arc<
             anyhow::bail!("Cannot attach taskbar controls to the window");
         }
     }
-    // Called during main-window creation, before playback and thumbnail requests.
-    if let Err(error) = attributes(window, true) {
-        unsafe {
-            remove(window, raw);
-        }
-        return Err(error);
-    }
+    // Keep the main window's native DWM surface available for Peek. Only the
+    // separate thumbnail proxy opts into iconic bitmap rendering.
     Ok(shared)
-}
-
-fn attributes(window: HWND, enabled: bool) -> Result<()> {
-    let value = i32::from(enabled);
-    unsafe {
-        DwmSetWindowAttribute(
-            window,
-            DWMWA_FORCE_ICONIC_REPRESENTATION,
-            (&value as *const i32).cast(),
-            std::mem::size_of_val(&value) as u32,
-        )?;
-        DwmSetWindowAttribute(
-            window,
-            DWMWA_HAS_ICONIC_BITMAP,
-            (&value as *const i32).cast(),
-            std::mem::size_of_val(&value) as u32,
-        )?;
-    }
-    Ok(())
 }
 
 /// May be called from the native worker at shutdown; the removal executes on UI.
@@ -87,7 +63,6 @@ unsafe fn remove(window: HWND, raw: *const Shared) {
         if RemoveWindowSubclass(window, Some(procedure), SUBCLASS).as_bool() {
             let shared = Arc::from_raw(raw);
             shared.enabled.store(false, Ordering::Release);
-            let _ = attributes(window, false);
         }
     }
 }
@@ -124,34 +99,24 @@ unsafe extern "system" fn procedure(
             return LRESULT(0);
         }
     }
-    if matches!(
-        message,
-        WM_DWMSENDICONICTHUMBNAIL | WM_DWMSENDICONICLIVEPREVIEWBITMAP
-    ) {
-        let frame = shared.frame.try_lock().ok().and_then(|frame| frame.clone());
-        if let Some(frame) = frame {
-            let size = if message == WM_DWMSENDICONICTHUMBNAIL {
-                (
-                    ((lparam.0 as u32 >> 16) & 0xffff) as i32,
-                    (lparam.0 as u32 & 0xffff) as i32,
-                )
-            } else {
-                (frame.width, frame.height)
-            };
-            // A bounded GDI scale/copy only: decoding and layout are already done.
-            if let Ok(bitmap) = frame.bitmap(size.0, size.1) {
-                unsafe {
-                    if message == WM_DWMSENDICONICTHUMBNAIL {
-                        if DwmSetIconicThumbnail(window, bitmap.bitmap, 0).is_ok() {
-                            shared.thumbnails.fetch_add(1, Ordering::Relaxed);
-                        }
-                    } else {
-                        let _ = DwmSetIconicLivePreviewBitmap(window, bitmap.bitmap, None, 0);
-                    }
+    unsafe { DefSubclassProc(window, message, wparam, lparam) }
+}
+
+pub(super) fn thumbnail(window: HWND, shared: &Shared, lparam: LPARAM) -> LRESULT {
+    let frame = shared.frame.try_lock().ok().and_then(|frame| frame.clone());
+    if let Some(frame) = frame {
+        let size = (
+            ((lparam.0 as u32 >> 16) & 0xffff) as i32,
+            (lparam.0 as u32 & 0xffff) as i32,
+        );
+        // A bounded GDI scale/copy only: decoding and layout are already done.
+        if let Ok(bitmap) = frame.bitmap(size.0, size.1) {
+            unsafe {
+                if DwmSetIconicThumbnail(window, bitmap.bitmap, 0).is_ok() {
+                    shared.thumbnails.fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
-        return LRESULT(0);
     }
-    unsafe { DefSubclassProc(window, message, wparam, lparam) }
+    LRESULT(0)
 }

@@ -2,6 +2,7 @@
 mod bitmap;
 mod hook;
 mod icons;
+mod proxy;
 mod render;
 
 use crate::{DesktopEvent, MediaCommand, MediaState, TransportState};
@@ -49,9 +50,9 @@ pub(super) fn detach(window: HWND, shared: &Shared) {
 }
 
 pub(super) struct Taskbar {
-    window: HWND,
+    proxy: proxy::Proxy,
     shared: Arc<Shared>,
-    api: ITaskbarList3,
+    api: ITaskbarList4,
     icons: [Icon; 5],
     renderer: Renderer,
     last_frame: Option<(MediaState, Language)>,
@@ -62,7 +63,7 @@ pub(super) struct Taskbar {
 
 impl Taskbar {
     pub fn new(window: HWND, shared: Arc<Shared>) -> Result<Self> {
-        let api: ITaskbarList3 =
+        let api: ITaskbarList4 =
             unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER)? };
         unsafe {
             api.HrInit()?;
@@ -77,7 +78,7 @@ impl Taskbar {
             Icon::new(include_bytes!("../../../../../assets/icons/square.svg"))?,
         ];
         Ok(Self {
-            window,
+            proxy: proxy::Proxy::new(window, shared.clone())?,
             shared,
             api,
             icons,
@@ -103,11 +104,12 @@ impl Taskbar {
             }
             self.last_frame = Some((display, language));
             unsafe {
-                let _ = DwmInvalidateIconicBitmaps(self.window);
+                let _ = DwmInvalidateIconicBitmaps(self.proxy.window());
             }
         }
         let generation = self.shared.generation.load(Ordering::Acquire);
         if generation != self.generation {
+            self.proxy.unregister(&self.api);
             self.generation = generation;
             self.shared.toolbar_ready.store(false, Ordering::Release);
             self.last_buttons = None;
@@ -120,12 +122,16 @@ impl Taskbar {
             // A hidden or not-yet-shown main window has no taskbar button yet.
             if Instant::now() >= self.next_attempt {
                 self.next_attempt = Instant::now() + Duration::from_millis(500);
-                if unsafe {
-                    self.api
-                        .ThumbBarAddButtons(self.window, &buttons)
-                        .or_else(|_| self.api.ThumbBarUpdateButtons(self.window, &buttons))
-                }
-                .is_ok()
+                if self.proxy.register(&self.api).is_ok()
+                    && unsafe {
+                        self.api
+                            .ThumbBarAddButtons(self.proxy.window(), &buttons)
+                            .or_else(|_| {
+                                self.api
+                                    .ThumbBarUpdateButtons(self.proxy.window(), &buttons)
+                            })
+                    }
+                    .is_ok()
                 {
                     self.shared.toolbar_ready.store(true, Ordering::Release);
                     self.last_buttons = Some((enabled, playing, language));
@@ -133,7 +139,8 @@ impl Taskbar {
             }
         } else if self.last_buttons != Some((enabled, playing, language)) {
             unsafe {
-                self.api.ThumbBarUpdateButtons(self.window, &buttons)?;
+                self.api
+                    .ThumbBarUpdateButtons(self.proxy.window(), &buttons)?;
             }
             self.last_buttons = Some((enabled, playing, language));
         }
@@ -179,9 +186,12 @@ impl Drop for Taskbar {
                 button.dwFlags = THBF_HIDDEN;
             }
             unsafe {
-                let _ = self.api.ThumbBarUpdateButtons(self.window, &buttons);
+                let _ = self
+                    .api
+                    .ThumbBarUpdateButtons(self.proxy.window(), &buttons);
             }
         }
+        self.proxy.unregister(&self.api);
     }
 }
 
