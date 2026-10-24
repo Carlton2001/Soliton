@@ -70,6 +70,28 @@ fn find_session(
     panic!("RAP SMTC session not published");
 }
 
+/// Size of the session artwork, once Windows has propagated it: the title can be
+/// visible to other processes before the thumbnail. `expected` waits for a
+/// given artwork rather than any previous one.
+fn artwork_size(session: &GlobalSystemMediaTransportControlsSession, expected: Option<u64>) -> u64 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let size = session
+            .TryGetMediaPropertiesAsync()
+            .ok()
+            .and_then(|request| request.get().ok())
+            .and_then(|properties| properties.Thumbnail().ok())
+            .and_then(|thumbnail| thumbnail.OpenReadAsync().ok()?.get().ok())
+            .and_then(|stream| stream.Size().ok())
+            .filter(|&size| size > 0 && expected.is_none_or(|expected| size == expected));
+        if let Some(size) = size {
+            return size;
+        }
+        assert!(Instant::now() < deadline, "SMTC artwork not published");
+        pump_for(Duration::from_millis(100));
+    }
+}
+
 fn tray_window() -> Option<HWND> {
     let mut after = None;
     loop {
@@ -167,18 +189,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     }
     let properties = session.TryGetMediaPropertiesAsync().unwrap().get().unwrap();
     assert_eq!(properties.Artist().unwrap(), "Artiste été");
-    assert!(
-        properties
-            .Thumbnail()
-            .unwrap()
-            .OpenReadAsync()
-            .unwrap()
-            .get()
-            .unwrap()
-            .Size()
-            .unwrap()
-            > 0
-    );
+    artwork_size(&session, None);
     // Long canonical cache paths also work, without stripping their prefix or
     // depending on the WinRT StorageFile path parser.
     let long_directory = directory
@@ -201,22 +212,8 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     for event in desktop.events.try_iter() {
         assert!(!matches!(event, DesktopEvent::Warning(_)), "{event:?}");
     }
-    assert_eq!(
-        session
-            .TryGetMediaPropertiesAsync()
-            .unwrap()
-            .get()
-            .unwrap()
-            .Thumbnail()
-            .unwrap()
-            .OpenReadAsync()
-            .unwrap()
-            .get()
-            .unwrap()
-            .Size()
-            .unwrap(),
-        std::fs::metadata(&long_cover).unwrap().len()
-    );
+    let long_size = std::fs::metadata(&long_cover).unwrap().len();
+    artwork_size(&session, Some(long_size));
     // A palette change while playing keeps the published artwork.
     desktop.publish(
         {
@@ -230,13 +227,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     );
     pump_for(Duration::from_millis(800));
     let session = find_session(&manager, &long_title);
-    let thumbnail = session
-        .TryGetMediaPropertiesAsync()
-        .unwrap()
-        .get()
-        .unwrap()
-        .Thumbnail();
-    assert!(thumbnail.is_ok(), "Palette change dropped the SMTC artwork");
+    artwork_size(&session, Some(long_size));
     assert!(session.TryPauseAsync().unwrap().get().unwrap());
     wait_event(&desktop, |event| {
         matches!(event, DesktopEvent::Media(MediaCommand::Pause))
