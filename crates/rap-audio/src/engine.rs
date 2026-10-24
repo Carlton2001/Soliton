@@ -3,6 +3,7 @@ use crate::{
     resample::Converter,
 };
 use anyhow::Result;
+use rap_core::failure::{Failure, Kind};
 #[path = "remote.rs"]
 mod remote;
 use crossbeam_channel::{Receiver, Sender, bounded};
@@ -80,9 +81,7 @@ impl Engine {
                                 worker.playback.outputs = Arc::new(outputs);
                                 worker.playback.outputs_error = None;
                             }
-                            Err(error) => {
-                                worker.playback.outputs_error = Some(format!("{error:#}"))
-                            }
+                            Err(error) => worker.playback.outputs_error = Some(Failure::of(&error)),
                         }
                     }
                     let hungry = worker.session.as_ref().is_some_and(|s| {
@@ -175,7 +174,7 @@ impl Engine {
         }
         self.commands
             .try_send(command)
-            .map_err(|_| anyhow::anyhow!("Audio command queue unavailable"))
+            .map_err(|_| Failure::new(Kind::Busy).into())
     }
 
     /// Called on a background executor when closing the app, so the remote
@@ -211,7 +210,8 @@ impl Session {
             Some(position) => reader.seek(position)?,
             None => 0,
         };
-        let output = Output::open(reader.rate, reader.channels, volume, selected)?;
+        let output = Output::open(reader.rate, reader.channels, volume, selected)
+            .map_err(|error| Failure::wrap(Kind::OutputUnavailable, &error))?;
         let converter = Converter::new(
             reader.rate,
             reader.channels,
@@ -256,7 +256,7 @@ impl Worker {
         self.session = None;
         self.playback.state = PlaybackState::Failed;
         self.playback.output = None;
-        self.playback.error = Some(format!("{error:#}"));
+        self.playback.error = Some(Failure::of(&error));
     }
 
     fn start_current(&mut self) -> Result<()> {
@@ -278,7 +278,10 @@ impl Worker {
         };
         self.playback.track = Some(track.clone());
         self.playback.duration_ms = track.metadata.duration_ms;
-        anyhow::ensure!(track.available, "Track is unavailable");
+        if !track.available {
+            let detail = track.path.display().to_string();
+            return Err(Failure::with(Kind::TrackUnavailable, detail).into());
+        }
         if self.playback.network_output.is_some() {
             return self.start_remote(track, position, true);
         }
@@ -399,7 +402,7 @@ impl Worker {
                     if let Err(error) =
                         self.remote_command(rap_network::Command::Volume(value.clamp(0., 1.)))
                     {
-                        self.playback.output_error = Some(format!("{error:#}"));
+                        self.playback.output_error = Some(Failure::of(&error));
                     }
                     return Ok(());
                 }
@@ -442,19 +445,19 @@ impl Worker {
             Command::Seek(position) => self.seek(position)?,
             Command::SelectOutput(selected) => {
                 self.playback.output_error =
-                    self.select_output(selected).err().map(|e| format!("{e:#}"));
+                    self.select_output(selected).err().map(|e| Failure::of(&e));
             }
             Command::RefreshOutputs => {}
             Command::DiscoverNetworkOutputs => {
                 self.playback.network_error =
-                    self.discover_network().err().map(|e| format!("{e:#}"));
+                    self.discover_network().err().map(|e| Failure::of(&e));
             }
             Command::SelectNetworkOutput(id) => {
                 if let Err(error) = self.select_network(&id) {
                     if self.playback.network_output.is_some() {
                         self.fail(error);
                     } else {
-                        self.playback.output_error = Some(format!("{error:#}"));
+                        self.playback.output_error = Some(Failure::of(&error));
                     }
                 } else {
                     self.playback.output_error = None;
@@ -537,10 +540,9 @@ impl Worker {
         let Some(session) = self.session.as_mut() else {
             return Ok(());
         };
-        anyhow::ensure!(
-            !session.output.failed.load(Ordering::Relaxed),
-            "Audio output was disconnected or failed"
-        );
+        if session.output.failed.load(Ordering::Relaxed) {
+            return Err(Failure::new(Kind::OutputDisconnected).into());
+        }
         if self.playback.state != PlaybackState::Playing {
             return Ok(());
         }

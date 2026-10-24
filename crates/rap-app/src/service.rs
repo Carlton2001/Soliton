@@ -4,7 +4,7 @@ use crate::{
     settings_writer::SettingsWriter,
 };
 use crossbeam_channel::{Receiver, Sender, bounded};
-use rap_core::model::LibrarySnapshot;
+use rap_core::{failure::Failure, model::LibrarySnapshot};
 use rap_library::{Cancellation, Library, ScanProgress};
 use rap_platform::AppPaths;
 use std::{path::PathBuf, sync::Arc};
@@ -32,8 +32,8 @@ pub enum Event {
     /// A source stopped answering; its entries are kept.
     SourceUnavailable(PathBuf),
     /// A file could not be read; the rest of the work went on.
-    Warning(String),
-    Error(String),
+    Warning(Failure),
+    Error(Failure),
 }
 pub struct Services {
     pub work: Sender<Work>,

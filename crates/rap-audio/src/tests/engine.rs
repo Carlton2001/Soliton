@@ -325,7 +325,10 @@ fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered()
         })
         .unwrap_err();
     worker.fail(error);
-    assert!(worker.playback.error.as_ref().unwrap().contains(preferred));
+    assert_eq!(
+        worker.playback.error,
+        Some(Failure::with(Kind::OutputUnavailable, preferred))
+    );
     assert!(worker.playback.output.is_none());
     assert_eq!(worker.playback.selected_output.as_deref(), Some(preferred));
     worker.command(Command::SelectOutput(None)).unwrap();

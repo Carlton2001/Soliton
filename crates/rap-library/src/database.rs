@@ -1,6 +1,7 @@
 use crate::schema;
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use rap_core::{
+    failure::{Failure, Kind},
     model::{Album, Edition, LibrarySnapshot, Metadata, Source, Track},
     text::fold,
 };
@@ -62,20 +63,30 @@ impl Library {
     }
 
     pub fn add_source(&mut self, path: &Path) -> Result<i64> {
-        let path = path.canonicalize().context("Cannot access source")?;
+        let shown = path.display().to_string();
+        let path = path.canonicalize().map_err(|error| {
+            Failure::with(Kind::SourceInaccessible, error.to_string()).about(&shown)
+        })?;
         if !path.is_dir() {
-            bail!("Source is not a directory");
+            return Err(Failure::new(Kind::SourceNotDirectory).about(shown).into());
         }
         // A source must not contain application storage, including via a junction.
         if self.storage.starts_with(&path) || path.starts_with(&self.storage) {
-            bail!("Source overlaps RAP application storage");
+            return Err(Failure::new(Kind::SourceOverlapsStorage)
+                .about(shown)
+                .into());
         }
         for source in self.sources()? {
             if path == source.path {
                 return Ok(source.id);
             }
             if path.starts_with(&source.path) || source.path.starts_with(&path) {
-                bail!("Source overlaps an existing source");
+                let existing = source.path.display();
+                return Err(
+                    Failure::with(Kind::SourceOverlapsSource, existing.to_string())
+                        .about(shown)
+                        .into(),
+                );
             }
         }
         self.connection.execute(
@@ -226,8 +237,11 @@ fn edition_rank(edition: &Edition) -> (bool, Reverse<u8>, Reverse<u32>, i64) {
 }
 
 pub(crate) fn path_text(path: &Path) -> Result<&str> {
-    path.to_str()
-        .context("Path cannot be represented as Unicode")
+    path.to_str().ok_or_else(|| {
+        Failure::new(Kind::PathNotUnicode)
+            .about(path.display())
+            .into()
+    })
 }
 
 #[cfg(test)]

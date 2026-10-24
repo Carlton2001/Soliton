@@ -3,7 +3,7 @@ use crate::{
     filters::Menu,
     i18n::{Text, text},
     input::TextInput,
-    notices::Notices,
+    notices::{Level, Notices},
     scrollbar::Scrollbar,
     service::{Event, Services, Work},
     slider::Slider,
@@ -12,6 +12,7 @@ use crate::{
 use gpui::{prelude::*, *};
 use rap_core::{
     config::{Accent, AlbumSort, Appearance, CoverSize, Language, Settings},
+    failure::{Failure, Kind},
     model::{Album, LibrarySnapshot},
 };
 use rap_library::{Cancellation, ScanProgress};
@@ -296,18 +297,35 @@ impl Rap {
             if let Some(error) = &playback.error
                 && playback.error != self.playback.error
             {
-                self.report_error(error.clone());
+                self.report_failure(Level::Error, Text::Playback, error);
             }
             let output_errors: Vec<_> = [
-                (&playback.output_error, &self.playback.output_error),
-                (&playback.outputs_error, &self.playback.outputs_error),
-                (&playback.network_error, &self.playback.network_error),
+                (
+                    &playback.output_error,
+                    &self.playback.output_error,
+                    Text::AudioOutput,
+                ),
+                (
+                    &playback.outputs_error,
+                    &self.playback.outputs_error,
+                    Text::AudioOutput,
+                ),
+                (
+                    &playback.network_error,
+                    &self.playback.network_error,
+                    Text::NetworkOutput,
+                ),
             ]
             .into_iter()
-            .filter_map(|(error, previous)| error.as_ref().filter(|_| error != previous).cloned())
+            .filter_map(|(error, previous, label)| {
+                error
+                    .as_ref()
+                    .filter(|_| error != previous)
+                    .map(|error| (label, error.clone()))
+            })
             .collect();
-            for error in output_errors {
-                self.report_error(self.labelled(self.t(Text::AudioOutput), &error));
+            for (label, error) in output_errors {
+                self.report_failure(Level::Error, label, &error);
             }
             // Save only an acknowledged choice; rejected changes keep the old one.
             if playback.selected_output != self.settings.output_device {
@@ -348,8 +366,12 @@ impl Rap {
                     self.report_warning(text);
                     self.query_pending = true;
                 }
-                Event::Warning(text) => self.report_warning(text),
-                Event::Error(text) => self.report_error(text),
+                Event::Warning(failure) => {
+                    self.report_failure(Level::Warning, service_label(&failure), &failure)
+                }
+                Event::Error(failure) => {
+                    self.report_failure(Level::Error, service_label(&failure), &failure)
+                }
             }
             changed = true;
         }
@@ -374,7 +396,9 @@ impl Rap {
                         .min(self.visible.len().saturating_sub(1));
                 }
                 Ok(_) => {}
-                Err(error) => self.report_error(format!("{error:#}")),
+                Err(error) => {
+                    self.report_failure(Level::Error, Text::Library, &Failure::of(&error))
+                }
             }
             changed = true;
         }
@@ -428,7 +452,7 @@ impl Rap {
             .try_send(Work::Scan(paths, self.cancellation.clone()))
         {
             Ok(()) => self.scanning = true,
-            Err(error) => self.report_error(error.to_string()),
+            Err(_) => self.report_failure(Level::Error, Text::Library, &Failure::new(Kind::Busy)),
         }
         cx.notify();
     }
@@ -462,8 +486,8 @@ impl Rap {
         if self.scanning {
             return;
         }
-        if let Err(error) = self.services.work.try_send(Work::RemoveSource(id)) {
-            self.report_error(error.to_string());
+        if self.services.work.try_send(Work::RemoveSource(id)).is_err() {
+            self.report_failure(Level::Error, Text::Library, &Failure::new(Kind::Busy));
         }
         cx.notify();
     }
@@ -717,5 +741,13 @@ impl Render for Rap {
             .children(self.menu_view(cx))
             .children(self.close_dialog(cx))
             .children(self.playlist_dialog(cx))
+    }
+}
+
+/// Library workers also save settings; their failures say which.
+fn service_label(failure: &Failure) -> Text {
+    match failure.kind {
+        Kind::SettingsNotSaved => Text::Settings,
+        _ => Text::Library,
     }
 }

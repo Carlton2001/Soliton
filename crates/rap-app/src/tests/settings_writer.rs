@@ -66,5 +66,11 @@ fn failures_reach_the_flush_or_the_event_queue() {
     assert!(errors.try_recv().is_err());
     writer.save(Settings::default());
     let reported = errors.recv_timeout(Duration::from_secs(5)).unwrap();
-    assert!(matches!(reported, Event::Error(_)));
+    assert!(matches!(
+        reported,
+        Event::Error(Failure {
+            kind: Kind::SettingsNotSaved,
+            ..
+        })
+    ));
 }

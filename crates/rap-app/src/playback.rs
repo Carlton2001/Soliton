@@ -1,8 +1,8 @@
 //! Playback commands from the interface. The engine runs on its own threads.
-use crate::app::Rap;
+use crate::{app::Rap, i18n::Text, notices::Level};
 use gpui::*;
 use rap_audio::{Command, PlaybackState};
-use rap_core::model::Album;
+use rap_core::{failure::Failure, model::Album};
 
 impl Rap {
     pub fn audio_command(&mut self, command: Command, cx: &mut Context<Self>) {
@@ -17,7 +17,7 @@ impl Rap {
         if let Some(audio) = &self.audio
             && let Err(error) = audio.send(command)
         {
-            self.report_error(error.to_string());
+            self.report_failure(Level::Error, Text::Playback, &Failure::of(&error));
         }
         cx.notify();
     }

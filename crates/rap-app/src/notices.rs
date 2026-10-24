@@ -5,6 +5,7 @@ use crate::{
     widgets::{button, plain_paths, tinted_icon},
 };
 use gpui::{prelude::*, *};
+use rap_core::failure::Failure;
 
 /// Older messages are dropped beyond this count.
 const KEPT: usize = 50;
@@ -17,6 +18,8 @@ pub enum Level {
 
 pub struct Notice {
     pub level: Level,
+    /// Where it happened: playback, library, an output…
+    pub label: Text,
     pub text: String,
 }
 
@@ -27,13 +30,17 @@ pub struct Notices {
 }
 
 impl Notices {
-    pub fn push(&mut self, level: Level, text: impl Into<String>) {
+    pub fn push(&mut self, level: Level, label: Text, text: impl Into<String>) {
         let text = text.into();
         // Repeated messages, such as a failing action retried, are shown once.
-        if self.items.last().is_some_and(|last| last.text == text) {
+        if self
+            .items
+            .last()
+            .is_some_and(|last| last.label == label && last.text == text)
+        {
             return;
         }
-        self.items.push(Notice { level, text });
+        self.items.push(Notice { level, label, text });
         if self.items.len() > KEPT {
             self.items.remove(0);
         }
@@ -46,10 +53,15 @@ impl Notices {
 
 impl Rap {
     pub fn report_error(&mut self, text: impl Into<String>) {
-        self.notices.push(Level::Error, text);
+        self.notices.push(Level::Error, Text::Error, text);
     }
     pub fn report_warning(&mut self, text: impl Into<String>) {
-        self.notices.push(Level::Warning, text);
+        self.notices.push(Level::Warning, Text::Warning, text);
+    }
+    /// Shows the failure in the interface language, under `label`.
+    pub fn report_failure(&mut self, level: Level, label: Text, failure: &Failure) {
+        let text = crate::i18n::describe(self.settings.language, failure);
+        self.notices.push(level, label, text);
     }
 
     pub fn notices_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -57,10 +69,11 @@ impl Rap {
         let theme = self.theme();
         let count = self.notices.items.len();
         let line = |notice: &Notice| {
-            let (name, label) = match notice.level {
-                Level::Error => ("circle-alert", Text::PlaybackError),
-                Level::Warning => ("triangle-alert", Text::Warning),
+            let name = match notice.level {
+                Level::Error => "circle-alert",
+                Level::Warning => "triangle-alert",
             };
+            let label = notice.label;
             div()
                 .flex()
                 .items_center()

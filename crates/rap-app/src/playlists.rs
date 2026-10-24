@@ -3,6 +3,7 @@ use crate::{
     app::Rap,
     i18n::Text,
     input::TextInput,
+    notices::Level,
     scrollbar::Scrollbar,
     service::Work,
     widgets::{RADIUS_LARGE, TEXT_TITLE, accent_button, button},
@@ -69,8 +70,9 @@ impl Rap {
                 cx.notify();
                 true
             }
-            Err(error) => {
-                self.report_error(error.to_string());
+            Err(_) => {
+                let busy = rap_core::failure::Failure::new(rap_core::failure::Kind::Busy);
+                self.report_failure(Level::Error, Text::Playlists, &busy);
                 cx.notify();
                 false
             }

@@ -1,6 +1,9 @@
-use rap_core::config::Language;
+use rap_core::{
+    config::Language,
+    failure::{Failure, Kind},
+};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Text {
     Actions,
     Playlists,
@@ -79,7 +82,10 @@ pub enum Text {
     RepeatOff,
     RepeatTrack,
     RepeatAll,
-    PlaybackError,
+    Error,
+    Playback,
+    Library,
+    NetworkOutput,
     Albums,
     Artists,
     Settings,
@@ -309,7 +315,10 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::RepeatOff => ("Désactivé", "Off"),
         Text::RepeatTrack => ("Piste", "Track"),
         Text::RepeatAll => ("File", "Queue"),
-        Text::PlaybackError => ("Erreur", "Error"),
+        Text::Error => ("Erreur", "Error"),
+        Text::Playback => ("Lecture", "Playback"),
+        Text::Library => ("Bibliothèque", "Library"),
+        Text::NetworkOutput => ("Sortie réseau", "Network output"),
         Text::Albums => ("Albums", "Albums"),
         Text::Artists => ("Artistes", "Artists"),
         Text::Settings => ("Paramètres", "Settings"),
@@ -426,6 +435,82 @@ pub fn text(language: Language, key: Text) -> &'static str {
     }
 }
 
+/// The explanation of a failure kind; `None` when only its detail can tell.
+pub fn failure_text(language: Language, kind: Kind) -> Option<&'static str> {
+    let (fr, en) = match kind {
+        Kind::Other => return None,
+        Kind::TrackUnavailable => ("Morceau indisponible", "Track unavailable"),
+        Kind::UnreadableAudio => ("Fichier audio illisible", "Unreadable audio file"),
+        Kind::UnsupportedAudio => (
+            "Format audio non pris en charge",
+            "Unsupported audio format",
+        ),
+        Kind::SkippedAudio => ("Passages corrompus ignorés", "Corrupted passages skipped"),
+        Kind::OutputDisconnected => (
+            "Sortie audio déconnectée ou en échec",
+            "Audio output disconnected or failed",
+        ),
+        Kind::OutputUnavailable => ("Sortie audio indisponible", "Audio output unavailable"),
+        Kind::OutputAmbiguous => (
+            "Nom de sortie partagé par plusieurs périphériques",
+            "Output name shared by multiple devices",
+        ),
+        Kind::NoOutputDevice => (
+            "Aucun périphérique de sortie audio",
+            "No audio output device",
+        ),
+        Kind::NetworkUnavailable => (
+            "Récepteur réseau indisponible",
+            "Network receiver unavailable",
+        ),
+        Kind::NetworkPlaybackFailed => (
+            "Le récepteur a signalé un échec",
+            "The receiver reported a failure",
+        ),
+        Kind::Busy => ("RAP est occupé, réessayez", "RAP is busy, try again"),
+        Kind::SourceInaccessible => ("Dossier source inaccessible", "Source folder unreachable"),
+        Kind::SourceOverlapsStorage => (
+            "Ce dossier contient les données de RAP ou se trouve dedans",
+            "This folder contains or is inside RAP’s data",
+        ),
+        Kind::SourceOverlapsSource => (
+            "Ce dossier chevauche une source existante",
+            "This folder overlaps an existing source",
+        ),
+        Kind::SourceNotDirectory => ("Ce n’est pas un dossier", "Not a folder"),
+        Kind::NoAudioFound => (
+            "Aucun fichier audio trouvé ; entrées conservées comme indisponibles",
+            "No audio file found; entries kept as unavailable",
+        ),
+        Kind::FolderUnreadable => ("Dossier illisible", "Unreadable folder"),
+        Kind::UnreadableFile => ("Tags illisibles", "Unreadable tags"),
+        Kind::CoverIgnored => ("Pochette ignorée", "Cover ignored"),
+        Kind::PathNotUnicode => ("Nom de fichier non pris en charge", "Unsupported file name"),
+        Kind::PlaylistName => (
+            "Le nom doit compter 1 à 200 caractères",
+            "The name must have 1 to 200 characters",
+        ),
+        Kind::PlaylistGone => (
+            "Cette playlist a changé entre-temps",
+            "This playlist changed meanwhile",
+        ),
+        Kind::SettingsNotSaved => ("Paramètres non enregistrés", "Settings not saved"),
+    };
+    Some(match language {
+        Language::French => fr,
+        Language::English => en,
+    })
+}
+
+/// The translated kind, followed by the detail shown unchanged.
+pub fn describe(language: Language, failure: &Failure) -> String {
+    match failure_text(language, failure.kind) {
+        None => failure.detail.clone(),
+        Some(text) if failure.detail.is_empty() => text.into(),
+        Some(text) => labelled(language, text, &failure.detail),
+    }
+}
+
 /// `Genre : Jazz` / `Genre: Jazz`, following each language's typography.
 pub fn labelled(language: Language, label: &str, value: &str) -> String {
     match language {
@@ -450,3 +535,7 @@ pub fn decade(language: Language, decade: u32) -> String {
         Language::English => format!("{decade}s"),
     }
 }
+
+#[cfg(test)]
+#[path = "tests/i18n.rs"]
+mod tests;

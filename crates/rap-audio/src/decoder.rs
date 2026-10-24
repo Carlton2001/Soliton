@@ -1,5 +1,9 @@
 use anyhow::{Context, Result, bail};
-use std::{fs::File, path::Path};
+use rap_core::failure::{Failure, Kind};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+};
 use symphonia::core::{
     audio::SampleBuffer,
     codecs::{Decoder, DecoderOptions},
@@ -12,6 +16,7 @@ use symphonia::core::{
 };
 
 pub(crate) struct Reader {
+    path: PathBuf,
     format: Box<dyn FormatReader>,
     decoder: Box<dyn Decoder>,
     track_id: u32,
@@ -28,8 +33,23 @@ pub(crate) struct Reader {
 #[path = "tests/decoder.rs"]
 mod tests;
 
+/// Names the file: an unclassified error means its audio cannot be read.
+fn in_file(path: &Path, error: anyhow::Error) -> anyhow::Error {
+    Failure::wrap(Kind::UnreadableAudio, &error)
+        .about(path.display())
+        .into()
+}
+
+fn unsupported(detail: String) -> anyhow::Error {
+    Failure::with(Kind::UnsupportedAudio, detail).into()
+}
+
 impl Reader {
     pub fn open(path: &Path) -> Result<Self> {
+        Self::probe(path).map_err(|error| in_file(path, error))
+    }
+
+    fn probe(path: &Path) -> Result<Self> {
         let source = MediaSourceStream::new(Box::new(File::open(path)?), Default::default());
         let mut hint = Hint::new();
         if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
@@ -52,6 +72,7 @@ impl Reader {
             symphonia::default::get_codecs().make(parameters, &DecoderOptions::default())?;
         let time_base = parameters.time_base;
         let mut reader = Self {
+            path: path.to_path_buf(),
             track_id: track.id,
             format,
             decoder,
@@ -65,7 +86,7 @@ impl Reader {
         };
         // AAC and some containers reveal their channel layout only after decoding
         // the first packet. Prime once before opening the output device.
-        reader.primed = Some(reader.next()?.context("No decoded audio samples")?);
+        reader.primed = Some(reader.decode()?.context("No decoded audio samples")?);
         reader.duration_ms = frames.map_or(0, |frames| {
             if let Some(base) = time_base {
                 let time = base.calc_time(frames);
@@ -81,6 +102,10 @@ impl Reader {
         if let Some(samples) = self.primed.take() {
             return Ok(Some(samples));
         }
+        self.decode().map_err(|error| in_file(&self.path, error))
+    }
+
+    fn decode(&mut self) -> Result<Option<Vec<f32>>> {
         loop {
             let packet = match self.format.next_packet() {
                 Ok(packet) => packet,
@@ -100,20 +125,20 @@ impl Reader {
             if self.rate == 0 {
                 self.rate = decoded.spec().rate;
                 self.channels = decoded.spec().channels.count();
-                anyhow::ensure!(
-                    (1..=2).contains(&self.channels),
-                    "Only mono and stereo are supported in this milestone"
-                );
-                anyhow::ensure!(
-                    (8000..=384000).contains(&self.rate),
-                    "Unsupported sample rate"
-                );
+                if !(1..=2).contains(&self.channels) {
+                    return Err(unsupported(format!("{} ch", self.channels)));
+                }
+                if !(8000..=384000).contains(&self.rate) {
+                    return Err(unsupported(format!("{} Hz", self.rate)));
+                }
             }
-            anyhow::ensure!(
-                decoded.spec().rate == self.rate
-                    && decoded.spec().channels.count() == self.channels,
-                "Audio format changed midstream"
-            );
+            let (rate, channels) = (decoded.spec().rate, decoded.spec().channels.count());
+            if rate != self.rate || channels != self.channels {
+                return Err(unsupported(format!(
+                    "{} Hz, {} ch → {rate} Hz, {channels} ch",
+                    self.rate, self.channels
+                )));
+            }
             if decoded.capacity() > 384000 * 2 {
                 bail!("Decoded packet is too large");
             }
@@ -142,6 +167,11 @@ impl Reader {
     }
 
     pub fn seek(&mut self, milliseconds: u64) -> Result<u64> {
+        self.seek_to(milliseconds)
+            .map_err(|error| in_file(&self.path, error))
+    }
+
+    fn seek_to(&mut self, milliseconds: u64) -> Result<u64> {
         let position = if self.duration_ms > 0 {
             milliseconds.min(self.duration_ms)
         } else {

@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::{Result, bail};
 use crossbeam_channel::bounded;
+use rap_core::failure::{Failure, Kind};
 use std::{
     collections::{BTreeSet, HashMap},
     path::{Path, PathBuf},
@@ -43,13 +44,13 @@ pub struct ScanReport {
     /// Entries forgotten because their file disappeared from an accessible source.
     pub removed: usize,
     /// Bounded diagnostic sample; total errors are counted separately.
-    pub diagnostics: Vec<String>,
+    pub diagnostics: Vec<Failure>,
 }
 impl ScanReport {
-    fn error(&mut self, text: String) {
+    fn error(&mut self, failure: Failure) {
         self.progress.errors += 1;
         if self.diagnostics.len() < 32 {
-            self.diagnostics.push(text);
+            self.diagnostics.push(failure);
         }
     }
 }
@@ -102,7 +103,8 @@ impl Library {
             .ok_or_else(|| anyhow::anyhow!("Unknown source"))?;
         if let Err(error) = std::fs::read_dir(&source.path) {
             self.set_source_available(source_id, false)?;
-            bail!("{}: {error}", source.path.display());
+            let failure = Failure::with(Kind::SourceInaccessible, error.to_string());
+            return Err(failure.about(source.path.display()).into());
         }
         let dirs = resolve_scope(&source.path, dirs);
         self.connection.execute(
@@ -191,10 +193,9 @@ impl Library {
                             // skipped, without stopping the scan or its conclusions.
                             Ok(Discovered::File(file)) if file.path.to_str().is_none() => {
                                 report.progress.discovered += 1;
-                                report.error(format!(
-                                    "{}: path cannot be represented as Unicode",
-                                    file.path.display()
-                                ));
+                                report.error(
+                                    Failure::new(Kind::PathNotUnicode).about(file.path.display()),
+                                );
                             }
                             Ok(Discovered::File(file)) => {
                                 report.progress.discovered += 1;
@@ -208,7 +209,7 @@ impl Library {
                             }
                             Ok(Discovered::Error(error)) => {
                                 traversal_failed = true;
-                                report.error(error);
+                                report.error(Failure::with(Kind::FolderUnreadable, error));
                             }
                             Err(_) => { found = None; jobs.take(); }
                         },
@@ -220,11 +221,16 @@ impl Library {
                                         let editions = self.store(source_id, &root, &file, generation, &value)?;
                                         dirty.extend(editions.into_iter().flatten());
                                         report.progress.indexed += 1;
-                                        for warning in value.warnings { report.error(warning); }
+                                        for warning in value.warnings {
+                                            report.error(Failure::with(Kind::CoverIgnored, warning));
+                                        }
                                     }
                                     Err(error) => {
                                         self.record_failure(source_id, &file.path, file.size, &file.modified, generation)?;
-                                        report.error(format!("{}: {error:#}", file.path.display()));
+                                        report.error(
+                                            Failure::with(Kind::UnreadableFile, format!("{error:#}"))
+                                                .about(file.path.display()),
+                                        );
                                     }
                                 }
                                 batched += 1;
@@ -274,10 +280,9 @@ impl Library {
             // An empty root more likely means an unmounted volume than a deleted library.
             if scope.whole() && report.progress.discovered == 0 && self.has_files(source_id)? {
                 self.mark_unseen_unavailable(&scope, generation)?;
-                report.diagnostics.push(format!(
-                    "{}: no audio file found; entries kept as unavailable",
-                    source.path.display()
-                ));
+                report
+                    .diagnostics
+                    .push(Failure::new(Kind::NoAudioFound).about(source.path.display()));
             } else {
                 report.removed = self.purge(&scope, generation)?;
             }

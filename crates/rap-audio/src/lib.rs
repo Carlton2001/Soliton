@@ -9,7 +9,7 @@ mod resample;
 pub use devices::{OutputDevice, OutputInfo};
 pub use engine::Engine;
 pub use queue::Repeat;
-use rap_core::model::Track;
+use rap_core::{failure::Failure, model::Track};
 pub use rap_network::{Device as NetworkDevice, Protocol as NetworkProtocol};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -58,17 +58,17 @@ pub struct Playback {
     /// None selects the system default at the next stream opening.
     pub selected_output: Option<String>,
     pub outputs: std::sync::Arc<Vec<OutputDevice>>,
-    pub outputs_error: Option<String>,
+    pub outputs_error: Option<Failure>,
     pub output: Option<OutputInfo>,
     pub network_outputs: std::sync::Arc<Vec<NetworkDevice>>,
     pub network_output: Option<NetworkDevice>,
     pub network_enabled: bool,
     pub network_discovering: bool,
-    pub network_error: Option<String>,
+    pub network_error: Option<Failure>,
     /// Discovery/selection errors do not interrupt an existing working stream.
-    pub output_error: Option<String>,
+    pub output_error: Option<Failure>,
     pub output_changing: bool,
-    pub error: Option<String>,
+    pub error: Option<Failure>,
 }
 
 pub enum Command {

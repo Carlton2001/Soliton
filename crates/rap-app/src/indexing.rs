@@ -3,7 +3,7 @@
 //! edits pass between scan batches; other work waits for the scan.
 use crate::service::{Event, Work};
 use crossbeam_channel::{Receiver, Sender, bounded};
-use rap_core::playlist::PlaylistChange;
+use rap_core::{failure::Failure, playlist::PlaylistChange};
 use rap_library::{
     Cancellation, Coalescer, Interlude, Library, Prober, ScanProgress, SourceWatcher, WatchEvent,
 };
@@ -40,7 +40,7 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
     let library = match Library::open(root) {
         Ok(library) => library,
         Err(error) => {
-            let _ = events.send(Event::Error(format!("{error:#}")));
+            let _ = events.send(Event::Error(Failure::of(&error)));
             let _ = events.send(Event::Finished(false));
             return;
         }
@@ -51,14 +51,14 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
             let _ = events.send(Event::Playlists(lists));
         }
         Err(error) => {
-            let _ = events.send(Event::Error(format!("{error:#}")));
+            let _ = events.send(Event::Error(Failure::of(&error)));
         }
     }
     let watcher = match SourceWatcher::new(notify_tx) {
         Ok(watcher) => Some(watcher),
         Err(error) => {
             // Scans still keep the library current without notifications.
-            let _ = events.send(Event::Error(format!("{error:#}")));
+            let _ = events.send(Event::Error(Failure::of(&error)));
             None
         }
     };
@@ -121,8 +121,8 @@ impl Worker {
         let _ = self.events.send(event);
     }
 
-    fn error(&self, error: impl std::fmt::Display) {
-        self.send(Event::Error(error.to_string()));
+    fn error(&self, error: &anyhow::Error) {
+        self.send(Event::Error(Failure::of(error)));
     }
 
     fn handle(&mut self, work: Work) {
@@ -130,13 +130,13 @@ impl Worker {
             Work::Playlist(change) => change_playlist(&mut self.library, &self.events, change),
             Work::RemoveSource(id) => {
                 if let Err(error) = self.library.remove_source(id) {
-                    self.error(format_args!("{error:#}"));
+                    self.error(&error);
                 }
                 self.sync_watcher();
                 self.send(Event::Removed);
                 match self.library.playlists() {
                     Ok(lists) => self.send(Event::Playlists(lists)),
-                    Err(error) => self.error(format_args!("{error:#}")),
+                    Err(error) => self.error(&error),
                 }
             }
             Work::Scan(paths, cancellation) => self.user_scan(paths, &cancellation),
@@ -153,7 +153,16 @@ impl Worker {
             for path in paths {
                 match self.library.add_source(&path) {
                     Ok(id) => ids.push(id),
-                    Err(error) => self.error(format_args!("{}: {error:#}", path.display())),
+                    Err(error) => {
+                        let failure = Failure::of(&error);
+                        // Library failures already name the folder.
+                        let failure = if failure.detail.is_empty() {
+                            failure.about(path.display())
+                        } else {
+                            failure
+                        };
+                        self.send(Event::Error(failure));
+                    }
                 }
             }
             ids
@@ -187,7 +196,7 @@ impl Worker {
                         self.send(Event::Warning(detail));
                     }
                 }
-                Err(error) => self.error(format_args!("{error:#}")),
+                Err(error) => self.error(&error),
             }
         }
         if everything {
@@ -228,7 +237,7 @@ impl Worker {
                     Some(source) if was_available && !source.available => {
                         self.send(Event::SourceUnavailable(source.path));
                     }
-                    Some(_) if was_available => self.error(format_args!("{error:#}")),
+                    Some(_) if was_available => self.error(&error),
                     _ => {}
                 }
                 self.send(Event::Changed);
@@ -297,7 +306,7 @@ impl Worker {
                         self.send(Event::SourceUnavailable(source.path));
                     }
                     Ok(false) => {}
-                    Err(error) => self.error(format_args!("{error:#}")),
+                    Err(error) => self.error(&error),
                 }
             } else if !source.available && reachable {
                 changed = true;
@@ -314,7 +323,7 @@ impl Worker {
     /// Safe between scans only: a running scan may not have stored new references yet.
     fn prune_covers(&self) {
         if let Err(error) = self.library.prune_covers() {
-            self.error(format_args!("{error:#}"));
+            self.error(&error);
         }
     }
 
@@ -329,7 +338,7 @@ impl Worker {
 
     fn sources(&self) -> Vec<rap_core::model::Source> {
         self.library.sources().unwrap_or_else(|error| {
-            self.error(format_args!("{error:#}"));
+            self.error(&error);
             Vec::new()
         })
     }
@@ -337,11 +346,11 @@ impl Worker {
 
 fn change_playlist(library: &mut Library, events: &Sender<Event>, change: PlaylistChange) {
     if let Err(error) = library.change_playlist(change) {
-        let _ = events.send(Event::Error(format!("{error:#}")));
+        let _ = events.send(Event::Error(Failure::of(&error)));
     }
     let event = match library.playlists() {
         Ok(lists) => Event::Playlists(lists),
-        Err(error) => Event::Error(format!("{error:#}")),
+        Err(error) => Event::Error(Failure::of(&error)),
     };
     let _ = events.send(event);
 }

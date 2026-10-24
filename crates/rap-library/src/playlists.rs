@@ -1,7 +1,8 @@
 //! Transactional manual playlists. No writes to the source collection.
 use crate::{Library, database::path_text};
-use anyhow::{Result, bail};
+use anyhow::Result;
 use rap_core::{
+    failure::{Failure, Kind},
     model::Track,
     playlist::{Playlist, PlaylistChange, PlaylistEntry},
 };
@@ -81,10 +82,10 @@ impl Library {
                     .collect::<rusqlite::Result<Vec<_>>>()?;
                 if Some(entry) != before {
                     let Some(from) = order.iter().position(|&e| e == entry) else {
-                        bail!("Playlist entry no longer exists");
+                        return Err(Failure::new(Kind::PlaylistGone).into());
                     };
                     if before.is_some_and(|e| !order.contains(&e)) {
-                        bail!("Playlist target no longer exists");
+                        return Err(Failure::new(Kind::PlaylistGone).into());
                     }
                     order.remove(from);
                     let at = before
@@ -105,7 +106,7 @@ impl Library {
 fn valid_name(name: &str) -> Result<&str> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 200 {
-        bail!("Playlist name must contain 1 to 200 characters");
+        return Err(Failure::new(Kind::PlaylistName).into());
     }
     Ok(name)
 }
@@ -116,7 +117,7 @@ fn require_list(tx: &Connection, id: i64) -> Result<()> {
         [id],
         |r| r.get::<_, bool>(0),
     )? {
-        bail!("Playlist no longer exists");
+        return Err(Failure::new(Kind::PlaylistGone).into());
     }
     Ok(())
 }

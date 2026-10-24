@@ -1,7 +1,6 @@
 //! Network routing on the audio command worker. A single queue remains the source
 //! of truth for albums, shuffle, repeat and manual/automatic navigation.
 use super::*;
-use anyhow::Context as _;
 use rap_core::model::Track;
 use rap_network::{Command as RemoteCommand, State as RemoteState, Status};
 
@@ -22,11 +21,11 @@ impl Worker {
             .iter()
             .find(|d| d.id == id)
             .cloned()
-            .context("Network output is unavailable")?;
+            .ok_or(Failure::new(Kind::NetworkUnavailable))?;
         let network = self
             .network
             .as_ref()
-            .context("Network discovery is not running")?;
+            .ok_or(Failure::new(Kind::NetworkUnavailable))?;
         network.call(RemoteCommand::Connect(device.clone()))?;
         let active = matches!(
             self.playback.state,
@@ -69,11 +68,11 @@ impl Worker {
             .playback
             .network_output
             .clone()
-            .context("No network output selected")?;
+            .ok_or(Failure::new(Kind::NetworkUnavailable))?;
         let network = self
             .network
             .as_ref()
-            .context("Network service is unavailable")?;
+            .ok_or(Failure::new(Kind::NetworkUnavailable))?;
         network.call(RemoteCommand::Connect(device))?;
         let status = network
             .call(RemoteCommand::Load {
@@ -82,7 +81,7 @@ impl Worker {
                 autoplay,
                 volume: self.playback.volume,
             })?
-            .context("The network receiver did not return a playback status")?;
+            .ok_or(Failure::new(Kind::NetworkPlaybackFailed))?;
         self.remote_generation = Some(status.generation);
         self.playback.error = None;
         self.apply_remote(&status)
@@ -92,9 +91,9 @@ impl Worker {
         let status = self
             .network
             .as_ref()
-            .context("Network service is unavailable")?
+            .ok_or(Failure::new(Kind::NetworkUnavailable))?
             .call(command)?
-            .context("The network receiver did not return a playback status")?;
+            .ok_or(Failure::new(Kind::NetworkPlaybackFailed))?;
         self.apply_remote(&status)
     }
 
@@ -102,7 +101,7 @@ impl Worker {
         if self.remote_generation.take().is_some() {
             self.network
                 .as_ref()
-                .context("Network service is unavailable")?
+                .ok_or(Failure::new(Kind::NetworkUnavailable))?
                 .call(RemoteCommand::Stop)?;
         }
         Ok(())
@@ -130,7 +129,7 @@ impl Worker {
         };
         self.network
             .as_ref()
-            .context("Network service is unavailable")?
+            .ok_or(Failure::new(Kind::NetworkUnavailable))?
             .call(RemoteCommand::Disconnect)?;
         self.remote_generation = None;
         self.playback.network_output = None;
@@ -144,11 +143,10 @@ impl Worker {
     }
 
     fn apply_remote(&mut self, status: &Status) -> Result<()> {
-        anyhow::ensure!(
-            status.state != RemoteState::Failed,
-            "{}",
-            status.error.as_deref().unwrap_or("Network playback failed")
-        );
+        if status.state == RemoteState::Failed {
+            let detail = status.error.clone().unwrap_or_default();
+            return Err(Failure::with(Kind::NetworkPlaybackFailed, detail).into());
+        }
         self.playback.position_ms = status.position_ms;
         if status.duration_ms > 0 {
             self.playback.duration_ms = status.duration_ms;
@@ -174,7 +172,9 @@ impl Worker {
             return Ok(());
         };
         self.playback.network_outputs = snapshot.devices;
-        self.playback.network_error = snapshot.discovery_error;
+        self.playback.network_error = snapshot
+            .discovery_error
+            .map(|error| Failure::with(Kind::Other, error));
         self.playback.network_discovering = snapshot.discovering;
         let Some(status) = snapshot
             .status

@@ -1,7 +1,8 @@
 //! Local CPAL outputs. Names are the only portable identifiers exposed by CPAL
 //! 0.16; ambiguous names are deliberately not selectable.
-use anyhow::{Context, Result, ensure};
+use anyhow::Result;
 use cpal::traits::{DeviceTrait, HostTrait};
+use rap_core::failure::{Failure, Kind};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutputDevice {
@@ -45,9 +46,9 @@ fn describe(mut names: Vec<String>) -> Vec<OutputDevice> {
 pub(crate) fn resolve(preferred: Option<&str>) -> Result<cpal::Device> {
     let host = cpal::default_host();
     let Some(name) = preferred else {
-        return host
+        return Ok(host
             .default_output_device()
-            .context("No audio output device");
+            .ok_or(Failure::new(Kind::NoOutputDevice))?);
     };
     let mut matching = Vec::new();
     for device in host.output_devices()? {
@@ -55,11 +56,14 @@ pub(crate) fn resolve(preferred: Option<&str>) -> Result<cpal::Device> {
             matching.push(device);
         }
     }
-    ensure!(!matching.is_empty(), "Audio output is unavailable: {name}");
-    ensure!(
-        matching.len() == 1,
-        "Audio output name is ambiguous: {name}"
-    );
+    if matching.len() != 1 {
+        let kind = if matching.is_empty() {
+            Kind::OutputUnavailable
+        } else {
+            Kind::OutputAmbiguous
+        };
+        return Err(Failure::with(kind, name).into());
+    }
     Ok(matching.pop().unwrap())
 }
 

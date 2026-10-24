@@ -2,7 +2,10 @@
 //! scans. Only the newest unsaved value is kept: older ones are already obsolete.
 use crate::service::Event;
 use crossbeam_channel::{Sender, bounded};
-use rap_core::config::Settings;
+use rap_core::{
+    config::Settings,
+    failure::{Failure, Kind},
+};
 use std::{
     path::PathBuf,
     sync::{Arc, Condvar, Mutex, MutexGuard},
@@ -66,7 +69,8 @@ impl SettingsWriter {
                     let result = settings.save(&path);
                     if flushes.is_empty() {
                         if let Err(error) = result {
-                            let _ = events.try_send(Event::Error(format!("{error:#}")));
+                            let failure = Failure::wrap(Kind::SettingsNotSaved, &error);
+                            let _ = events.try_send(Event::Error(failure));
                         }
                         continue;
                     }
