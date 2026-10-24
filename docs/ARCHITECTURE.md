@@ -36,7 +36,9 @@ tags, 16 travaux en attente. Un scan à la fois, liens non suivis, métadonnées
 natives réutilisées sans second `stat`.
 
 **Incrémental.** Taille et date de modification évitent les relectures ; les
-échecs d'extraction sont mémorisés par taille, date et version d'extracteur.
+échecs d'extraction sont mémorisés par taille, date et version d'extracteur. Un
+chemin sans représentation Unicode est signalé et ignoré sans interrompre le
+parcours ni empêcher ses conclusions.
 
 **Disparitions.** Après un parcours complet sans erreur de parcours, sur une
 source vérifiée accessible avant et après, les fichiers non rencontrés sont

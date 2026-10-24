@@ -187,6 +187,15 @@ impl Library {
                     };
                     crossbeam_channel::select! {
                         recv(found_queue) -> message => match message {
+                            // SQLite stores paths as text: such a file is reported and
+                            // skipped, without stopping the scan or its conclusions.
+                            Ok(Discovered::File(file)) if file.path.to_str().is_none() => {
+                                report.progress.discovered += 1;
+                                report.error(format!(
+                                    "{}: path cannot be represented as Unicode",
+                                    file.path.display()
+                                ));
+                            }
                             Ok(Discovered::File(file)) => {
                                 report.progress.discovered += 1;
                                 match self.known(source_id, &file.path, file.size, &file.modified, &mut covers_present)? {
@@ -286,7 +295,8 @@ fn resolve_scope(root: &Path, dirs: &[PathBuf]) -> Vec<PathBuf> {
             continue;
         }
         let mut dir = dir.as_path();
-        while dir != root && !dir.is_dir() {
+        // Files below a non-Unicode directory cannot be stored either.
+        while dir != root && (!dir.is_dir() || dir.to_str().is_none()) {
             dir = dir.parent().unwrap_or(root);
         }
         resolved.insert(dir.to_path_buf());

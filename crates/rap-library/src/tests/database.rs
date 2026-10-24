@@ -623,3 +623,51 @@ fn waiting_writes_pass_between_batches_and_the_scan_completes() {
     assert_eq!(albums.len(), 1);
     assert_eq!(albums[0].editions[0].tracks.len(), 3);
 }
+
+/// A file name that is valid on the platform but has no Unicode representation.
+fn non_unicode(dir: &Path) -> PathBuf {
+    #[cfg(windows)]
+    let name = {
+        use std::os::windows::ffi::OsStringExt;
+        // An unpaired surrogate, as some old tools wrote.
+        std::ffi::OsString::from_wide(&[0x0041, 0xD800, 0x002E, 0x0077, 0x0061, 0x0076])
+    };
+    #[cfg(unix)]
+    let name = {
+        use std::os::unix::ffi::OsStrExt;
+        std::ffi::OsStr::from_bytes(b"A\xff.wav").to_os_string()
+    };
+    dir.join(name)
+}
+
+#[test]
+fn non_unicode_paths_are_reported_without_failing_the_scan() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("music");
+    let album = source.join("Artist/Album");
+    wav(&album.join("01.wav"));
+    wav(&album.join("02.wav"));
+    let odd = non_unicode(&album);
+    std::fs::copy(album.join("01.wav"), &odd).unwrap();
+    let odd_dir = non_unicode(&source.join("Artist"));
+    wav(&odd_dir.join("01.wav"));
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    let id = library.add_source(&source).unwrap();
+    let report = scan(&mut library, id);
+    assert!(report.complete);
+    assert_eq!(report.progress.indexed, 2);
+    assert_eq!(report.progress.errors, 2);
+    // Removals are still concluded on the rest of the source.
+    std::fs::remove_file(album.join("02.wav")).unwrap();
+    let report = scan(&mut library, id);
+    assert!(report.complete);
+    assert_eq!(report.removed, 1);
+    // A notification inside the odd directory rescans its nearest Unicode ancestor.
+    let root = library.sources().unwrap()[0].path.clone();
+    let scoped = non_unicode(&root.join("Artist"));
+    let report = library
+        .scan_scope(id, &[scoped], &Cancellation::default(), |_| {}, &mut ())
+        .unwrap();
+    assert!(report.complete);
+    assert_eq!(report.progress.unchanged, 1);
+}
