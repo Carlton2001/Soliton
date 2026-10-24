@@ -55,12 +55,16 @@ impl Rap {
                     .gap_2()
                     .pl_3()
                     .pr_4()
-                    .child(img("images/logo.svg").size(px(18.)).flex_none())
+                    .child(
+                        img(crate::assets::Assets::logo_path(self.settings.app_icon))
+                            .size(px(18.))
+                            .flex_none(),
+                    )
                     .child(
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::BOLD)
-                            .child("RAP"),
+                            .child("rap"),
                     ),
             )
             .child(drag("title-bar-drag").flex_1())

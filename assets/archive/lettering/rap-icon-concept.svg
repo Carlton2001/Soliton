@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RAP</title>
+  <desc id="desc">Carré rouge aux coins arrondis, lettres RAP en gras : R et P blancs, A noir. Red rounded square with bold RAP lettering: white R and P, black A.</desc>
+  <rect x="8" y="8" width="496" height="496" rx="100" fill="#E52232"/>
+  <g fill-rule="evenodd">
+    <path fill="#FFFFFF" d="M64 166H121C160 166 180 185 180 221C180 246 169 263 149 271L185 346H143L113 279H101V346H64ZM101 200V246H119C135 246 143 238 143 223C143 208 135 200 119 200Z"/>
+    <path fill="#000000" d="M190 346L238 166H270L318 346H279L269 306H239L229 346ZM246 274H262L254 232Z"/>
+    <path fill="#FFFFFF" d="M332 166H391C429 166 448 187 448 224C448 262 428 283 390 283H369V346H332ZM369 201V248H388C403 248 411 240 411 224C411 209 403 201 388 201Z"/>
+  </g>
+</svg>

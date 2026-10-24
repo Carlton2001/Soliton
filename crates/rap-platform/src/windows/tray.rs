@@ -1,8 +1,9 @@
 //! The hidden top-level owner receives Shell callbacks and Explorer restarts.
+use super::app_icons::Icon;
 use crate::{DesktopEvent, MediaCommand, TransportState};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use crossbeam_channel::Sender;
-use rap_core::config::Language;
+use rap_core::config::{AppIcon, Language};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -28,7 +29,8 @@ const QUIT: usize = 5;
 
 pub(super) struct Tray {
     window: HWND,
-    icon: HICON,
+    icon: Icon,
+    palette: AppIcon,
     // Box address stays stable for GWLP_USERDATA until DestroyWindow returns.
     state: Box<State>,
 }
@@ -47,6 +49,7 @@ impl Tray {
         events: Sender<DesktopEvent>,
         ready: Arc<AtomicBool>,
         language: Language,
+        palette: AppIcon,
     ) -> Result<Self> {
         unsafe {
             let instance = GetModuleHandleW(None)?;
@@ -80,7 +83,7 @@ impl Tray {
                     return Err(error.into());
                 }
             };
-            let icon = match icon() {
+            let icon = match Icon::load(palette, GetSystemMetrics(SM_CXSMICON)) {
                 Ok(icon) => icon,
                 Err(error) => {
                     let _ = DestroyWindow(window);
@@ -94,7 +97,7 @@ impl Tray {
                 uID: 1,
                 uFlags: NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP,
                 uCallbackMessage: CALLBACK,
-                hIcon: icon,
+                hIcon: icon.0,
                 ..Default::default()
             };
             for (dest, value) in data.szTip.iter_mut().zip("RAP".encode_utf16()) {
@@ -112,6 +115,7 @@ impl Tray {
             let mut tray = Self {
                 window,
                 icon,
+                palette,
                 state,
             };
             SetWindowLongPtrW(
@@ -127,6 +131,27 @@ impl Tray {
     pub fn update(&mut self, state: TransportState, language: Language) {
         self.state.language = language;
         self.state.playing = state == TransportState::Playing;
+    }
+
+    pub fn set_icon(&mut self, palette: AppIcon) -> Result<()> {
+        if self.palette == palette {
+            return Ok(());
+        }
+        self.palette = palette;
+        let icon = Icon::load(palette, unsafe { GetSystemMetrics(SM_CXSMICON) })?;
+        let mut data = self.state.data;
+        data.hIcon = icon.0;
+        let installed = unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) }.as_bool();
+        // Retain the latest choice for TaskbarCreated even if Explorer is
+        // temporarily unavailable and could not replace its displayed copy.
+        self.state.data = data;
+        self.icon = icon;
+        if !installed {
+            self.state.ready.store(false, Ordering::Release);
+            let _ = self.state.events.try_send(DesktopEvent::Show);
+            anyhow::bail!("Cannot update Windows notification icon");
+        }
+        Ok(())
     }
 }
 
@@ -255,62 +280,9 @@ impl Drop for Tray {
             let _ = Shell_NotifyIconW(NIM_DELETE, &self.state.data);
             SetWindowLongPtrW(self.window, GWLP_USERDATA, 0);
             let _ = DestroyWindow(self.window);
-            let _ = DestroyIcon(self.icon);
             if let Ok(instance) = GetModuleHandleW(None) {
                 let _ = UnregisterClassW(CLASS, Some(instance.into()));
             }
         }
     }
-}
-
-/// Load the executable's multi-size icon at the shell's small-icon size, so
-/// Windows picks the matching frame instead of shrinking a single bitmap.
-fn icon() -> Result<HICON> {
-    unsafe {
-        let module = GetModuleHandleW(None)?;
-        let loaded = LoadImageW(
-            Some(module.into()),
-            windows::core::PCWSTR(1 as _),
-            IMAGE_ICON,
-            GetSystemMetrics(SM_CXSMICON),
-            GetSystemMetrics(SM_CYSMICON),
-            LR_DEFAULTCOLOR,
-        );
-        match loaded {
-            Ok(handle) => Ok(HICON(handle.0)),
-            Err(_) => rendered_icon(),
-        }
-    }
-}
-
-/// Fallback for binaries without the icon resource: the logo on a 32px tile.
-fn rendered_icon() -> Result<HICON> {
-    let tree = resvg::usvg::Tree::from_data(
-        include_bytes!("../../../../assets/log_rap_small.svg"),
-        &Default::default(),
-    )?;
-    let mut image = resvg::tiny_skia::Pixmap::new(32, 32).context("Cannot allocate tray icon")?;
-    let bounds = tree.root().abs_bounding_box();
-    let scale = 32. / bounds.width().max(bounds.height());
-    resvg::render(
-        &tree,
-        resvg::tiny_skia::Transform::from_row(
-            scale,
-            0.,
-            0.,
-            scale,
-            (32. - bounds.width() * scale) / 2. - bounds.x() * scale,
-            (32. - bounds.height() * scale) / 2. - bounds.y() * scale,
-        ),
-        &mut image.as_mut(),
-    );
-    let mut pixels = Vec::with_capacity(32 * 32 * 4);
-    // CreateIcon expects bottom-up BGRA pixels for this 32-bit bitmap.
-    for row in image.data().chunks_exact(32 * 4).rev() {
-        for rgba in row.chunks_exact(4) {
-            pixels.extend_from_slice(&[rgba[2], rgba[1], rgba[0], rgba[3]]);
-        }
-    }
-    let mask = [0u8; 32 * 4];
-    Ok(unsafe { CreateIcon(None, 32, 32, 1, 32, mask.as_ptr(), pixels.as_ptr())? })
 }

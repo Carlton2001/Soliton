@@ -1,8 +1,10 @@
 //! A hidden tab supplies the music thumbnail; Peek uses the main DWM surface.
 //! Created, messaged and destroyed on the desktop worker, never the GPUI thread.
+use super::super::app_icons::IconPair;
 use super::{Shared, command, hook};
 use crate::DesktopEvent;
 use anyhow::Result;
+use rap_core::config::AppIcon;
 use std::sync::{Arc, atomic::Ordering};
 use windows::{
     Win32::{
@@ -20,6 +22,8 @@ pub(super) struct Proxy {
     // Stable address borrowed by the subclass until DestroyWindow returns.
     state: Box<State>,
     registered: bool,
+    icons: IconPair,
+    palette: AppIcon,
 }
 
 struct State {
@@ -29,11 +33,12 @@ struct State {
 
 impl Proxy {
     pub fn new(main: HWND, shared: Arc<Shared>) -> Result<Self> {
+        let icons = IconPair::load(AppIcon::default())?;
         let window = unsafe {
             CreateWindowExW(
                 WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
                 w!("STATIC"),
-                w!("RAP"),
+                w!("rap"),
                 WS_POPUP | WS_CAPTION | WS_SYSMENU,
                 0,
                 0,
@@ -49,6 +54,8 @@ impl Proxy {
             window,
             state: Box::new(State { main, shared }),
             registered: false,
+            icons,
+            palette: AppIcon::default(),
         };
         unsafe {
             anyhow::ensure!(
@@ -61,16 +68,8 @@ impl Proxy {
                 .as_bool(),
                 "Cannot attach the taskbar thumbnail proxy"
             );
-            for (kind, class_icon) in [(ICON_SMALL, GCLP_HICONSM), (ICON_BIG, GCLP_HICON)] {
-                let icon = GetClassLongPtrW(main, class_icon);
-                SendMessageW(
-                    window,
-                    WM_SETICON,
-                    Some(WPARAM(kind as usize)),
-                    Some(LPARAM(icon as isize)),
-                );
-            }
         }
+        proxy.icons.apply(window)?;
         let enabled = 1_i32;
         for attribute in [DWMWA_FORCE_ICONIC_REPRESENTATION, DWMWA_HAS_ICONIC_BITMAP] {
             unsafe {
@@ -87,6 +86,18 @@ impl Proxy {
 
     pub fn window(&self) -> HWND {
         self.window
+    }
+
+    pub fn set_icon(&mut self, palette: AppIcon) -> Result<()> {
+        if self.palette == palette {
+            return Ok(());
+        }
+        // A failed palette is reported once; a different choice can retry.
+        self.palette = palette;
+        let icons = IconPair::load(palette)?;
+        icons.apply(self.window)?;
+        self.icons = icons;
+        Ok(())
     }
 
     pub fn register(&mut self, api: &ITaskbarList4) -> Result<()> {

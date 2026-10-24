@@ -135,6 +135,8 @@ cargo test -p rap-audio -- --include-ignored
 ./scripts/smoke-windows.ps1 -CloseScenario Hidden
 ./scripts/smoke-windows.ps1 -CloseScenario Ask
 ./scripts/smoke-windows.ps1 -Taskbar
+./scripts/smoke-icons-windows.ps1
+./scripts/smoke-icons-windows.ps1 -Language English -Light
 ./scripts/smoke-windows.ps1 -AudioOutputs
 ./scripts/smoke-windows.ps1 -NetworkOutputs -LocalOutputCount 2
 cargo run -p rap-network --example discover

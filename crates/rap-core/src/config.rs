@@ -45,6 +45,40 @@ impl Accent {
     ];
 }
 
+/// Application icon palette, independent of the interface accent and theme.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AppIcon {
+    Blue,
+    Teal,
+    Violet,
+    Copper,
+    #[default]
+    GraphiteMint,
+    IvoryInk,
+}
+
+impl AppIcon {
+    pub const ALL: [Self; 6] = [
+        Self::Blue,
+        Self::Teal,
+        Self::Violet,
+        Self::Copper,
+        Self::GraphiteMint,
+        Self::IvoryInk,
+    ];
+
+    pub fn slug(self) -> &'static str {
+        match self {
+            Self::Blue => "blue",
+            Self::Teal => "teal",
+            Self::Violet => "violet",
+            Self::Copper => "copper",
+            Self::GraphiteMint => "graphite-mint",
+            Self::IvoryInk => "ivory-ink",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CoverSize {
     Small,
@@ -126,6 +160,7 @@ pub struct Settings {
     pub language: Language,
     pub appearance: Appearance,
     pub accent: Accent,
+    pub app_icon: AppIcon,
     pub album_grid: bool,
     pub artist_grid: bool,
     pub cover_size: CoverSize,
@@ -158,6 +193,7 @@ impl Default for Settings {
             language: Language::French,
             appearance: Appearance::System,
             accent: Accent::Teal,
+            app_icon: AppIcon::default(),
             album_grid: true,
             artist_grid: true,
             cover_size: CoverSize::Medium,

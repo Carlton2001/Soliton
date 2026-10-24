@@ -37,6 +37,7 @@ public class RapNativeQa {
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint process);
  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder text, int size);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")] public static extern int GetWindowLongW(IntPtr h, int index);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect rect);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int height, uint flags);
@@ -51,14 +52,14 @@ public class RapNativeQa {
   finally { SetThreadDpiAwarenessContext(previous); }
  }
  public static IntPtr Find(uint process) {
-  return FindTitle(process, "RAP");
+  return FindTitle(process, "rap");
  }
  public static IntPtr FindTitle(uint process, string title) {
   IntPtr found = IntPtr.Zero;
   EnumWindows((h,p) => {
    uint id; GetWindowThreadProcessId(h, out id);
    var text = new StringBuilder(256); GetWindowText(h, text, 256);
-   if (id == process && text.ToString() == title) { found=h; return false; }
+   if (id == process && text.ToString() == title && (title != "rap" || (GetWindowLongW(h,-20) & 0x80) == 0)) { found=h; return false; }
    return true;
   }, IntPtr.Zero);
   return found;

@@ -12,6 +12,7 @@ mod collection;
 mod filters;
 mod history;
 mod i18n;
+mod icon_preferences;
 mod indexing;
 mod input;
 mod keys;
@@ -74,7 +75,7 @@ fn main() -> anyhow::Result<()> {
                     window_min_size: Some(placement::MIN_SIZE),
                     titlebar: Some(TitlebarOptions {
                         appears_transparent: true,
-                        title: Some("RAP".into()),
+                        title: Some("rap".into()),
                         ..Default::default()
                     }),
                     ..Default::default()

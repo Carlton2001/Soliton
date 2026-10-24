@@ -41,7 +41,7 @@ impl Renderer {
             // An empty cover keeps the same quiet shape as the library's placeholder.
             surface.rect(24, 28, 180, 180, colors.muted);
             surface.rect(28, 32, 172, 172, colors.background);
-            surface.text("RAP", (40, 92, 150, 48), 36, true, colors.muted)?;
+            surface.text("rap", (40, 92, 150, 48), 36, true, colors.muted)?;
         }
         let (title, artist, album) = state
             .track

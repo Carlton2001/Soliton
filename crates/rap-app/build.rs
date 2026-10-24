@@ -1,34 +1,48 @@
 //! Embeds the RAP logo as the Windows executable icon.
 //!
-//! The icon is rasterized at build time from `assets/log_rap_small.svg`, a
-//! simplified drawing of the logo that stays legible at every size.
-//! Resource id 1 is the one GPUI loads for the window class, so the same
-//! icon serves the executable, the title bar and the taskbar.
+//! All six palettes are rasterized from assets/logos at build time.
+//! Resource 1 is the default Graphite/Mint icon; resources 2..7 follow PALETTES.
 
 use std::{env, fs, path::PathBuf};
 
-const LOGO: &str = "../../assets/log_rap_small.svg";
+const PALETTES: [&str; 6] = [
+    "blue",
+    "teal",
+    "violet",
+    "copper",
+    "graphite-mint",
+    "ivory-ink",
+];
 const SIZES: [u32; 7] = [16, 20, 24, 32, 48, 64, 256];
 
 fn main() {
-    println!("cargo:rerun-if-changed={LOGO}");
+    for palette in PALETTES {
+        println!("cargo:rerun-if-changed=../../assets/logos/{palette}.svg");
+    }
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
-    let ico = out.join("rap.ico");
-    fs::write(&ico, ico_bytes()).expect("write rap.ico");
+    let mut resources = String::new();
+    for (index, palette) in PALETTES.iter().enumerate() {
+        let ico = out.join(format!("rap-{palette}.ico"));
+        fs::write(&ico, ico_bytes(palette)).expect("write icon");
+        let ico_path = ico.display().to_string().replace('\\', "/");
+        if *palette == "graphite-mint" {
+            resources.push_str(&format!("1 ICON \"{ico_path}\"\n"));
+        }
+        resources.push_str(&format!("{} ICON \"{ico_path}\"\n", index + 2));
+    }
     let rc = out.join("rap.rc");
-    let ico_path = ico.display().to_string().replace('\\', "/");
-    fs::write(&rc, format!("1 ICON \"{ico_path}\"\n")).expect("write rap.rc");
+    fs::write(&rc, resources).expect("write rap.rc");
     embed_resource::compile(&rc, embed_resource::NONE)
         .manifest_required()
         .expect("compile icon resource");
 }
 
 #[cfg(windows)]
-fn ico_bytes() -> Vec<u8> {
-    let svg = fs::read(LOGO).expect("read logo");
+fn ico_bytes(palette: &str) -> Vec<u8> {
+    let svg = fs::read(format!("../../assets/logos/{palette}.svg")).expect("read logo");
     let tree = resvg::usvg::Tree::from_data(&svg, &Default::default()).expect("parse logo");
     let images: Vec<Vec<u8>> = SIZES.iter().map(|&size| dib(&tree, size)).collect();
 
@@ -50,7 +64,7 @@ fn ico_bytes() -> Vec<u8> {
 }
 
 #[cfg(not(windows))]
-fn ico_bytes() -> Vec<u8> {
+fn ico_bytes(_: &str) -> Vec<u8> {
     panic!("Windows icons can only be built on a Windows host");
 }
 

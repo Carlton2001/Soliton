@@ -22,7 +22,13 @@ impl Rap {
         }
         let result = HasWindowHandle::window_handle(window)
             .map_err(|error| anyhow::anyhow!(error.to_string()))
-            .and_then(|handle| Desktop::start(handle.as_raw(), self.settings.language));
+            .and_then(|handle| {
+                Desktop::start(
+                    handle.as_raw(),
+                    self.settings.language,
+                    self.settings.app_icon,
+                )
+            });
         match result {
             Ok(desktop) => self.desktop = Some(desktop),
             Err(error) => {
@@ -90,7 +96,7 @@ impl Rap {
                     accent: rgb(theme.accent),
                 },
             };
-            desktop.publish(state, self.settings.language);
+            desktop.publish(state, self.settings.language, self.settings.app_icon);
         }
     }
 

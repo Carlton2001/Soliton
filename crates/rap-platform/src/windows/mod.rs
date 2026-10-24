@@ -1,4 +1,5 @@
 //! Native ownership lives on one worker; callbacks only enqueue commands.
+mod app_icons;
 mod autostart;
 pub(crate) mod bluetooth;
 pub(crate) mod device_watch;
@@ -9,7 +10,7 @@ mod tray;
 use crate::{DesktopEvent, MediaState};
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender, bounded};
-use rap_core::config::Language;
+use rap_core::config::{AppIcon, Language};
 use raw_window_handle::RawWindowHandle;
 use std::{
     sync::{
@@ -25,7 +26,7 @@ use windows::Win32::{
     UI::WindowsAndMessaging::*,
 };
 
-type Update = (MediaState, Language);
+type Update = (MediaState, Language, AppIcon);
 
 pub(super) struct Integration {
     window: usize,
@@ -42,6 +43,7 @@ impl Integration {
     pub fn start(
         handle: RawWindowHandle,
         language: Language,
+        icon: AppIcon,
     ) -> Result<(Self, Receiver<DesktopEvent>)> {
         let RawWindowHandle::Win32(handle) = handle else {
             anyhow::bail!("Expected a Win32 window");
@@ -72,6 +74,7 @@ impl Integration {
                 if let Err(error) = run(
                     window,
                     language,
+                    icon,
                     &events,
                     latest,
                     requests,
@@ -115,9 +118,9 @@ impl Integration {
         ))
     }
 
-    pub fn publish(&self, state: MediaState, language: Language) {
+    pub fn publish(&self, state: MediaState, language: Language, icon: AppIcon) {
         if let Err(crossbeam_channel::TrySendError::Full(update)) =
-            self.updates.try_send((state, language))
+            self.updates.try_send((state, language, icon))
         {
             let _ = self.stale.try_recv();
             let _ = self.updates.try_send(update);
@@ -167,6 +170,7 @@ impl Drop for Integration {
 fn run(
     window: usize,
     language: Language,
+    icon: AppIcon,
     events: &Sender<DesktopEvent>,
     updates: Receiver<Update>,
     startup: Receiver<bool>,
@@ -175,7 +179,19 @@ fn run(
     restore: &AtomicBool,
     taskbar_binding: Option<Arc<taskbar::Shared>>,
 ) -> Result<()> {
-    let mut tray = match tray::Tray::new(events.clone(), ready.clone(), language) {
+    let mut window_icons = match app_icons::WindowIcons::new(HWND(window as *mut _)) {
+        Ok(mut icons) => {
+            if let Err(error) = icons.apply(icon) {
+                let _ = events.try_send(DesktopEvent::Warning(format!("Window icon: {error:#}")));
+            }
+            Some(icons)
+        }
+        Err(error) => {
+            let _ = events.try_send(DesktopEvent::Warning(format!("Window icon: {error:#}")));
+            None
+        }
+    };
+    let mut tray = match tray::Tray::new(events.clone(), ready.clone(), language, icon) {
         Ok(tray) => Some(tray),
         Err(error) => {
             let _ = events.try_send(DesktopEvent::Warning(format!("Tray: {error:#}")));
@@ -231,9 +247,22 @@ fn run(
                 let _ = SetForegroundWindow(window);
             }
         }
-        if let Ok((state, language)) = updates.recv_timeout(Duration::from_millis(40)) {
+        if let Ok((state, language, icon)) = updates.recv_timeout(Duration::from_millis(40)) {
+            if let Some(icons) = &mut window_icons
+                && let Err(error) = icons.apply(icon)
+            {
+                let _ = events.try_send(DesktopEvent::Warning(format!("Window icon: {error:#}")));
+            }
             if let Some(tray) = &mut tray {
                 tray.update(state.state, language);
+                if let Err(error) = tray.set_icon(icon) {
+                    let _ = events.try_send(DesktopEvent::Warning(format!("Tray icon: {error:#}")));
+                }
+            }
+            if let Some(taskbar) = &mut taskbar
+                && let Err(error) = taskbar.set_icon(icon)
+            {
+                let _ = events.try_send(DesktopEvent::Warning(format!("Taskbar icon: {error:#}")));
             }
             let error = taskbar
                 .as_mut()
@@ -271,6 +300,7 @@ fn run(
         taskbar::detach(HWND(window as *mut _), &binding);
     }
     drop(tray);
+    drop(window_icons);
     if initialized {
         unsafe {
             RoUninitialize();

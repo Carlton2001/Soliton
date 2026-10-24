@@ -529,6 +529,15 @@ Prévoir :
 
 Centraliser les couleurs, espacements et styles dans un système de design cohérent.
 
+Identité retenue le 24 octobre 2026 : onde continue inversée horizontalement
+sur un carré aux coins arrondis. Six icônes sont proposées dans les paramètres :
+Bleu électrique, Pétrole, Violet, Cuivre, Graphite et menthe (par défaut),
+Ivoire et encre. Le choix est persistant et indépendant du thème et de l’accent.
+Il s’applique sans redémarrage à la barre de titre, à la fenêtre et à son aperçu
+Windows ainsi qu’à la zone de notification. L’icône du fichier exécutable reste
+Graphite et menthe ; les raccourcis épinglés peuvent conserver leur icône en cache.
+Le titre de la fenêtre est « rap », en minuscules.
+
 ## 8.9 Lecture
 
 Barre de lecture permanente avec :

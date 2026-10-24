@@ -289,6 +289,7 @@ impl Rap {
                 [
                     setting_row(self.t(Text::Theme), None, appearance, theme),
                     setting_row(self.t(Text::AccentColor), None, accents, theme),
+                    self.icon_preferences(cx),
                     setting_row(self.t(Text::CoverSize), None, cover_size, theme),
                     hide.into_any_element(),
                 ],

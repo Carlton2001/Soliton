@@ -1,8 +1,16 @@
 use gpui::{AssetSource, SharedString};
+use rap_core::config::AppIcon;
 use std::borrow::Cow;
 
 pub struct Assets;
+#[cfg(test)]
+#[path = "tests/assets.rs"]
+mod tests;
 impl Assets {
+    pub fn logo_path(icon: AppIcon) -> SharedString {
+        format!("logos/{}.svg", icon.slug()).into()
+    }
+
     pub fn load_fonts(cx: &gpui::App) -> anyhow::Result<()> {
         cx.text_system().add_fonts(vec![
             Cow::Borrowed(include_bytes!("../../../assets/fonts/Inter-Regular.ttf").as_slice()),
@@ -18,10 +26,21 @@ impl AssetSource for Assets {
                 _ => None,
             } };
         }
-        if path == "images/logo.svg" {
-            return Ok(Some(Cow::Borrowed(include_bytes!(
-                "../../../assets/log_rap_small.svg"
-            ))));
+        macro_rules! logos {
+            ($($name:literal),*) => { match path {
+                $(concat!("logos/", $name, ".svg") => Some(Cow::Borrowed(include_bytes!(concat!("../../../assets/logos/", $name, ".svg")).as_slice())),)*
+                _ => None,
+            } };
+        }
+        if let Some(logo) = logos!(
+            "blue",
+            "teal",
+            "violet",
+            "copper",
+            "graphite-mint",
+            "ivory-ink"
+        ) {
+            return Ok(Some(logo));
         }
         Ok(icons!(
             "house",

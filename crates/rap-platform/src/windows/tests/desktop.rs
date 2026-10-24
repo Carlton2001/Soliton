@@ -92,7 +92,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     let raw = RawWindowHandle::Win32(Win32WindowHandle::new(
         NonZeroIsize::new(window.0.0 as isize).unwrap(),
     ));
-    let desktop = Desktop::start(raw, Language::English).unwrap();
+    let desktop = Desktop::start(raw, Language::English, Default::default()).unwrap();
     wait_event(&desktop, |event| {
         matches!(event, DesktopEvent::Autostart(Ok(_)))
     });
@@ -119,7 +119,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
         duration_ms: 60_000,
         ..Default::default()
     };
-    desktop.publish(state.clone(), Language::English);
+    desktop.publish(state.clone(), Language::English, Default::default());
     let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
         .unwrap()
         .get()
@@ -159,7 +159,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     let track = long_state.track.as_mut().unwrap();
     track.title = long_title.clone();
     track.cover = Some(long_cover.clone());
-    desktop.publish(long_state, Language::French);
+    desktop.publish(long_state, Language::French, Default::default());
     let session = find_session(&manager, &long_title);
     for event in desktop.events.try_iter() {
         assert!(!matches!(event, DesktopEvent::Warning(_)), "{event:?}");
@@ -206,7 +206,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     let track = without_cover.track.as_mut().unwrap();
     track.title = next_title.clone();
     track.cover = None;
-    desktop.publish(without_cover, Language::French);
+    desktop.publish(without_cover, Language::French, Default::default());
     let session = find_session(&manager, &next_title);
     assert!(
         session

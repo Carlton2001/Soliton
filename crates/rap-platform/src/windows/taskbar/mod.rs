@@ -9,7 +9,7 @@ use crate::{DesktopEvent, MediaCommand, MediaState, TransportState};
 use anyhow::Result;
 use crossbeam_channel::Sender;
 use icons::Icon;
-use rap_core::config::Language;
+use rap_core::config::{AppIcon, Language};
 use render::Renderer;
 use std::{
     sync::{
@@ -62,6 +62,10 @@ pub(super) struct Taskbar {
 }
 
 impl Taskbar {
+    pub fn set_icon(&mut self, icon: AppIcon) -> Result<()> {
+        self.proxy.set_icon(icon)
+    }
+
     pub fn new(window: HWND, shared: Arc<Shared>) -> Result<Self> {
         let api: ITaskbarList4 =
             unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER)? };

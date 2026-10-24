@@ -340,8 +340,15 @@ que le menu de notification bascule l'état. Les touches multimédias passent pa
 SMTC, sans second raccourci global risquant de doubler la commande.
 
 **Notification et fenêtre.** Clic gauche : restaurer ; clic droit : menu natif
-FR/EN, piloté par les mêmes commandes que l'interface. L'icône est rastérisée
-depuis le SVG Lucide officiel existant sur un fond d'accent. `TaskbarCreated`
+FR/EN, piloté par les mêmes commandes que l'interface. Les six palettes du logo
+SVG sont embarquées en ressources Windows à sept tailles ; Graphite et menthe
+est l’icône par défaut de l’exécutable. Le choix `Settings.app_icon` est transmis
+par la file coalescée au worker ; celui-ci met à jour les icônes de la fenêtre,
+de l’aperçu et de la notification. Les handles de fenêtre restent vivants jusqu’à
+leur remplacement par les handles empruntés d’origine lors de l’arrêt. Les SVG
+embarqués servent aussi de repli pour les exécutables sans ces ressources.
+Le sélecteur d’icônes et la barre de titre utilisent les mêmes fichiers de
+`assets/logos/`, indépendamment de l’accent de l’interface. `TaskbarCreated`
 réinstalle l'icône après un redémarrage d'Explorer. Un échec d'installation
 interdit le masquage et demande la restauration de la fenêtre. Le réglage de
 fermeture conserve Quitter par défaut ; Masquer et Demander sont persistants.

@@ -1,7 +1,7 @@
 //! Portable contracts for native integration. No native types leave this crate.
 use anyhow::Result;
 use crossbeam_channel::Receiver;
-use rap_core::config::Language;
+use rap_core::config::{AppIcon, Language};
 use raw_window_handle::RawWindowHandle;
 use std::path::PathBuf;
 
@@ -81,24 +81,24 @@ impl Desktop {
     pub const SUPPORTED: bool = cfg!(target_os = "windows");
 
     /// The caller must drop the integration before destroying the borrowed window.
-    pub fn start(handle: RawWindowHandle, language: Language) -> Result<Self> {
+    pub fn start(handle: RawWindowHandle, language: Language, icon: AppIcon) -> Result<Self> {
         #[cfg(target_os = "windows")]
         {
-            let (native, events) = crate::windows::Integration::start(handle, language)?;
+            let (native, events) = crate::windows::Integration::start(handle, language, icon)?;
             Ok(Self { native, events })
         }
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = (handle, language);
+            let _ = (handle, language, icon);
             anyhow::bail!("Desktop integration is not implemented on this platform")
         }
     }
 
-    pub fn publish(&self, state: MediaState, language: Language) {
+    pub fn publish(&self, state: MediaState, language: Language, icon: AppIcon) {
         #[cfg(target_os = "windows")]
-        self.native.publish(state, language);
+        self.native.publish(state, language, icon);
         #[cfg(not(target_os = "windows"))]
-        let _ = (state, language);
+        let _ = (state, language, icon);
     }
 
     pub fn can_hide(&self) -> bool {

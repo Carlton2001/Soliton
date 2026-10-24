@@ -1,6 +1,27 @@
 use super::*;
 
 #[test]
+fn icon_defaults_for_older_settings_and_all_palettes_persist_independently() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    assert_eq!(
+        Settings::load(&path).unwrap().app_icon,
+        AppIcon::GraphiteMint
+    );
+    fs::write(&path, br#"{"accent":"Red","appearance":"Light"}"#).unwrap();
+    let mut settings = Settings::load(&path).unwrap();
+    assert_eq!(settings.app_icon, AppIcon::GraphiteMint);
+    for app_icon in AppIcon::ALL {
+        settings.app_icon = app_icon;
+        settings.save(&path).unwrap();
+        let loaded = Settings::load(&path).unwrap();
+        assert_eq!(loaded.app_icon, app_icon);
+        assert_eq!(loaded.accent, Accent::Red);
+        assert_eq!(loaded.appearance, Appearance::Light);
+    }
+}
+
+#[test]
 fn settings_roundtrip_and_missing_defaults() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");
