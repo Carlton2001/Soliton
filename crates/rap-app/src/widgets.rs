@@ -113,7 +113,7 @@ pub fn accent_button(
         .items_center()
         .justify_center()
         .gap(rems(0.5))
-        .px(rems(0.875))
+        .px(rems(0.75))
         .rounded(RADIUS)
         .bg(theme.accent)
         .text_color(theme.on_accent)
@@ -365,7 +365,7 @@ pub fn radio_row(
         .flex()
         .items_center()
         .gap(rems(0.75))
-        .px(rems(0.875))
+        .px(rems(0.75))
         .child(mark)
         .child(tinted_icon(name, color))
         .child(div().flex_1().min_w_0().truncate().child(label.into()));
@@ -384,7 +384,7 @@ pub fn list_row() -> Div {
         .flex()
         .items_center()
         .gap(rems(0.75))
-        .px(rems(0.875))
+        .px(rems(0.75))
         .py(rems(0.375))
 }
 

@@ -5,7 +5,7 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 
-const TITLE_BAR_HEIGHT: f32 = 36.;
+const TITLE_BAR_HEIGHT: f32 = 40.;
 const CAPTION_BUTTON_WIDTH: f32 = 46.;
 /// Hover color of the close caption button, as in native Windows title bars.
 const CLOSE_HOVER: u32 = 0xc42b1c;
@@ -48,9 +48,7 @@ impl Rap {
             .flex()
             .flex_none()
             .items_center()
-            .bg(theme.panel)
-            .border_b_1()
-            .border_color(theme.border)
+            .bg(theme.background)
             .child(
                 drag("title-bar-brand")
                     .flex_none()
@@ -84,8 +82,8 @@ impl Rap {
         let theme = self.theme();
         let entries = [
             (Section::Home, "house", Text::Home),
-            (Section::Artists, "users", Text::Artists),
             (Section::Albums, "disc-3", Text::Albums),
+            (Section::Artists, "users", Text::Artists),
             (Section::Playlists, "list", Text::Playlists),
             (Section::Queue, "list-end", Text::Queue),
             (Section::Settings, "settings", Text::Settings),
@@ -96,11 +94,9 @@ impl Rap {
             .flex_none()
             .items_center()
             .gap(rems(0.25))
-            .px(rems(1.))
+            .px(rems(0.75))
             .py(rems(0.5))
-            .bg(theme.panel)
-            .border_b_1()
-            .border_color(theme.border)
+            .bg(theme.background)
             .children(
                 entries
                     .into_iter()
@@ -123,6 +119,14 @@ impl Rap {
                             },
                         ))
                     }),
+            )
+            .child(div().flex_1())
+            .when(
+                matches!(
+                    self.section,
+                    Section::Home | Section::Albums | Section::Artists
+                ),
+                |nav| nav.child(self.search_field().w(rems(19.)).max_w_full()),
             )
     }
 }

@@ -22,7 +22,7 @@ impl Rap {
             .flex()
             .flex_col()
             .child(
-                div().flex_none().px(rems(1.)).py(rems(0.5)).child(
+                div().flex_none().px(rems(0.75)).py(rems(0.5)).child(
                     button(
                         "close-now-playing",
                         "arrow-left",
@@ -45,8 +45,8 @@ impl Rap {
                     .items_center()
                     .justify_center()
                     .gap(rems(0.75))
-                    .px(rems(2.))
-                    .pb(rems(1.))
+                    .px(rems(0.75))
+                    .pb(rems(0.75))
                     .child(cover(
                         track.and_then(|t| t.cover.as_ref()),
                         side * 16.,

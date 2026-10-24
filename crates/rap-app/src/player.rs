@@ -20,13 +20,11 @@ impl Rap {
             .flex_col()
             .gap(rems(0.25))
             .py(rems(0.5))
-            .bg(theme.panel)
-            .border_t_1()
-            .border_color(theme.border)
-            .child(self.progress_row(cx).w_full().px(rems(1.)))
+            .bg(theme.background)
+            .child(self.progress_row(cx).w_full().px(rems(0.75)))
             .child(
                 div()
-                    .h(rems(5.))
+                    .h(rems(4.))
                     .flex_none()
                     .flex()
                     .items_center()
@@ -42,7 +40,7 @@ impl Rap {
                             .items_center()
                             .gap(rems(0.75))
                             .when(!compact, |info| {
-                                info.child(cover(track.and_then(|t| t.cover.as_ref()), 64., theme))
+                                info.child(cover(track.and_then(|t| t.cover.as_ref()), 52., theme))
                             })
                             .child(
                                 div()
@@ -71,18 +69,12 @@ impl Rap {
                                             .text_color(theme.muted)
                                             .child(
                                                 track
-                                                    .map(|t| t.metadata.album.clone())
-                                                    .unwrap_or_default(),
-                                            ),
-                                    )
-                                    .child(
-                                        div()
-                                            .truncate()
-                                            .text_size(TEXT_SMALL)
-                                            .text_color(theme.muted)
-                                            .child(
-                                                track
-                                                    .map(|t| t.metadata.artist.clone())
+                                                    .map(|t| {
+                                                        format!(
+                                                            "{} · {}",
+                                                            t.metadata.artist, t.metadata.album
+                                                        )
+                                                    })
                                                     .unwrap_or_default(),
                                             ),
                                     ),
@@ -119,6 +111,31 @@ impl Rap {
                                         .justify_end()
                                         .gap(rems(0.5))
                                         .child(self.volume_control(120., cx).max_w_full())
+                                        .when(
+                                            f32::from(window.viewport_size().width)
+                                                / f32::from(window.rem_size())
+                                                >= 90.,
+                                            |side| {
+                                                side.child(
+                                                    div()
+                                                        .w(rems(8.))
+                                                        .truncate()
+                                                        .text_size(TEXT_CAPTION)
+                                                        .text_color(theme.muted)
+                                                        .child(
+                                                            self.playback
+                                                                .output
+                                                                .as_ref()
+                                                                .map(|output| {
+                                                                    output.device_name.clone()
+                                                                })
+                                                                .unwrap_or_else(|| {
+                                                                    self.t(Text::AudioOutput).into()
+                                                                }),
+                                                        ),
+                                                )
+                                            },
+                                        )
                                         .child(self.now_playing_button(cx)),
                                 )
                             }),
@@ -210,7 +227,11 @@ impl Rap {
                     if playing { "pause" } else { "play" },
                     self.t(if playing { Text::Pause } else { Text::Play }),
                     true,
-                    theme,
+                    crate::theme::Theme {
+                        accent: theme.on_accent,
+                        selected: theme.accent,
+                        ..theme
+                    },
                 )
                 .size(rems(if compact { 2.5 } else { 3. }))
                 .rounded_full()

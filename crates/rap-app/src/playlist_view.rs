@@ -74,11 +74,11 @@ impl Rap {
                 .min_h_0()
                 .flex()
                 .flex_col()
-                .gap(rems(1.))
+                .gap(rems(0.75))
                 .child(
                     div()
-                        .px(rems(1.5))
-                        .pt(rems(1.25))
+                        .px(rems(0.75))
+                        .pt(rems(0.75))
                         .flex()
                         .items_center()
                         .gap(rems(0.5))
@@ -117,7 +117,7 @@ impl Rap {
                 )
                 .child(
                     div()
-                        .px(rems(1.5))
+                        .px(rems(0.75))
                         .flex()
                         .flex_col()
                         .gap(rems(0.5))
@@ -205,13 +205,13 @@ impl Rap {
                         div()
                             .id(("playlist", id as usize))
                             .h(rems(5.5))
-                            .px(rems(1.5))
+                            .px(rems(0.75))
                             .child(
                                 div()
                                     .h_full()
                                     .flex()
                                     .items_center()
-                                    .gap(rems(1.))
+                                    .gap(rems(0.75))
                                     .border_b_1()
                                     .border_color(theme.border)
                                     .child(
@@ -280,11 +280,11 @@ impl Rap {
             .flex_col()
             .child(
                 div()
-                    .p(rems(1.5))
+                    .p(rems(0.75))
                     .flex()
                     .items_center()
                     .justify_between()
-                    .gap(rems(1.))
+                    .gap(rems(0.75))
                     .flex_wrap()
                     .child(
                         div()
@@ -308,7 +308,7 @@ impl Rap {
             .when(count == 0, |v| {
                 v.child(
                     div()
-                        .p(rems(2.))
+                        .p(rems(0.75))
                         .flex()
                         .flex_col()
                         .gap(rems(0.5))

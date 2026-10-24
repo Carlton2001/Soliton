@@ -47,6 +47,7 @@ impl FilterKind {
 pub enum Menu {
     Filters(FilterKind),
     Sort,
+    AlbumActions,
 }
 
 #[derive(Clone)]
@@ -172,42 +173,40 @@ impl Rap {
         cx.notify();
     }
 
-    /// The filter button, one removable chip per active filter, and a reset.
+    /// Direct access to each filter, removable active chips, and a reset.
     pub fn filter_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let active = self.filter.active();
-        let open = matches!(self.menu, Some(Menu::Filters(_)));
         div()
             .flex()
             .flex_wrap()
             .gap(rems(0.5))
             .items_center()
-            .child(
+            .children(FilterKind::ALL.into_iter().map(|kind| {
+                let open = matches!(self.menu, Some(Menu::Filters(current)) if current == kind);
                 div()
                     .relative()
                     .child(
-                        toggle_button(
-                            "filters",
-                            "sliders-horizontal",
-                            self.t(Text::Filters),
-                            open,
+                        nav_item(
+                            ("filter-kind", kind as usize),
+                            "chevron-down",
+                            self.t(kind.label()),
+                            open || self.current(kind).is_some(),
                             theme,
                         )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            let kind = FilterKind::ALL
-                                .into_iter()
-                                .find(|&k| this.current(k).is_some())
-                                .unwrap_or(FilterKind::Genre);
-                            this.open_menu(Menu::Filters(kind), cx)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            if open {
+                                this.menu = None;
+                                cx.notify();
+                            } else {
+                                this.open_menu(Menu::Filters(kind), cx);
+                            }
                         })),
                     )
-                    .children(match self.menu {
-                        Some(Menu::Filters(kind)) => {
-                            Some(dropdown(self.filters_menu(kind, cx), false))
-                        }
-                        _ => None,
-                    }),
-            )
+                    .when(open, |view| {
+                        view.child(dropdown(self.filters_menu(kind, cx), false))
+                    })
+            }))
             .children(FilterKind::ALL.into_iter().filter_map(|kind| {
                 let value = self.current(kind)?;
                 Some(

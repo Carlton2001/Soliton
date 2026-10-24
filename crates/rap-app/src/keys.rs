@@ -94,8 +94,14 @@ impl Rap {
             }
             _ => {}
         }
-        let browsing =
-            self.section == Section::Albums && self.selected.is_none() && self.menu.is_none();
+        let browsing = self.section == Section::Albums
+            && (self.selected.is_none()
+                || crate::collection::split_collection(
+                    f32::from(window.viewport_size().width) / f32::from(window.rem_size()),
+                    self.section,
+                    self.selected.is_some(),
+                ))
+            && self.menu.is_none();
         if !browsing || self.visible.is_empty() {
             return;
         }

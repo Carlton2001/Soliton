@@ -410,6 +410,15 @@ L'interface principale comporte :
 - Des filtres contextuels.
 - Une barre de lecture permanente en bas.
 
+Disposition validée le 24 octobre 2026 à partir de la proposition Figma
+« Collection » : la barre de titre, la navigation et le lecteur partagent le
+fond de l'application, sans séparateur autour de la barre de titre. La recherche
+rejoint la navigation. Dans Albums, une sélection ouvre sa fiche dans un panneau
+à droite sur les fenêtres larges ; la grille ou liste reste visible et adapte
+son nombre de colonnes. En fenêtre étroite, la fiche conserve une page dédiée.
+Accueil conserve ses trois colonnes. Les pochettes restent celles de la
+bibliothèque ; les illustrations de la maquette ne sont pas des ressources RAP.
+
 Sections principales :
 
 - Accueil.

@@ -180,14 +180,14 @@ impl Rap {
         let mut panel = div()
             .w(rems(29.))
             .max_w_full()
-            .p(rems(1.5))
+            .p(rems(0.75))
             .rounded(RADIUS_LARGE)
             .bg(theme.panel)
             .border_1()
             .border_color(theme.border)
             .flex()
             .flex_col()
-            .gap(rems(1.));
+            .gap(rems(0.75));
         panel = panel.child(div().text_size(TEXT_TITLE).child(self.t(title)));
         if naming {
             panel = panel
@@ -339,7 +339,7 @@ impl Rap {
                 .absolute()
                 .inset_0()
                 .occlude()
-                .p(rems(1.))
+                .p(rems(0.75))
                 .flex()
                 .items_center()
                 .justify_center()

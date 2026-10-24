@@ -25,6 +25,14 @@ impl Rap {
     }
 
     pub fn album_view(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        self.album_sheet(window, false, cx)
+    }
+
+    pub(super) fn album_panel(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        self.album_sheet(window, true, cx)
+    }
+
+    fn album_sheet(&self, window: &Window, panel: bool, cx: &mut Context<Self>) -> AnyElement {
         let Some((album, edition_index)) = self.selected_album() else {
             return div().into_any_element();
         };
@@ -32,7 +40,7 @@ impl Rap {
         let theme = self.theme();
         let first = &edition.tracks[0].metadata;
         let album_id = album.id;
-        let wide = f32::from(window.viewport_size().width) > crate::scale::scaled(1000.);
+        let wide = !panel && f32::from(window.viewport_size().width) > crate::scale::scaled(1000.);
         let summary = [
             first.year.map(|y| y.to_string()),
             (!first.genre.is_empty()).then(|| first.genre.clone()),
@@ -52,12 +60,14 @@ impl Rap {
             .flex_col()
             .min_w_0()
             .gap(rems(0.5))
-            .child(
-                div()
-                    .text_size(crate::widgets::TEXT_SMALL)
-                    .text_color(theme.muted)
-                    .child(self.t(Text::Albums)),
-            )
+            .when(!panel, |v| {
+                v.child(
+                    div()
+                        .text_size(crate::widgets::TEXT_SMALL)
+                        .text_color(theme.muted)
+                        .child(self.t(Text::Albums)),
+                )
+            })
             .child(
                 div()
                     .text_size(crate::widgets::TEXT_DISPLAY)
@@ -92,13 +102,20 @@ impl Rap {
             );
         let record = div()
             .flex()
-            .gap(rems(1.25))
+            .gap(rems(0.75))
             .min_w_0()
             .when(wide, |v| v.flex_col().w(rems(19.)).flex_none())
-            .when(!wide, |v| v.items_center())
+            .when(!wide && !panel, |v| v.items_center())
+            .when(panel, |v| v.flex_col().flex_none())
             .child(cover(
                 edition.cover().or(album.cover()),
-                if wide { 280. } else { 112. },
+                if panel {
+                    244.
+                } else if wide {
+                    280.
+                } else {
+                    112.
+                },
                 theme,
             ))
             .child(information);
@@ -112,27 +129,180 @@ impl Rap {
             .when(album.editions.len() > 1, |v| {
                 v.child(self.editions_view(album, edition_index, cx))
             })
-            .child(self.tracks_view(album_id, edition_index, cx));
+            .child(self.tracks_view(album_id, edition_index, panel, cx));
+        if panel {
+            return div()
+                .flex_1()
+                .min_h_0()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .flex_none()
+                        .flex()
+                        .justify_between()
+                        .items_center()
+                        .p(rems(0.75))
+                        .child(
+                            div()
+                                .text_size(crate::widgets::TEXT_CAPTION)
+                                .text_color(theme.muted)
+                                .child(self.t(Text::SelectedAlbum)),
+                        )
+                        .child(
+                            button("close-album-panel", "x", self.t(Text::CloseAlbum), theme)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.selected = None;
+                                    this.menu = None;
+                                    this.track_menu = None;
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .child(
+                    div()
+                        .id("album-panel-summary")
+                        .max_h(relative(0.65))
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .px(rems(1.5))
+                        .pb(rems(0.75))
+                        .child(record)
+                        .child(self.panel_album_actions(album, edition_index, cx)),
+                )
+                .child(songs)
+                .into_any_element();
+        }
         div()
             .flex_1()
             .min_h_0()
             .flex()
             .flex_col()
-            .gap(rems(1.25))
+            .gap(rems(0.75))
             .child(self.album_actions(album, edition_index, true, cx))
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .gap(rems(1.5))
-                    .px(rems(1.5))
-                    .pb(rems(1.))
+                    .gap(rems(0.75))
+                    .px(rems(0.75))
+                    .pb(rems(0.75))
                     .when(!wide, |v| v.flex_col())
                     .child(record)
                     .child(songs),
             )
             .into_any_element()
+    }
+
+    /// Keep the main action visible; secondary album operations share one menu.
+    fn panel_album_actions(
+        &self,
+        album: &Album,
+        edition_index: usize,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let theme = self.theme();
+        let album_id = album.id;
+        let edition = &album.editions[edition_index];
+        let first = edition.tracks.iter().position(|t| t.available);
+        let open = self.menu == Some(crate::filters::Menu::AlbumActions);
+        div()
+            .flex()
+            .gap(rems(0.5))
+            .pt(rems(0.75))
+            .pb(rems(0.25))
+            .child(
+                crate::widgets::accent_button(
+                    "panel-play-album",
+                    "play",
+                    self.t(Text::Play),
+                    theme,
+                )
+                .opacity(if first.is_some() { 1. } else { 0.5 })
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if let Some(start) = first {
+                        this.play_album(album_id, edition_index, start, cx);
+                    }
+                })),
+            )
+            .child(
+                div()
+                    .relative()
+                    .child(
+                        button(
+                            "panel-album-actions",
+                            "chevron-down",
+                            self.t(Text::Actions),
+                            theme,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.menu = if open {
+                                None
+                            } else {
+                                Some(crate::filters::Menu::AlbumActions)
+                            };
+                            cx.notify();
+                        })),
+                    )
+                    .when(open, |anchor| {
+                        anchor.child(
+                            deferred(
+                                div().absolute().top_full().right_0().mt(rems(0.25)).child(
+                                    crate::widgets::popover(theme)
+                                        .flex()
+                                        .flex_col()
+                                        .gap(rems(0.25))
+                                        .child(
+                                            button(
+                                                "panel-album-next",
+                                                "skip-forward",
+                                                self.t(Text::PlayNext),
+                                                theme,
+                                            )
+                                            .on_click(
+                                                cx.listener(move |this, _, _, cx| {
+                                                    this.menu = None;
+                                                    this.enqueue_album(
+                                                        album_id,
+                                                        edition_index,
+                                                        true,
+                                                        cx,
+                                                    );
+                                                }),
+                                            ),
+                                        )
+                                        .child(
+                                            button(
+                                                "panel-album-append",
+                                                "list-end",
+                                                self.t(Text::AppendQueue),
+                                                theme,
+                                            )
+                                            .on_click(
+                                                cx.listener(move |this, _, _, cx| {
+                                                    this.menu = None;
+                                                    this.enqueue_album(
+                                                        album_id,
+                                                        edition_index,
+                                                        false,
+                                                        cx,
+                                                    );
+                                                }),
+                                            ),
+                                        )
+                                        .child(self.playlist_tools(
+                                            edition.tracks.clone(),
+                                            "panel-album-to-playlist",
+                                            cx,
+                                        )),
+                                ),
+                            )
+                            .with_priority(2),
+                        )
+                    }),
+            )
     }
 
     /// Shared album actions; Home keeps its panes instead of a back button.
@@ -148,8 +318,8 @@ impl Rap {
         let album_id = album.id;
         let first_available = edition.tracks.iter().position(|t| t.available);
         div()
-            .px(rems(1.5))
-            .pt(rems(1.))
+            .px(rems(0.75))
+            .pt(rems(0.75))
             .flex()
             .items_center()
             .gap(rems(0.5))
@@ -208,7 +378,7 @@ impl Rap {
     ) -> Div {
         let theme = self.theme();
         div()
-            .px(rems(1.25))
+            .px(rems(0.75))
             .flex()
             .flex_wrap()
             .items_center()
@@ -247,6 +417,7 @@ impl Rap {
         &self,
         album_id: i64,
         edition: usize,
+        compact: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let count = self
@@ -276,7 +447,7 @@ impl Rap {
                 range
                     .filter_map(|i| tracks.get(i).map(|t| (i, t)))
                     .map(|(index, track)| {
-                        let row = this.selection_row(
+                        let row = this.album_selection_row(
                             crate::track_list::TrackRow {
                                 selection: crate::track_list::Selection::Album {
                                     album: album_id,
@@ -295,6 +466,7 @@ impl Rap {
                                 first: index == 0,
                                 last: index + 1 == tracks.len(),
                             },
+                            compact,
                             cx,
                         );
                         if home {

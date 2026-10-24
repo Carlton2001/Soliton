@@ -29,7 +29,7 @@ pub fn section(
                 .flex()
                 .items_center()
                 .justify_between()
-                .gap(rems(1.))
+                .gap(rems(0.75))
                 .child(
                     div()
                         .text_size(TEXT_SUBTITLE)
@@ -55,8 +55,8 @@ pub fn setting_row(
         .flex_wrap()
         .items_center()
         .justify_between()
-        .gap(rems(1.))
-        .px(rems(1.))
+        .gap(rems(0.75))
+        .px(rems(0.75))
         .py(rems(0.625))
         .child(
             div()
@@ -123,12 +123,12 @@ impl Rap {
                     .w(rems(52.))
                     .flex_shrink_0()
                     .max_w_full()
-                    .px(rems(2.))
-                    .pt(rems(1.5))
-                    .pb(rems(3.))
+                    .px(rems(0.75))
+                    .pt(rems(0.75))
+                    .pb(rems(0.75))
                     .flex()
                     .flex_col()
-                    .gap(rems(2.))
+                    .gap(rems(0.75))
                     .child(
                         div()
                             .text_size(TEXT_TITLE)
@@ -274,7 +274,7 @@ impl Rap {
             }),
             theme,
         );
-        let hide = div().px(rems(1.)).py(rems(0.625)).child(
+        let hide = div().px(rems(0.75)).py(rems(0.625)).child(
             checkbox(
                 "hide-unavailable",
                 s.hide_unavailable,

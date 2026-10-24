@@ -223,7 +223,7 @@ impl Rap {
             }),
             theme,
         );
-        let autostart = div().px(rems(1.)).py(rems(0.625)).child(
+        let autostart = div().px(rems(0.75)).py(rems(0.625)).child(
             checkbox(
                 "autostart",
                 self.autostart == Some(true),
@@ -269,14 +269,14 @@ impl Rap {
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     div()
-                        .p(rems(1.5))
+                        .p(rems(0.75))
                         .rounded(RADIUS_LARGE)
                         .border_1()
                         .border_color(theme.control_border)
                         .bg(theme.panel)
                         .flex()
                         .flex_col()
-                        .gap(rems(1.25))
+                        .gap(rems(0.75))
                         .child(
                             div()
                                 .text_size(TEXT_SUBTITLE)

@@ -60,7 +60,7 @@ impl Rap {
             .flex_col()
             .child(
                 div()
-                    .p(rems(1.25))
+                    .p(rems(0.75))
                     .flex()
                     .items_center()
                     .gap(rems(0.75))
@@ -117,14 +117,14 @@ impl Rap {
             .when_some(track, |v, track| {
                 v.child(
                     div()
-                        .mx(rems(1.25))
-                        .mb(rems(1.))
-                        .pb(rems(1.))
+                        .mx(rems(0.75))
+                        .mb(rems(0.75))
+                        .pb(rems(0.75))
                         .border_b_1()
                         .border_color(theme.border)
                         .flex()
                         .items_center()
-                        .gap(rems(1.))
+                        .gap(rems(0.75))
                         .child(cover(track.cover.as_ref(), 64., theme))
                         .child(
                             div()
@@ -178,7 +178,7 @@ impl Rap {
             .when(count == 0, |v| {
                 v.child(
                     div()
-                        .p(rems(1.25))
+                        .p(rems(0.75))
                         .text_color(theme.muted)
                         .child(self.t(Text::QueueEmpty)),
                 )

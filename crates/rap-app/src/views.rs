@@ -11,9 +11,9 @@ use gpui::{prelude::*, *};
 use rap_core::{config::CoverSize, text::fold};
 
 /// Horizontal padding of the album list and grid, in rems.
-pub const CONTENT_PADDING: f32 = 1.25;
+pub const CONTENT_PADDING: f32 = 1.5;
 /// Gap between grid tiles, in rems.
-pub const TILE_GAP: f32 = 0.75;
+pub const TILE_GAP: f32 = 1.;
 
 /// Side of album covers in the grid, in pixels at the 16 px reference.
 pub fn cover_side(size: CoverSize) -> f32 {
@@ -25,80 +25,64 @@ pub fn cover_side(size: CoverSize) -> f32 {
 }
 
 impl Rap {
+    pub fn search_field(&self) -> Div {
+        let theme = self.theme();
+        div()
+            .min_w_0()
+            .flex()
+            .items_center()
+            .gap(rems(0.5))
+            .h(CONTROL_HEIGHT)
+            .bg(theme.card)
+            .rounded(RADIUS)
+            .px(rems(0.625))
+            .child(crate::widgets::icon("search", theme))
+            .child(div().flex_1().min_w_0().child(self.search.clone()))
+    }
+
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
-        let albums = self.section == Section::Home
-            || (self.section == Section::Albums && self.selected.is_none());
+        let albums = matches!(self.section, Section::Home | Section::Albums);
         let grid = match self.section {
-            Section::Albums if albums => Some(self.settings.album_grid),
+            Section::Albums => Some(self.settings.album_grid),
             Section::Artists => Some(self.settings.artist_grid),
             _ => None,
         };
         div()
+            .flex_none()
             .px(rems(CONTENT_PADDING))
-            .py(rems(0.875))
+            .py(rems(1.25))
             .flex()
             .flex_col()
-            .gap(rems(0.625))
-            .border_b_1()
-            .border_color(theme.border)
-            .when(
-                self.section == Section::Albums && albums && self.settings.album_grid,
-                |view| {
-                    view.child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .gap(rems(1.))
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(rems(0.25))
-                                    .child(
-                                        div()
-                                            .text_size(TEXT_SMALL)
-                                            .text_color(theme.muted)
-                                            .child(self.t(Text::Collection)),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_size(crate::widgets::TEXT_DISPLAY)
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .child(self.t(Text::PickRecord)),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .text_color(theme.muted)
-                                    .child(crate::i18n::album_count(self.visible.len())),
-                            ),
-                    )
-                },
-            )
+            .gap(rems(1.))
             .child(
                 div()
                     .flex()
+                    .flex_wrap()
                     .items_center()
-                    .gap(rems(0.5))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .mr(rems(0.5))
-                            .flex()
-                            .items_center()
-                            .gap(rems(0.5))
-                            .h(CONTROL_HEIGHT)
-                            .bg(theme.panel)
-                            .rounded(RADIUS)
-                            .border_1()
-                            .border_color(theme.control_border)
-                            .px(rems(0.625))
-                            .child(crate::widgets::icon("search", theme))
-                            .child(div().flex_1().min_w_0().child(self.search.clone())),
-                    )
+                    .gap(rems(0.75))
+                    .when(self.section == Section::Albums, |row| {
+                        row.child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .flex()
+                                .flex_col()
+                                .gap(rems(0.25))
+                                .child(
+                                    div()
+                                        .text_size(crate::widgets::TEXT_DISPLAY)
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(self.t(Text::Discography)),
+                                )
+                                .child(
+                                    div()
+                                        .text_size(TEXT_SMALL)
+                                        .text_color(theme.muted)
+                                        .child(crate::i18n::album_count(self.visible.len())),
+                                ),
+                        )
+                    })
                     .when(albums, |row| row.child(self.sort_button(cx)))
                     .when_some(grid, |row, grid| {
                         row.child(segments(
@@ -122,7 +106,6 @@ impl Rap {
             )
             .child(self.filter_bar(cx))
     }
-
     fn empty_state(
         &self,
         title: &'static str,
@@ -137,7 +120,7 @@ impl Rap {
             .items_center()
             .justify_center()
             .gap(rems(0.75))
-            .p(rems(2.))
+            .p(rems(0.75))
             .child(cover(None, 96., theme))
             .child(
                 div()
@@ -193,11 +176,7 @@ impl Rap {
                             .px(rems(CONTENT_PADDING - 0.5))
                             .gap(rems(TILE_GAP))
                             .when(columns == 1, |row| row.py(rems(0.0625)))
-                            .when(columns > 1, |row| {
-                                row.py(rems(0.75))
-                                    .border_b_2()
-                                    .border_color(this.theme().border)
-                            })
+                            .when(columns > 1, |row| row.py(rems(0.75)))
                             .children(
                                 (row * columns..((row + 1) * columns).min(this.visible.len()))
                                     .map(|index| this.album_tile(index, side, cx)),
@@ -220,7 +199,11 @@ impl Rap {
         let frame = div()
             .id(("album", id as usize))
             .rounded(RADIUS)
-            .when(index == self.keyboard_index, |view| view.bg(theme.hover))
+            .when(Some(id) == self.selected, |view| view.bg(theme.selected))
+            .when(
+                index == self.keyboard_index && Some(id) != self.selected,
+                |view| view.bg(theme.hover),
+            )
             .when(!available, |view| view.opacity(0.55))
             .p(rems(0.5))
             .min_w_0()
@@ -260,7 +243,7 @@ impl Rap {
             .w_full()
             .flex_1()
             .flex()
-            .gap(rems(1.))
+            .gap(rems(0.75))
             .items_center()
             .child(cover(album.cover(), 40., theme))
             .child(
@@ -351,7 +334,7 @@ impl Rap {
                                             .rounded(RADIUS)
                                             .flex()
                                             .items_center()
-                                            .gap(rems(1.))
+                                            .gap(rems(0.75))
                                             .hover(move |s| s.bg(theme.hover))
                                             .active(move |s| s.bg(theme.pressed))
                                             .child(cover(card.cover.as_ref(), 40., theme))
@@ -436,7 +419,7 @@ impl Rap {
                     div()
                         .px(rems(CONTENT_PADDING))
                         .py(rems(0.375))
-                        .gap(rems(1.))
+                        .gap(rems(0.75))
                         .bg(theme.panel)
                         .border_t_1()
                         .border_color(theme.border)

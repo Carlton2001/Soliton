@@ -91,7 +91,7 @@ impl Rap {
                             .id("notices-list")
                             .max_h(rems(11.25))
                             .overflow_y_scroll()
-                            .px(rems(1.))
+                            .px(rems(0.75))
                             .pt(rems(0.5))
                             .flex()
                             .flex_col()
@@ -109,7 +109,7 @@ impl Rap {
                 })
                 .child(
                     div()
-                        .px(rems(1.))
+                        .px(rems(0.75))
                         .py(rems(0.375))
                         .flex()
                         .items_center()

@@ -170,8 +170,10 @@ impl Rap {
             .min_w_0()
             .flex()
             .overflow_hidden()
+            .px(rems(0.75))
             .child(self.home_artists(cx))
             .child(self.home_albums(cx))
+            .child(div().w(rems(0.75)).flex_none())
             .child(self.home_tracks(cx))
             .into_any_element()
     }
@@ -249,6 +251,7 @@ impl Rap {
         .min_h_0();
         div()
             .w(rems(self.home.catalog.metrics.artists_width() / 16.))
+            .border_t_1()
             .flex_none()
             .min_h_0()
             .border_r_1()
@@ -269,7 +272,15 @@ impl Rap {
                         .child(self.t(Text::NoResults)),
                 )
             })
-            .child(scroll_area(list, &self.home.artist_bar, theme))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .py(rems(0.75))
+                    .child(scroll_area(list, &self.home.artist_bar, theme)),
+            )
             .into_any_element()
     }
 
@@ -372,6 +383,7 @@ impl Rap {
         .min_h_0();
         div()
             .w(rems(self.home.album_column_width() / 16.))
+            .border_t_1()
             .flex_none()
             .min_h_0()
             .flex()
@@ -387,13 +399,23 @@ impl Rap {
                         .child(self.t(Text::ChooseArtist)),
                 )
             })
-            .child(scroll_area(list, &self.home.album_bar, theme))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .py(rems(0.75))
+                    .child(scroll_area(list, &self.home.album_bar, theme)),
+            )
             .into_any_element()
     }
 
     fn home_tracks(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         let pane = div()
+            .border_t_1()
+            .border_color(theme.border)
             .flex_1()
             .min_w_0()
             .min_h_0()
@@ -421,7 +443,7 @@ impl Rap {
             .p(rems(0.75))
             .flex_none()
             .flex()
-            .gap(rems(1.))
+            .gap(rems(0.75))
             .child(cover(edition.cover().or(album.cover()), 72., theme))
             .child(
                 div()
@@ -469,7 +491,7 @@ impl Rap {
                         .flex_none(),
                 )
             })
-            .child(self.tracks_view(album.id, index, cx))
+            .child(self.tracks_view(album.id, index, false, cx))
             .into_any_element()
     }
 }

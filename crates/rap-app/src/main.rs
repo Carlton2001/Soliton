@@ -8,6 +8,7 @@ mod assets;
 mod audio_preferences;
 mod bluetooth_preferences;
 mod catalog;
+mod collection;
 mod filters;
 mod history;
 mod home;

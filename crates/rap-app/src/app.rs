@@ -487,6 +487,8 @@ impl Rap {
     /// Shows an album sheet on its best edition.
     pub fn open_album(&mut self, id: i64, cx: &mut Context<Self>) {
         self.volume_popup = false;
+        self.track_menu = None;
+        self.menu = None;
         self.now_playing = false;
         self.selected = Some(id);
         self.selected_edition = 0;
@@ -616,7 +618,21 @@ impl Render for Rap {
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
         let reserved = crate::scale::scaled((2. * crate::views::CONTENT_PADDING - 1.) * 16. + 12.);
-        self.columns = ((f32::from(window.viewport_size().width) - reserved + gap) / (tile + gap))
+        let split = crate::collection::split_collection(
+            f32::from(window.viewport_size().width) / f32::from(window.rem_size()),
+            self.section,
+            self.selected.is_some(),
+        );
+        let panel_width = if split {
+            crate::scale::scaled(crate::collection::ALBUM_PANEL_WIDTH * 16.)
+        } else {
+            0.
+        };
+        if !split && self.menu == Some(Menu::AlbumActions) {
+            self.menu = None;
+        }
+        self.columns = ((f32::from(window.viewport_size().width) - panel_width - reserved + gap)
+            / (tile + gap))
             .floor()
             .max(1.) as usize;
         let theme = self.theme();
@@ -648,8 +664,8 @@ impl Render for Rap {
                 Section::Queue => self.queue_view(cx),
                 Section::Playlists => self.playlists_view(cx),
                 Section::Settings => self.settings_view(cx),
+                Section::Albums => self.collection_view(window, cx),
                 _ if self.selected.is_some() => self.album_view(window, cx),
-                Section::Albums => self.albums_view(cx),
                 Section::Artists => self.artists_view(cx),
             }
         };
@@ -663,8 +679,7 @@ impl Render for Rap {
             .when(
                 !self.now_playing
                     && (self.section == Section::Home
-                        || (matches!(self.section, Section::Albums | Section::Artists)
-                            && self.selected.is_none())),
+                        || (matches!(self.section, Section::Artists) && self.selected.is_none())),
                 |v| v.child(self.header(cx)),
             )
             .child(body);

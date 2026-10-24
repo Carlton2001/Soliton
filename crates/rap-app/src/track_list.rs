@@ -66,6 +66,15 @@ fn album_track_number(metadata: &Metadata, index: usize, multi_disc: bool) -> St
 
 impl Rap {
     pub fn selection_row(&self, row: TrackRow<'_>, cx: &mut Context<Self>) -> AnyElement {
+        self.album_selection_row(row, false, cx)
+    }
+
+    pub(super) fn album_selection_row(
+        &self,
+        row: TrackRow<'_>,
+        compact: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = self.theme();
         let selection = row.selection;
         let key = match selection {
@@ -134,10 +143,10 @@ impl Rap {
             .w_full()
             .h(rems(3.5))
             .px(rems(0.75))
-            .pr(rems(1.25))
+            .pr(rems(0.75))
             .flex()
             .items_center()
-            .gap(rems(0.75))
+            .gap(rems(if compact { 0.375 } else { 0.75 }))
             .rounded(crate::widgets::RADIUS)
             .when(row.current, |v| v.bg(theme.selected))
             .hover(move |s| s.bg(theme.hover))
@@ -162,7 +171,13 @@ impl Rap {
             )
             .child(
                 div()
-                    .min_w(rems(if row.multi_disc { 2.75 } else { 1.75 }))
+                    .min_w(rems(if row.multi_disc {
+                        2.75
+                    } else if compact {
+                        1.25
+                    } else {
+                        1.75
+                    }))
                     .flex_none()
                     .text_color(theme.muted)
                     .font(crate::widgets::numeric_font())
@@ -211,7 +226,7 @@ impl Rap {
             )
             .child(
                 div()
-                    .w(rems(3.5))
+                    .w(rems(if compact { 2.5 } else { 3.5 }))
                     .text_right()
                     .font(crate::widgets::numeric_font())
                     .text_color(theme.muted)
@@ -228,6 +243,9 @@ impl Rap {
                             self.t(Text::Actions),
                             theme,
                         )
+                        .when(compact, |v| {
+                            v.px(rems(0.375)).text_size(crate::widgets::TEXT_CAPTION)
+                        })
                         .on_click(cx.listener(
                             move |this, _, window, cx| {
                                 cx.stop_propagation();
