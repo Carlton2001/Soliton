@@ -240,6 +240,12 @@ impl Queue {
             self.publish();
             true
         } else if self.repeat == Repeat::All {
+            if self.shuffle && self.order.len() > 1 {
+                // Each round gets a new order, which the track just played
+                // does not open.
+                self.shuffle_order();
+                self.order.rotate_left(1);
+            }
             self.cursor = 0;
             self.publish();
             true
@@ -251,7 +257,11 @@ impl Queue {
         if self.order.is_empty() {
             return false;
         }
-        self.cursor = self.cursor.saturating_sub(1);
+        self.cursor = if self.cursor == 0 && self.repeat == Repeat::All {
+            self.order.len() - 1
+        } else {
+            self.cursor.saturating_sub(1)
+        };
         self.publish();
         true
     }

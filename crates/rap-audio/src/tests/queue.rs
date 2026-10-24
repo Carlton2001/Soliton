@@ -47,6 +47,48 @@ fn repeat_modes_manual_navigation_and_empty_queue() {
     assert_eq!(queue.current().unwrap().id, 1);
     assert!(queue.previous());
     assert_eq!(queue.current().unwrap().id, 0);
+    // Only Repeat all goes back from the first track to the last one.
+    assert!(queue.previous());
+    assert_eq!(queue.current().unwrap().id, 0);
+    queue.repeat = Repeat::All;
+    assert!(queue.previous());
+    assert_eq!(queue.current().unwrap().id, 7);
+}
+
+#[test]
+fn shuffled_repeat_all_reshuffles_each_round() {
+    let mut queue = Queue::default();
+    queue.set(tracks(), 0);
+    queue.shuffle(true);
+    queue.repeat = Repeat::All;
+    let round = |queue: &mut Queue| {
+        let mut ids = vec![queue.current().unwrap().id];
+        for _ in 1..8 {
+            assert!(queue.next(true));
+            ids.push(queue.current().unwrap().id);
+        }
+        assert!(queue.next(true));
+        ids
+    };
+    let mut previous = round(&mut queue);
+    let mut changed = false;
+    // Each new order is random: across several rounds, one at least differs.
+    for _ in 0..5 {
+        let first = queue.current().unwrap().id;
+        assert_ne!(first, *previous.last().unwrap());
+        let ids = round(&mut queue);
+        let mut sorted = ids.clone();
+        sorted.sort();
+        assert_eq!(sorted, (0..8).collect::<Vec<_>>());
+        changed |= ids != previous;
+        previous = ids;
+    }
+    assert!(changed);
+    // The snapshot follows the new order.
+    assert_eq!(
+        queue.snapshot.entries[0].id,
+        queue.snapshot.current.unwrap()
+    );
 }
 
 #[test]
