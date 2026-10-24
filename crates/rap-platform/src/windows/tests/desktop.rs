@@ -19,10 +19,30 @@ impl Drop for TestWindow {
     }
 }
 
+/// The test thread owns the window, like GPUI's UI thread: it must dispatch
+/// messages, including the icon messages the worker sends synchronously.
+fn pump() {
+    unsafe {
+        let mut message = MSG::default();
+        while PeekMessageW(&mut message, None, 0, 0, PM_REMOVE).as_bool() {
+            DispatchMessageW(&message);
+        }
+    }
+}
+
+fn pump_for(duration: Duration) {
+    let deadline = Instant::now() + duration;
+    while Instant::now() < deadline {
+        pump();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 fn wait_event(desktop: &Desktop, predicate: impl Fn(&DesktopEvent) -> bool) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        if let Ok(event) = desktop.events.recv_timeout(Duration::from_millis(100)) {
+        pump();
+        if let Ok(event) = desktop.events.recv_timeout(Duration::from_millis(10)) {
             assert!(!matches!(event, DesktopEvent::Warning(_)), "{event:?}");
             if predicate(&event) {
                 return;
@@ -45,7 +65,7 @@ fn find_session(
                 return session;
             }
         }
-        std::thread::sleep(Duration::from_millis(100));
+        pump_for(Duration::from_millis(100));
     }
     panic!("RAP SMTC session not published");
 }
@@ -96,6 +116,15 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     wait_event(&desktop, |event| {
         matches!(event, DesktopEvent::Autostart(Ok(_)))
     });
+    let icon = unsafe {
+        SendMessageW(
+            window.0,
+            WM_GETICON,
+            Some(windows::Win32::Foundation::WPARAM(ICON_BIG as usize)),
+            None,
+        )
+    };
+    assert_ne!(icon.0, 0, "Window icon was not applied");
     assert!(desktop.can_hide(), "Tray icon was not registered");
     assert!(desktop.hide());
     assert!(!unsafe { IsWindowVisible(window.0) }.as_bool());
@@ -231,7 +260,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
         )
         .unwrap();
     }
-    std::thread::sleep(Duration::from_millis(150));
+    pump_for(Duration::from_millis(150));
     // Real tray left-click callback restores the app via the portable event.
     unsafe {
         PostMessageW(
@@ -246,12 +275,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     // Keep the owner thread pumping while the background worker detaches.
     let cleanup = std::thread::spawn(move || desktop.shutdown());
     while !cleanup.is_finished() {
-        unsafe {
-            let mut message = MSG::default();
-            while PeekMessageW(&mut message, None, 0, 0, PM_REMOVE).as_bool() {
-                DispatchMessageW(&message);
-            }
-        }
+        pump();
         std::thread::sleep(Duration::from_millis(10));
     }
     cleanup.join().unwrap();
