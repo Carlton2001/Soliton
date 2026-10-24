@@ -1,6 +1,7 @@
 //! Application icon resources and native ownership, used on the desktop worker.
 use anyhow::{Context, Result};
 use rap_core::config::AppIcon;
+use std::time::{Duration, Instant};
 use windows::{
     Win32::{
         Foundation::{HWND, LPARAM, WPARAM},
@@ -127,12 +128,22 @@ fn send(window: HWND, message: u32, kind: u32, value: isize) -> Result<usize> {
     Ok(result)
 }
 
+/// The UI thread may be busy past the message timeout, notably while the first
+/// frame is prepared: the icon is tried again at this pace.
+const RETRY_EVERY: Duration = Duration::from_millis(250);
+/// A failure is reported once the window stayed unresponsive this long.
+const REPORT_AFTER: Duration = Duration::from_secs(10);
+
 /// Keep all palettes alive while Windows can reference their HICON handles.
 pub(super) struct WindowIcons {
     window: HWND,
-    original: [usize; 2],
+    /// Read before the first change, restored on drop.
+    original: Option<[usize; 2]>,
     palettes: Vec<IconPair>,
-    attempted: Option<AppIcon>,
+    applied: Option<AppIcon>,
+    /// When the shown palette first failed to change, and whether that was reported.
+    failing: Option<(Instant, bool)>,
+    next_try: Instant,
 }
 
 impl WindowIcons {
@@ -141,37 +152,60 @@ impl WindowIcons {
             .into_iter()
             .map(IconPair::load)
             .collect::<Result<_>>()?;
-        let original = [
-            send(window, WM_GETICON, ICON_SMALL, 0)?,
-            send(window, WM_GETICON, ICON_BIG, 0)?,
-        ];
         Ok(Self {
             window,
-            original,
+            original: None,
             palettes,
-            attempted: None,
+            applied: None,
+            failing: None,
+            next_try: Instant::now(),
         })
     }
 
+    /// Shows `palette`; cheap once shown, so it can be called on every worker turn.
+    /// A window that does not answer is tried again later, and its failure is
+    /// returned once, rather than on every playback tick.
     pub fn apply(&mut self, palette: AppIcon) -> Result<()> {
-        if self.attempted == Some(palette) {
+        if self.applied == Some(palette) || Instant::now() < self.next_try {
             return Ok(());
         }
-        // Report a failed choice once, rather than on every playback tick.
-        self.attempted = Some(palette);
+        match self.change(palette) {
+            Ok(()) => {
+                self.applied = Some(palette);
+                self.failing = None;
+                Ok(())
+            }
+            Err(error) => {
+                self.next_try = Instant::now() + RETRY_EVERY;
+                let (since, reported) = self.failing.get_or_insert((Instant::now(), false));
+                if *reported || since.elapsed() < REPORT_AFTER {
+                    return Ok(());
+                }
+                *reported = true;
+                Err(error)
+            }
+        }
+    }
+
+    fn change(&mut self, palette: AppIcon) -> Result<()> {
+        if self.original.is_none() {
+            self.original = Some([
+                send(self.window, WM_GETICON, ICON_SMALL, 0)?,
+                send(self.window, WM_GETICON, ICON_BIG, 0)?,
+            ]);
+        }
         self.palettes[palette as usize].apply(self.window)
     }
 }
 
 impl Drop for WindowIcons {
     fn drop(&mut self) {
-        let small = send(
-            self.window,
-            WM_SETICON,
-            ICON_SMALL,
-            self.original[0] as isize,
-        );
-        let big = send(self.window, WM_SETICON, ICON_BIG, self.original[1] as isize);
+        // Icons are only sent once the originals are known: none was handed over.
+        let Some(original) = self.original else {
+            return;
+        };
+        let small = send(self.window, WM_SETICON, ICON_SMALL, original[0] as isize);
+        let big = send(self.window, WM_SETICON, ICON_BIG, original[1] as isize);
         if (small.is_err() || big.is_err()) && unsafe { IsWindow(Some(self.window)) }.as_bool() {
             // An unresponsive borrowed window may still consume a timed-out
             // message. Retain this bounded cache rather than free live handles.

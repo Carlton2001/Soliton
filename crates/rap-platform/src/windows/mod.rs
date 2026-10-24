@@ -179,11 +179,11 @@ fn run(
     restore: &AtomicBool,
     taskbar_binding: Option<Arc<taskbar::Shared>>,
 ) -> Result<()> {
+    // Tried before SMTC registers the window; retried on every turn below if
+    // the UI thread does not answer yet.
     let mut window_icons = match app_icons::WindowIcons::new(HWND(window as *mut _)) {
         Ok(mut icons) => {
-            if let Err(error) = icons.apply(icon) {
-                let _ = events.try_send(DesktopEvent::Warning(format!("Window icon: {error:#}")));
-            }
+            let _ = icons.apply(icon);
             Some(icons)
         }
         Err(error) => {
@@ -232,6 +232,7 @@ fn run(
         taskbar::detach(HWND(window as *mut _), binding);
     }
     let _ = events.try_send(DesktopEvent::Autostart(autostart::enabled()));
+    let mut wanted_icon = icon;
     while !shutdown.load(Ordering::Acquire) {
         if restore.swap(false, Ordering::AcqRel) {
             unsafe {
@@ -247,12 +248,13 @@ fn run(
                 let _ = SetForegroundWindow(window);
             }
         }
+        if let Some(icons) = &mut window_icons
+            && let Err(error) = icons.apply(wanted_icon)
+        {
+            let _ = events.try_send(DesktopEvent::Warning(format!("Window icon: {error:#}")));
+        }
         if let Ok((state, language, icon)) = updates.recv_timeout(Duration::from_millis(40)) {
-            if let Some(icons) = &mut window_icons
-                && let Err(error) = icons.apply(icon)
-            {
-                let _ = events.try_send(DesktopEvent::Warning(format!("Window icon: {error:#}")));
-            }
+            wanted_icon = icon;
             if let Some(tray) = &mut tray {
                 tray.update(state.state, language);
                 if let Err(error) = tray.set_icon(icon) {

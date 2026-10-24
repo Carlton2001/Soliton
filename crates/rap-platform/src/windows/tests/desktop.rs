@@ -116,15 +116,23 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
     wait_event(&desktop, |event| {
         matches!(event, DesktopEvent::Autostart(Ok(_)))
     });
-    let icon = unsafe {
-        SendMessageW(
-            window.0,
-            WM_GETICON,
-            Some(windows::Win32::Foundation::WPARAM(ICON_BIG as usize)),
-            None,
-        )
-    };
-    assert_ne!(icon.0, 0, "Window icon was not applied");
+    // The worker applies the icon on its own turns, once this thread answers.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let icon = unsafe {
+            SendMessageW(
+                window.0,
+                WM_GETICON,
+                Some(windows::Win32::Foundation::WPARAM(ICON_BIG as usize)),
+                None,
+            )
+        };
+        if icon.0 != 0 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "Window icon was not applied");
+        pump_for(Duration::from_millis(20));
+    }
     assert!(desktop.can_hide(), "Tray icon was not registered");
     assert!(desktop.hide());
     assert!(!unsafe { IsWindowVisible(window.0) }.as_bool());
@@ -209,6 +217,26 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
             .unwrap(),
         std::fs::metadata(&long_cover).unwrap().len()
     );
+    // A palette change while playing keeps the published artwork.
+    desktop.publish(
+        {
+            let mut state = state.clone();
+            state.track.as_mut().unwrap().title = long_title.clone();
+            state.track.as_mut().unwrap().cover = Some(long_cover.clone());
+            state
+        },
+        Language::French,
+        rap_core::config::AppIcon::Teal,
+    );
+    pump_for(Duration::from_millis(800));
+    let session = find_session(&manager, &long_title);
+    let thumbnail = session
+        .TryGetMediaPropertiesAsync()
+        .unwrap()
+        .get()
+        .unwrap()
+        .Thumbnail();
+    assert!(thumbnail.is_ok(), "Palette change dropped the SMTC artwork");
     assert!(session.TryPauseAsync().unwrap().get().unwrap());
     wait_event(&desktop, |event| {
         matches!(event, DesktopEvent::Media(MediaCommand::Pause))

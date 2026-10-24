@@ -152,7 +152,9 @@ commandes système dans une file de 64. Les touches multimédias passent par SMT
 - **Notification** : rétablie sur `TaskbarCreated` ; si elle échoue, le masquage
   est interdit.
 - **Icônes** : six SVG de `assets/logos/` rastérisés à sept tailles par `build.rs`,
-  appliqués à la fenêtre, à l'aperçu et à la notification.
+  appliqués à la fenêtre, à l'aperçu et à la notification. Si l'interface ne
+  répond pas encore, l'icône de la fenêtre est retentée toutes les 250 ms ; un
+  échec n'est signalé qu'après 10 s.
 - **Démarrage** : valeur RAP sous `HKCU\…\CurrentVersion\Run`, écrite seulement par
   une action de l'utilisateur.
 - **Fermeture** : annulation des travaux, arrêt du moteur, retrait des abonnements
