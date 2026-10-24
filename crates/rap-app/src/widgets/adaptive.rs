@@ -53,9 +53,11 @@ impl Element for Content {
                 icon * 0.5 + text.width
             };
         let height = window.line_height().max(icon);
-        let mut layout = Style::default();
-        layout.flex_shrink = 1.;
-        layout.flex_grow = 1.;
+        let mut layout = Style {
+            flex_shrink: 1.,
+            flex_grow: 1.,
+            ..Default::default()
+        };
         layout.min_size.width = px(0.).into();
         let id = window.request_measured_layout(layout, move |known, available, _, _| {
             let width = known.width.unwrap_or_else(|| match available.width {

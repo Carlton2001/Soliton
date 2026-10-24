@@ -42,7 +42,7 @@ impl Frame {
         }
         // GDI blits may clear the alpha channel; DWM requires opaque pixels.
         let mut surface = surface;
-        for pixel in surface.pixels().chunks_exact_mut(4) {
+        for pixel in surface.pixels().as_chunks_mut::<4>().0 {
             pixel[3] = 255;
         }
         Ok(surface)
@@ -227,7 +227,7 @@ impl Surface {
             GdiFlush().ok()?;
         }
         let mut pixels = self.pixels().to_vec();
-        for pixel in pixels.chunks_exact_mut(4) {
+        for pixel in pixels.as_chunks_mut::<4>().0 {
             pixel[3] = 255;
         }
         anyhow::ensure!(!pixels.is_empty(), "Empty preview frame");
@@ -245,7 +245,7 @@ impl Surface {
         }
         let (width, height) = (self.width as u32, self.height as u32);
         let mut rgba = self.pixels().to_vec();
-        for pixel in rgba.chunks_exact_mut(4) {
+        for pixel in rgba.as_chunks_mut::<4>().0 {
             pixel.swap(0, 2);
             pixel[3] = 255;
         }

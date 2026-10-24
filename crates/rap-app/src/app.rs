@@ -570,10 +570,8 @@ impl Rap {
             cx.notify();
             return;
         }
-        if self.menu.take().is_none() {
-            if self.selected.is_some() {
-                self.return_from_album(cx);
-            }
+        if self.menu.take().is_none() && self.selected.is_some() {
+            self.return_from_album(cx);
         }
         cx.notify();
     }

@@ -35,7 +35,7 @@ fn pcm(path: &Path, rate: u32, bits: u16) {
 fn tag(path: &Path, items: &[(ItemKey, &str)], cover: bool) {
     let mut tag = Tag::new(TagType::Id3v2);
     for (key, value) in items {
-        tag.insert_text(key.clone(), (*value).into());
+        tag.insert_text(*key, (*value).into());
     }
     if cover {
         let pixels = image::RgbaImage::from_pixel(2, 2, image::Rgba([20, 120, 50, 255]));

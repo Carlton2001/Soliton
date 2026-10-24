@@ -33,7 +33,14 @@ fn render_clears_artwork_and_uses_the_supplied_palette() {
     let frame = renderer.render(&state, Language::French).unwrap();
     let pixel = (80 * frame.width as usize + 80) * 4;
     assert_eq!(&frame.pixels[pixel..pixel + 4], &[10, 25, 250, 255]);
-    assert!(frame.pixels.chunks_exact(4).all(|pixel| pixel[3] == 255));
+    assert!(
+        frame
+            .pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|pixel| pixel[3] == 255)
+    );
     state.track.as_mut().unwrap().cover = None;
     state.preview.background = 0xf5f6f8;
     let clear = renderer.render(&state, Language::English).unwrap();

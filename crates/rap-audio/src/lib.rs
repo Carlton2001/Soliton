@@ -5,6 +5,10 @@ mod engine;
 mod output;
 mod queue;
 mod resample;
+/// Fixtures shared by the decoder and engine tests.
+#[cfg(test)]
+#[path = "tests/support.rs"]
+mod test_support;
 
 pub use devices::{OutputDevice, OutputInfo};
 pub use engine::Engine;

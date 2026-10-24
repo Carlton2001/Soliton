@@ -1,6 +1,5 @@
 use super::*;
-#[path = "support.rs"]
-mod support;
+use crate::test_support as support;
 
 #[test]
 fn streaming_decoder_reads_pcm_and_seeks_without_changing_source() {

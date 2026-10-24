@@ -156,17 +156,19 @@ fn last_view_and_artist_layout_round_trip() {
 fn repeated_queue_occurrences_and_playlist_views_round_trip() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");
-    let mut settings = Settings::default();
-    settings.last_queue = LastQueue {
-        playlist_entries: vec![Some(10), Some(11), None],
-        tracks: vec![3, 3, 4],
-        current: Some(3),
-        current_index: Some(1),
-        position_ms: 4000,
-    };
-    settings.last_view = LastView {
-        view: View::Playlists,
-        playlist: Some(9),
+    let settings = Settings {
+        last_queue: LastQueue {
+            playlist_entries: vec![Some(10), Some(11), None],
+            tracks: vec![3, 3, 4],
+            current: Some(3),
+            current_index: Some(1),
+            position_ms: 4000,
+        },
+        last_view: LastView {
+            view: View::Playlists,
+            playlist: Some(9),
+            ..Default::default()
+        },
         ..Default::default()
     };
     settings.save(&path).unwrap();
@@ -184,12 +186,14 @@ fn repeated_queue_occurrences_and_playlist_views_round_trip() {
 fn home_artist_and_album_round_trip() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");
-    let mut settings = Settings::default();
-    settings.last_view = LastView {
-        view: View::Home,
-        artist: Some("Björk".into()),
-        album: Some(42),
-        playlist: None,
+    let settings = Settings {
+        last_view: LastView {
+            view: View::Home,
+            artist: Some("Björk".into()),
+            album: Some(42),
+            playlist: None,
+        },
+        ..Default::default()
     };
     settings.save(&path).unwrap();
     assert_eq!(Settings::load(&path).unwrap().last_view, settings.last_view);

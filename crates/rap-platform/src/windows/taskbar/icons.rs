@@ -19,8 +19,8 @@ impl Icon {
             &mut image.as_mut(),
         );
         let mut pixels = Vec::with_capacity(32 * 32 * 4);
-        for row in image.data().chunks_exact(32 * 4).rev() {
-            for rgba in row.chunks_exact(4) {
+        for row in image.data().as_chunks::<{ 32 * 4 }>().0.iter().rev() {
+            for rgba in row.as_chunks::<4>().0 {
                 pixels.extend_from_slice(&[rgba[2], rgba[1], rgba[0], rgba[3]]);
             }
         }

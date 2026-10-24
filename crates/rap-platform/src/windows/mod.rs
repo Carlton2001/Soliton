@@ -71,16 +71,18 @@ impl Integration {
         let worker = std::thread::Builder::new()
             .name("rap-desktop".into())
             .spawn(move || {
+                let flags = Flags {
+                    ready: &worker_ready,
+                    shutdown: &worker_shutdown,
+                    restore: &worker_restore,
+                };
                 if let Err(error) = run(
                     window,
-                    language,
-                    icon,
+                    (language, icon),
                     &events,
                     latest,
                     requests,
-                    &worker_ready,
-                    &worker_shutdown,
-                    &worker_restore,
+                    flags,
                     worker_taskbar,
                 ) {
                     let _ = events.try_send(DesktopEvent::Warning(format!("{error:#}")));
@@ -167,16 +169,24 @@ impl Drop for Integration {
     }
 }
 
+/// State the worker shares with [`Integration`].
+struct Flags<'a> {
+    ready: &'a Arc<AtomicBool>,
+    shutdown: &'a AtomicBool,
+    restore: &'a AtomicBool,
+}
+
 fn run(
     window: usize,
-    language: Language,
-    icon: AppIcon,
+    (language, icon): (Language, AppIcon),
     events: &Sender<DesktopEvent>,
     updates: Receiver<Update>,
     startup: Receiver<bool>,
-    ready: &Arc<AtomicBool>,
-    shutdown: &AtomicBool,
-    restore: &AtomicBool,
+    Flags {
+        ready,
+        shutdown,
+        restore,
+    }: Flags,
     taskbar_binding: Option<Arc<taskbar::Shared>>,
 ) -> Result<()> {
     // Tried before SMTC registers the window; retried on every turn below if

@@ -99,13 +99,15 @@ fn native_toolbar_buttons_thumbnail_restart_and_detach() {
         let _ = ShowWindow(window, SW_SHOWNOACTIVATE);
     }
     let mut taskbar = Taskbar::new(window, shared.clone()).unwrap();
-    let mut state = MediaState::default();
-    state.track = Some(crate::MediaTrack {
-        title: "QA".into(),
-        artist: "Artiste".into(),
-        album: "Album".into(),
-        cover: None,
-    });
+    let mut state = MediaState {
+        track: Some(crate::MediaTrack {
+            title: "QA".into(),
+            artist: "Artiste".into(),
+            album: "Album".into(),
+            cover: None,
+        }),
+        ..Default::default()
+    };
     let deadline = Instant::now() + Duration::from_secs(5);
     while !shared.toolbar_ready.load(Ordering::Acquire) && Instant::now() < deadline {
         taskbar.update(&state, Language::French).unwrap();

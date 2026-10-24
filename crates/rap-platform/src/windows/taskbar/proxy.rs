@@ -162,11 +162,12 @@ unsafe extern "system" fn procedure(
         if message == WM_DWMSENDICONICTHUMBNAIL {
             return hook::thumbnail(window, &state.shared, lparam);
         }
-        if message == WM_COMMAND && ((wparam.0 >> 16) as u32) == THBN_CLICKED {
-            if let Some(command) = command(wparam.0 as u32 & 0xffff) {
-                let _ = state.shared.events.try_send(DesktopEvent::Media(command));
-                return LRESULT(0);
-            }
+        if message == WM_COMMAND
+            && ((wparam.0 >> 16) as u32) == THBN_CLICKED
+            && let Some(command) = command(wparam.0 as u32 & 0xffff)
+        {
+            let _ = state.shared.events.try_send(DesktopEvent::Media(command));
+            return LRESULT(0);
         }
         if (message == WM_ACTIVATE && (wparam.0 & 0xffff) != WA_INACTIVE as usize)
             || (message == WM_SYSCOMMAND && (wparam.0 & 0xfff0) == SC_RESTORE as usize)

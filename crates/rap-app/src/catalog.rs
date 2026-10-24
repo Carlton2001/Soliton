@@ -56,10 +56,12 @@ impl Facets {
 /// Cover of the artist's most recent album: albums credited to the artist come
 /// before those where they only appear on a track; undated albums come last.
 fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCard> {
+    /// Credited, dated, newest, then title: the smallest key wins.
+    type Rank = (bool, bool, Reverse<u32>, String);
     #[derive(Default)]
     struct Found<'a> {
         albums: usize,
-        best: Option<((bool, bool, Reverse<u32>, String), &'a PathBuf)>,
+        best: Option<(Rank, &'a PathBuf)>,
     }
     let mut found: HashMap<String, Found> = HashMap::new();
     for album in &snapshot.albums {

@@ -57,12 +57,12 @@ impl Controller {
                 self.device = Some(device);
                 self.connection = Some(connection);
                 self.status = None;
-                return Ok(None);
+                Ok(None)
             }
             Command::Disconnect => {
                 self.disconnect().await;
                 self.device = None;
-                return Ok(None);
+                Ok(None)
             }
             Command::Load {
                 track,
@@ -123,7 +123,7 @@ impl Controller {
                     status.duration_ms = track.metadata.duration_ms;
                 }
                 self.status = None;
-                return Ok(Some(self.accept(status)));
+                Ok(Some(self.accept(status)))
             }
             command => {
                 let connection = self

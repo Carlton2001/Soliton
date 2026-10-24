@@ -1,6 +1,5 @@
 use super::*;
-#[path = "support.rs"]
-mod support;
+use crate::test_support as support;
 
 #[test]
 fn restored_playlist_deduplicates_without_losing_position_or_provenance() {

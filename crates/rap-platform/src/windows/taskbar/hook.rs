@@ -93,11 +93,12 @@ unsafe extern "system" fn procedure(
         shared.generation.fetch_add(1, Ordering::AcqRel);
         shared.toolbar_ready.store(false, Ordering::Release);
     }
-    if message == WM_COMMAND && ((wparam.0 >> 16) as u32) == THBN_CLICKED {
-        if let Some(command) = command(wparam.0 as u32 & 0xffff) {
-            let _ = shared.events.try_send(DesktopEvent::Media(command));
-            return LRESULT(0);
-        }
+    if message == WM_COMMAND
+        && ((wparam.0 >> 16) as u32) == THBN_CLICKED
+        && let Some(command) = command(wparam.0 as u32 & 0xffff)
+    {
+        let _ = shared.events.try_send(DesktopEvent::Media(command));
+        return LRESULT(0);
     }
     unsafe { DefSubclassProc(window, message, wparam, lparam) }
 }
