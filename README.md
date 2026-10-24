@@ -78,7 +78,7 @@ Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de l
 
 ## Limites
 
-- Sortie partagée mono/stéréo ; pas d'égaliseur, de mode exclusif ni de bit-perfect.
+- Sortie partagée, sources mono/stéréo (stéréo à l'avant sur une sortie 5.1/7.1) ; pas d'égaliseur, de mode exclusif ni de bit-perfect.
 - Formats testés : WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, AIFF. Pas d'Opus, WMA, APE.
 - Les sorties CPAL sont identifiées par leur nom : une sortie renommée doit être
   choisie à nouveau. Le format affiché est celui envoyé par RAP au système.

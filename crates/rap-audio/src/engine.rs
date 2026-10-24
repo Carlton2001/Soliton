@@ -215,7 +215,7 @@ impl Session {
             reader.rate,
             reader.channels,
             output.rate,
-            output.channels as usize,
+            output.frame_channels,
         )?;
         Ok(Self {
             reader,
@@ -562,7 +562,7 @@ impl Worker {
                 }
             }
         }
-        let channels = session.output.channels as usize;
+        let channels = session.output.frame_channels;
         while session.pending.len() >= channels {
             let left = session.pending.pop_front().unwrap();
             let right = if channels == 2 {

@@ -18,7 +18,9 @@ pub(crate) struct Output {
     pub played: Arc<AtomicU64>,
     pub failed: Arc<AtomicBool>,
     pub rate: u32,
-    pub channels: u16,
+    /// Channels carried by queued frames: mono, or stereo for any wider device,
+    /// whose further channels stay silent.
+    pub frame_channels: usize,
     pub info: OutputInfo,
 }
 
@@ -35,16 +37,15 @@ impl Output {
         let config = supported
             .map(|c| c.with_sample_rate(cpal::SampleRate(rate)))
             .unwrap_or(default);
-        anyhow::ensure!(
-            (1..=2).contains(&config.channels()),
-            "Output must be configured as mono or stereo"
-        );
+        // Shared-mode WASAPI only accepts the mix format's channel count, which
+        // is 6 or 8 for surround speakers: stereo goes to front left and right.
+        anyhow::ensure!(config.channels() > 0, "Output has no channel");
         let rate = config.sample_rate().0;
-        let channels = config.channels();
+        let frame_channels = usize::from(config.channels()).min(2);
         let info = OutputInfo {
             device_name: device.name()?,
             sample_rate: rate,
-            channels,
+            channels: config.channels(),
             sample_format: format!("{:?}", config.sample_format()),
         };
         let samples = Arc::new(ArrayQueue::new(rate as usize * 2));
@@ -83,7 +84,7 @@ impl Output {
             played,
             failed,
             rate,
-            channels,
+            frame_channels,
             info,
         })
     }
@@ -136,7 +137,8 @@ fn render<T: SizedSample + FromSample<f32>>(
             [0.; 2]
         };
         for (channel, sample) in frame.iter_mut().enumerate() {
-            *sample = T::from_sample((values[channel] * gain).clamp(-1., 1.));
+            let value = values.get(channel).copied().unwrap_or(0.);
+            *sample = T::from_sample((value * gain).clamp(-1., 1.));
         }
     }
     consumed

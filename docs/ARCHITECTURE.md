@@ -70,7 +70,9 @@ supprimées après chaque analyse complète, dans le cache RAP uniquement.
 
 Symphonia décode paquet par paquet sur un worker dédié ; Rubato convertit la
 fréquence sur ce même worker. CPAL/WASAPI en mode partagé, f32, fréquence et canaux
-natifs si possible. Mono/stéréo uniquement.
+natifs si possible. Sources mono/stéréo uniquement ; une sortie de plus de deux
+canaux (5.1, 7.1) reçoit la stéréo à l'avant gauche et droit, les autres canaux
+restent silencieux.
 
 Le callback ne fait que des lectures atomiques, dépile un tampon lock-free
 préalloué de trames complètes et applique le volume. PCM en attente borné à deux

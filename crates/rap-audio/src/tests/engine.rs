@@ -217,6 +217,14 @@ fn native_output_play_pause_seek_next_and_stop() {
         cover: None,
         available: true,
     };
+    // The queue keeps one occurrence per file: Next needs another file.
+    let next_path = dir.path().join("next.wav");
+    support::wav(&next_path, 44100, 5);
+    let next = rap_core::model::Track {
+        id: 2,
+        path: next_path,
+        ..track.clone()
+    };
     let engine = Engine::start(0., None).unwrap();
     let wait = |predicate: &dyn Fn(&Playback) -> bool| {
         let start = Instant::now();
@@ -234,7 +242,7 @@ fn native_output_play_pause_seek_next_and_stop() {
     };
     engine
         .send(Command::Play {
-            tracks: vec![track.clone(), track],
+            tracks: vec![track, next],
             start: 0,
         })
         .unwrap();
@@ -248,7 +256,7 @@ fn native_output_play_pause_seek_next_and_stop() {
     let named = wait(&|p| !p.outputs.is_empty());
     let output = named.output.unwrap();
     assert!(output.sample_rate > 0);
-    assert!((1..=2).contains(&output.channels));
+    assert!(output.channels > 0);
     assert!(!output.sample_format.is_empty());
     // Explicit selection while paused must keep the track and position.
     engine
