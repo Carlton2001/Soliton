@@ -3,6 +3,7 @@
 use crate::theme::Theme;
 use gpui::{prelude::*, *};
 use std::path::PathBuf;
+mod adaptive;
 
 /// Type scale at the 16 px reference: body text is 13 px.
 pub const TEXT_CAPTION: Rems = Rems(0.6875);
@@ -14,10 +15,57 @@ pub const TEXT_DISPLAY: Rems = Rems(1.75);
 
 /// Height shared by buttons, fields and segmented controls so they align.
 pub const CONTROL_HEIGHT: Rems = Rems(2.);
+/// Space below navigation before a page's first controls or heading.
+pub const PAGE_INSET: Rems = Rems(0.75);
+pub const PAGE_TOP_PADDING: Rems = Rems(0.75);
+/// One owner for the gap between a page toolbar and its content or sections.
+pub const PAGE_SECTION_GAP: Rems = Rems(0.75);
+/// Related actions within a toolbar stay closer than separate content sections.
+pub const CONTROL_GAP: Rems = Rems(0.5);
 pub const ROW_HEIGHT: Rems = Rems(2.5);
 pub const RADIUS: Rems = Rems(0.3125);
 pub const RADIUS_LARGE: Rems = Rems(0.5);
 const ICON: Rems = Rems(1.);
+
+/// Compact actions keep their hit target and tooltip, without a label-sized box.
+pub fn compact_button(control: Stateful<Div>, chevron: bool) -> Stateful<Div> {
+    let width = if chevron { rems(3.5) } else { CONTROL_HEIGHT };
+    control.w(width).min_w(width).max_w(width).px(rems(0.5))
+}
+
+/// First row of page actions, with one owner for its surrounding space.
+pub fn page_toolbar() -> Div {
+    div()
+        .flex_none()
+        .px(PAGE_INSET)
+        .pt(PAGE_TOP_PADDING)
+        .pb(PAGE_SECTION_GAP)
+        .flex()
+        .items_center()
+        .gap(CONTROL_GAP)
+}
+
+/// Single-line input frame sharing the exact outer height of toolbar buttons.
+pub fn input_field(input: Entity<crate::input::TextInput>, search: bool, theme: Theme) -> Div {
+    div()
+        .h(CONTROL_HEIGHT)
+        .text_size(TEXT_BODY)
+        .font_weight(FontWeight::NORMAL)
+        .min_h(CONTROL_HEIGHT)
+        .max_h(CONTROL_HEIGHT)
+        .min_w_0()
+        .flex()
+        .items_center()
+        .gap(rems(0.5))
+        .px(rems(0.625))
+        .rounded(RADIUS)
+        .border_1()
+        .border_color(theme.control_border)
+        .bg(theme.control)
+        .text_color(theme.text)
+        .when(search, |field| field.child(icon("search", theme)))
+        .child(div().flex_1().min_w_0().child(input))
+}
 
 /// Inter's tabular digits align durations without changing the UI typeface.
 pub fn numeric_font() -> Font {
@@ -50,18 +98,47 @@ pub fn button(
     label: impl Into<SharedString>,
     theme: Theme,
 ) -> Stateful<Div> {
-    div()
+    styled_button(id, name, label, theme, false)
+}
+
+fn styled_button(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: impl Into<SharedString>,
+    theme: Theme,
+    primary: bool,
+) -> Stateful<Div> {
+    let tooltip_theme = theme;
+    let theme = if primary {
+        Theme {
+            text: theme.on_accent,
+            control: theme.accent,
+            control_border: theme.accent,
+            ..theme
+        }
+    } else {
+        theme
+    };
+    let label = label.into();
+    let control = div()
         .id(id)
         .tab_index(0)
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
         .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
+            if primary {
+                style.bg(theme.control).border_color(theme.on_accent)
+            } else {
+                style.bg(theme.selected).border_color(theme.accent)
+            }
         })
         .h(CONTROL_HEIGHT)
+        .text_size(TEXT_BODY)
+        .font_weight(FontWeight::MEDIUM)
         .flex()
-        .flex_none()
+        .flex_shrink()
+        .min_w(rems(2.5))
         .items_center()
         .justify_center()
         .gap(rems(0.5))
@@ -72,10 +149,26 @@ pub fn button(
         .bg(theme.control)
         .text_color(theme.text)
         .whitespace_nowrap()
-        .hover(move |style| style.bg(theme.control_hover))
-        .active(move |style| style.bg(theme.control_pressed))
-        .child(tinted_icon(name, theme.text))
-        .child(label.into())
+        .hover(move |style| {
+            if primary {
+                style.opacity(0.9)
+            } else {
+                style.bg(theme.control_hover)
+            }
+        })
+        .active(move |style| {
+            if primary {
+                style.opacity(0.8)
+            } else {
+                style.bg(theme.control_pressed)
+            }
+        })
+        .child(adaptive::Content {
+            icon: name,
+            label: label.clone(),
+            color: theme.text,
+        });
+    with_tooltip(control, label, tooltip_theme)
 }
 
 /// Familiar playback command, named by a tooltip and optionally highlighted.
@@ -86,17 +179,15 @@ pub fn icon_button(
     active: bool,
     theme: Theme,
 ) -> Stateful<Div> {
-    let color = if active { theme.accent } else { theme.text };
+    let color = theme.text;
     with_tooltip(
         div()
             .id(id)
             .tab_index(0)
-            .focus(move |style| {
-                style
-                    .bg(theme.selected)
-                    .border_2()
-                    .border_color(theme.accent)
-            })
+            .capture_any_mouse_down(keyboard_focus_only)
+            .border_1()
+            .border_color(gpui::transparent_black())
+            .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
             .size(CONTROL_HEIGHT)
             .flex()
             .flex_none()
@@ -119,33 +210,8 @@ pub fn accent_button(
     label: impl Into<SharedString>,
     theme: Theme,
 ) -> Stateful<Div> {
-    div()
-        .id(id)
-        .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
-        .h(CONTROL_HEIGHT)
-        .flex()
-        .flex_none()
-        .items_center()
-        .justify_center()
-        .gap(rems(0.5))
-        .px(rems(0.75))
-        .rounded(RADIUS)
-        .bg(theme.accent)
-        .text_color(theme.on_accent)
-        .font_weight(FontWeight::MEDIUM)
-        .whitespace_nowrap()
-        .hover(|style| style.opacity(0.9))
-        .active(|style| style.opacity(0.8))
-        .child(tinted_icon(name, theme.on_accent))
-        .child(label.into())
+    styled_button(id, name, label, theme, true)
 }
-
 /// [`button`] that stays highlighted while what it opens or enables is active.
 pub fn toggle_button(
     id: impl Into<ElementId>,
@@ -154,36 +220,8 @@ pub fn toggle_button(
     active: bool,
     theme: Theme,
 ) -> Stateful<Div> {
-    if !active {
-        return button(id, name, label, theme);
-    }
-    div()
-        .id(id)
-        .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
-        .h(CONTROL_HEIGHT)
-        .flex()
-        .flex_none()
-        .items_center()
-        .justify_center()
-        .gap(rems(0.5))
-        .px(rems(0.75))
-        .rounded(RADIUS)
-        .border_1()
-        .border_color(theme.accent)
-        .bg(theme.selected)
-        .text_color(theme.accent)
-        .whitespace_nowrap()
-        .active(move |style| style.bg(theme.pressed))
-        .child(tinted_icon(name, theme.accent))
-        .child(label.into())
+    button(id, name, label, theme).when(active, |control| control.bg(theme.selected))
 }
-
 /// Entry of a drop-down menu; the current one carries a check mark.
 pub fn menu_item(
     id: impl Into<ElementId>,
@@ -194,13 +232,13 @@ pub fn menu_item(
     div()
         .id(id)
         .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
         .h(CONTROL_HEIGHT)
+        .text_size(TEXT_BODY)
+        .font_weight(FontWeight::MEDIUM)
         .flex()
         .flex_none()
         .items_center()
@@ -213,7 +251,15 @@ pub fn menu_item(
         .child(div().size(rems(1.)).flex_none().when(selected, |mark| {
             mark.child(tinted_icon("check", theme.accent))
         }))
-        .child(div().flex_1().min_w_0().truncate().child(label.into()))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .whitespace_normal()
+                .line_clamp(1)
+                .child(label.into()),
+        )
 }
 
 /// Floating surface of menus and dialogs.
@@ -235,18 +281,20 @@ pub fn ghost(
     label: impl Into<SharedString>,
     theme: Theme,
 ) -> Stateful<Div> {
-    div()
+    let label = label.into();
+    let control = div()
         .id(id)
         .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
         .h(CONTROL_HEIGHT)
+        .text_size(TEXT_BODY)
+        .font_weight(FontWeight::MEDIUM)
         .flex()
-        .flex_none()
+        .flex_shrink()
+        .min_w(rems(2.5))
         .items_center()
         .gap(rems(0.625))
         .px(rems(0.75))
@@ -254,11 +302,15 @@ pub fn ghost(
         .whitespace_nowrap()
         .hover(move |style| style.bg(theme.hover))
         .active(move |style| style.bg(theme.pressed))
-        .child(icon(name, theme))
-        .child(label.into())
+        .child(adaptive::Content {
+            icon: name,
+            label: label.clone(),
+            color: theme.muted,
+        });
+    with_tooltip(control, label, theme)
 }
 
-/// Navigation entry; the current one is tinted with the accent.
+/// Navigation entry; selection uses a tinted background and body foreground.
 pub fn nav_item(
     id: impl Into<ElementId>,
     name: &'static str,
@@ -266,43 +318,47 @@ pub fn nav_item(
     selected: bool,
     theme: Theme,
 ) -> Stateful<Div> {
+    let label = label.into();
     let entry = div()
         .id(id)
         .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
         .h(rems(2.25))
+        .font_weight(FontWeight::MEDIUM)
         .flex()
-        .flex_none()
+        .flex_shrink()
+        .min_w(rems(2.5))
         .items_center()
         .gap(rems(0.625))
         .px(rems(0.75))
         .rounded(RADIUS)
+        .active(move |style| style.bg(theme.pressed))
         .whitespace_nowrap();
-    if selected {
-        entry
-            .bg(theme.selected)
-            .text_color(theme.accent)
-            .font_weight(FontWeight::MEDIUM)
-            .child(tinted_icon(name, theme.accent))
-            .child(label.into())
+    let color = if selected { theme.text } else { theme.muted };
+    let entry = if selected {
+        entry.bg(theme.selected).text_color(theme.text)
     } else {
-        entry
-            .hover(move |style| style.bg(theme.hover))
-            .active(move |style| style.bg(theme.pressed))
-            .child(icon(name, theme))
-            .child(label.into())
-    }
+        entry.hover(move |style| style.bg(theme.hover))
+    };
+    with_tooltip(
+        entry.child(adaptive::Content {
+            icon: name,
+            label: label.clone(),
+            color,
+        }),
+        label,
+        theme,
+    )
 }
-
 /// Mutually exclusive options drawn as one bordered control.
 pub fn segments(options: impl IntoIterator<Item = Stateful<Div>>, theme: Theme) -> Div {
     div()
         .h(CONTROL_HEIGHT)
+        .text_size(TEXT_BODY)
+        .font_weight(FontWeight::MEDIUM)
         .flex()
         .flex_none()
         .items_center()
@@ -323,30 +379,44 @@ pub fn segment(
     selected: bool,
     theme: Theme,
 ) -> Stateful<Div> {
-    let color = if selected { theme.accent } else { theme.muted };
+    let label = label.into();
+    let color = if selected { theme.text } else { theme.muted };
     let option = div()
         .id(id)
         .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
         .h(rems(1.5))
         .flex()
         .items_center()
         .gap(rems(0.375))
         .px(rems(0.625))
         .rounded(rems(0.1875))
+        .font_weight(FontWeight::MEDIUM)
         .whitespace_nowrap()
-        .children(name.map(|name| tinted_icon(name, color)))
-        .child(label.into());
+        .min_w_0();
+    let option = if let Some(name) = name {
+        let content = option.min_w(rems(2.25)).child(adaptive::Content {
+            icon: name,
+            label: label.clone(),
+            color,
+        });
+        // Icon-only steppers supply their meaningful tooltip at the call site.
+        if label.is_empty() {
+            content
+        } else {
+            with_tooltip(content, label, theme)
+        }
+    } else {
+        option.child(label)
+    };
     if selected {
         option
             .bg(theme.selected)
-            .text_color(theme.accent)
-            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text)
+            .active(move |style| style.bg(theme.pressed))
     } else {
         option
             .hover(move |style| style.bg(theme.hover))
@@ -384,12 +454,12 @@ pub fn checkbox(
     div()
         .id(id)
         .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
+        .hover(move |style| style.bg(theme.hover))
+        .active(move |style| style.bg(theme.pressed))
         .group("checkbox")
         .min_h(CONTROL_HEIGHT)
         .flex()
@@ -421,16 +491,14 @@ pub fn radio_row(
     } else {
         mark.border_color(theme.control_border).bg(theme.control)
     };
-    let color = if selected { theme.accent } else { theme.muted };
+    let color = if selected { theme.text } else { theme.muted };
     let row = div()
         .id(id)
         .tab_index(0)
-        .focus(move |style| {
-            style
-                .bg(theme.selected)
-                .border_2()
-                .border_color(theme.accent)
-        })
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
         .min_h(ROW_HEIGHT)
         .flex()
         .items_center()
@@ -438,9 +506,18 @@ pub fn radio_row(
         .px(rems(0.75))
         .child(mark)
         .child(tinted_icon(name, color))
-        .child(div().flex_1().min_w_0().truncate().child(label.into()));
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .whitespace_normal()
+                .line_clamp(1)
+                .child(label.into()),
+        );
     if selected {
         row.bg(theme.selected)
+            .active(move |style| style.bg(theme.pressed))
     } else {
         row.hover(move |style| style.bg(theme.hover))
             .active(move |style| style.bg(theme.pressed))
@@ -561,3 +638,14 @@ pub fn quality(metadata: &rap_core::model::Metadata) -> String {
     }
     values.join(" · ")
 }
+
+/// Keep click feedback separate from the keyboard focus ring on actions.
+pub fn keyboard_focus_only(event: &MouseDownEvent, window: &mut Window, _: &mut App) {
+    if event.button == MouseButton::Left {
+        window.prevent_default();
+    }
+}
+
+#[cfg(test)]
+#[path = "tests/widgets.rs"]
+mod tests;

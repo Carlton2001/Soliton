@@ -73,9 +73,9 @@ fn album_returns_to_queue_and_keeps_forward_navigation() {
     let queue = place(Section::Queue, None);
     let album = place(Section::Albums, Some(42));
     history.observe(queue.clone());
-    assert!(!history.can_go_back());
+    assert!(history.back.is_empty());
     history.observe(album.clone());
-    assert!(history.can_go_back());
+    assert!(!history.back.is_empty());
     assert!(history.back() == Some(queue));
     assert!(history.forward() == Some(album));
 }
@@ -101,7 +101,7 @@ fn search_is_restored_without_recording_every_keystroke_as_a_destination() {
     history.observe(artists.clone());
     artists.search = "Björk".into();
     assert!(!history.observe(artists.clone()));
-    assert!(!history.can_go_back());
+    assert!(history.back.is_empty());
     history.observe(place(Section::Albums, Some(42)));
     assert!(history.back() == Some(artists));
 }

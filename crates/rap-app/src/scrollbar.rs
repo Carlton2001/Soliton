@@ -16,6 +16,15 @@ pub struct Scrollbar {
 }
 
 impl Scrollbar {
+    /// Reserve a lane only while the vertical scrollbar is needed.
+    pub fn gutter(&self) -> Rems {
+        rems(if self.handle.max_offset().height > px(0.) {
+            TRACK / 16.
+        } else {
+            0.
+        })
+    }
+
     pub fn new(handle: ScrollHandle) -> Self {
         Self {
             handle,

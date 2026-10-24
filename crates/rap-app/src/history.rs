@@ -29,9 +29,6 @@ pub struct History {
 }
 
 impl History {
-    pub fn can_go_back(&self) -> bool {
-        !self.back.is_empty()
-    }
     /// Records `place` when it differs from the current one. A new place
     /// discards the forward path, as in a browser.
     /// Returns whether the place changed.

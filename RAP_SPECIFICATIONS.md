@@ -400,6 +400,8 @@ Direction graphique :
 
 Éviter les panneaux inutiles et les interfaces excessivement configurables.
 
+Les contrôles d’un même type partagent leurs dimensions, leur typographie et leurs états dans toutes les pages. La sélection utilise un fond teinté et un premier plan lisible, sans changement de graisse ou d’épaisseur de bordure. Les actions affichent leur contour de focus au clavier ; les champs et curseurs restent focalisables à la souris. L’espace initial sous la navigation est commun aux pages (0,75 rem), avant le premier titre ou la première rangée de contrôles. La séparation entre cette rangée et le contenu, ainsi que les sections, est de 0,75 rem et appartient à un seul conteneur, sans cumul avec une marge haute du contenu. Les actions liées dans une barre sont espacées de 0,5 rem ; les grilles Albums et Artistes partagent le même rythme vertical.
+
 ## 8.3 Organisation générale
 
 L'interface principale comporte :
@@ -438,12 +440,12 @@ page redondant avec la navigation ; leurs actions et les noms des playlists rest
 Les filtres de métadonnées sont réservés à Albums. Les deux vues de bibliothèque
 proposent l’ajout d’un dossier lorsqu’elles sont vides. Ctrl+F affiche la recherche
 avant de lui donner le focus, y compris depuis une fiche ou Lecture en cours.
-Le bouton Retour et Alt+Gauche/Alt+Droite parcourent l’historique ; une fiche
+La barre de navigation ne comporte pas de bouton Retour. Alt+Gauche/Alt+Droite parcourent l’historique ; une fiche
 album revient au contexte d’origine. Les contrôles acceptent Tab/Maj+Tab et
 Entrée/Espace, avec un focus visible ; les dialogues retiennent la tabulation.
 Les fiches album partagent les mêmes actions Lire et Actions quelle que soit la
-largeur. Les lignes d’albums et barres d’actions s’adaptent aux petites fenêtres.
-Une playlist s’ouvre au clic sur sa ligne ou sur Ouvrir. Dans Lecture en cours,
+largeur. Les lignes d’albums et barres d’actions s’adaptent aux petites fenêtres. Les morceaux affichent toujours leur numéro disque.piste issu des tags, dans les fiches album, playlists et files de lecture, y compris pour un seul disque ; à défaut, le disque vaut 1 et la piste utilise la position de liste.
+Une playlist s’ouvre au clic sur sa ligne ou sur Ouvrir. Renommer et Supprimer sont accessibles dans cette liste et dans la fiche de playlist. La fiche album présente directement son titre, son artiste et ses métadonnées regroupées, sans libellé Albums redondant. La file propose deux commandes distinctes : Retirer les morceaux à venir conserve le morceau courant et les précédents ; Vider la file arrête la lecture et retire toutes les entrées de la file sans modifier les playlists enregistrées. Dans Lecture en cours,
 l’artiste et l’album de bibliothèque donnent accès à leur vue correspondante.
 
 ## 8.4 Vue Albums
@@ -544,8 +546,7 @@ Barre de lecture permanente avec :
 Simplification retenue le 23 octobre 2026 : la file de lecture possède une page
 dédiée, accessible par la navigation principale. Le tiroir de file et la vue de
 session séparée avaient été supprimés. La page « Lecture en cours » est rétablie le 24 octobre 2026 : grande pochette centrée, métadonnées et cartouche permanent, accessible par le bouton Agrandir du lecteur ; Retour ou Échap ferme cette page sans perdre la vue précédente. F11 affiche la page active en plein écran en
-conservant la navigation et la barre de lecture. Les actions comportent un libellé,
-sauf les commandes usuelles du lecteur (précédent, lire/pause, suivant, aléatoire,
+conservant la navigation et la barre de lecture. Les boutons avec icône affichent leur libellé lorsque la place le permet ; sinon seule l’icône reste visible dans un bouton compact à sa taille, avec le libellé complet en infobulle. Les commandes usuelles du lecteur (précédent, lire/pause, suivant, aléatoire,
 répéter et couper/rétablir le son) et Lire/Pause dans les listes de pistes : ces
 icônes disposent d'une infobulle. Les actions secondaires des morceaux sont
 réunies dans un menu « Actions ».

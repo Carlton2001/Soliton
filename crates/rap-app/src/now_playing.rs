@@ -23,19 +23,26 @@ impl Rap {
             .flex()
             .flex_col()
             .child(
-                div().flex_none().px(rems(0.75)).py(rems(0.5)).child(
-                    button(
-                        "close-now-playing",
-                        "arrow-left",
-                        self.t(Text::BackToLibrary),
-                        theme,
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.now_playing = false;
-                        this.focus.focus(window);
-                        cx.notify();
-                    })),
-                ),
+                div()
+                    .flex_none()
+                    .px(crate::widgets::PAGE_INSET)
+                    .pt(crate::widgets::PAGE_TOP_PADDING)
+                    .pb(crate::widgets::PAGE_SECTION_GAP)
+                    .flex()
+                    .items_center()
+                    .child(
+                        button(
+                            "close-now-playing",
+                            "arrow-left",
+                            self.t(Text::BackToLibrary),
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.now_playing = false;
+                            this.focus.focus(window);
+                            cx.notify();
+                        })),
+                    ),
             )
             .child(
                 div()
@@ -46,8 +53,8 @@ impl Rap {
                     .items_center()
                     .justify_center()
                     .gap(rems(0.75))
-                    .px(rems(0.75))
-                    .pb(rems(0.75))
+                    .px(crate::widgets::PAGE_INSET)
+                    .pb(crate::widgets::PAGE_SECTION_GAP)
                     .child(cover(
                         track.and_then(|t| t.cover.as_ref()),
                         side * 16.,
@@ -84,6 +91,11 @@ impl Rap {
                                             .text_color(theme.accent)
                                             .id("now-artist")
                                             .tab_index(0)
+                                            .border_2()
+                                            .border_color(gpui::transparent_black())
+                                            .capture_any_mouse_down(
+                                                crate::widgets::keyboard_focus_only,
+                                            )
                                             .hover(move |s| s.bg(theme.hover))
                                             .focus(move |s| {
                                                 s.bg(theme.selected)
@@ -108,6 +120,11 @@ impl Rap {
                                             .text_color(theme.muted)
                                             .id("now-album")
                                             .tab_index(0)
+                                            .border_2()
+                                            .border_color(gpui::transparent_black())
+                                            .capture_any_mouse_down(
+                                                crate::widgets::keyboard_focus_only,
+                                            )
                                             .tab_stop(album_id.is_some())
                                             .when(album_id.is_some(), |v| {
                                                 v.text_color(theme.accent)

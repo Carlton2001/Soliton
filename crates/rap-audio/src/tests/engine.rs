@@ -91,6 +91,44 @@ fn editing_a_loaded_queue_does_not_open_outputs_or_reset_position() {
 }
 
 #[test]
+fn clearing_the_entire_queue_resets_current_track_and_position() {
+    let track = rap_core::model::Track {
+        id: 1,
+        source_id: 1,
+        path: "unopened.flac".into(),
+        metadata: rap_core::model::Metadata {
+            duration_ms: 60_000,
+            ..Default::default()
+        },
+        cover: None,
+        available: true,
+    };
+    let mut worker = Worker::default();
+    worker
+        .command(Command::Load {
+            tracks: vec![track],
+            start: 0,
+            position_ms: 12_000,
+        })
+        .unwrap();
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
+    worker
+        .command(Command::Load {
+            tracks: Vec::new(),
+            start: 0,
+            position_ms: 0,
+        })
+        .unwrap();
+    let snapshot = worker.snapshot();
+    assert!(snapshot.queue.entries.is_empty());
+    assert!(snapshot.queue.current.is_none());
+    assert!(snapshot.track.is_none());
+    assert_eq!(snapshot.state, PlaybackState::Stopped);
+    assert_eq!(snapshot.position_ms, 0);
+    assert_eq!(snapshot.duration_ms, 0);
+    assert!(worker.session.is_none());
+}
+#[test]
 fn commands_without_a_device_preserve_stopped_state_and_validate_volume() {
     let mut worker = Worker {
         queue: Queue::default(),

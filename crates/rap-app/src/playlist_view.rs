@@ -4,12 +4,19 @@ use crate::{
     i18n::Text,
     playlists::Dialog,
     track_list::{Selection, TrackRow},
-    widgets::{TEXT_DISPLAY, TEXT_SMALL, accent_button, button, icon, time},
+    widgets::{TEXT_SMALL, accent_button, button, cover, time},
 };
 use gpui::{prelude::*, *};
 use rap_audio::Command;
 
 impl Rap {
+    fn playlist_cover(&self, list: &rap_core::playlist::Playlist) -> Option<&std::path::PathBuf> {
+        list.entries
+            .iter()
+            .filter_map(|entry| entry.track_id)
+            .filter_map(|id| self.tracks.get(&id))
+            .find_map(|track| track.cover.as_ref())
+    }
     pub fn playlists_view(&self, cx: &mut Context<Self>) -> AnyElement {
         if let Some(list) = self
             .playlists
@@ -48,13 +55,13 @@ impl Rap {
                             let track = e.track_id.and_then(|id| known.get(&id));
                             this.selection_row(
                                 TrackRow {
-                                    multi_disc: false,
                                     selection: Selection::Playlist {
                                         list: id,
                                         entry: e.id,
                                     },
                                     index,
                                     metadata: track.map_or(&e.metadata, |t| &t.metadata),
+                                    cover: track.and_then(|t| t.cover.as_ref()),
                                     available: track.is_some_and(|t| t.available),
                                     current: current == Some(e.id),
                                     first: index == 0,
@@ -74,12 +81,14 @@ impl Rap {
                 .min_h_0()
                 .flex()
                 .flex_col()
-                .gap(rems(0.75))
+                .gap(crate::widgets::PAGE_SECTION_GAP)
                 .child(
                     div()
-                        .px(rems(0.75))
-                        .pt(rems(0.75))
+                        .px(crate::widgets::PAGE_INSET)
+                        .pt(crate::widgets::PAGE_TOP_PADDING)
+                        .flex_none()
                         .flex()
+                        .flex_wrap()
                         .items_center()
                         .gap(rems(0.5))
                         .child(
@@ -101,7 +110,7 @@ impl Rap {
                         .child(
                             button(
                                 "playlist-rename",
-                                "sliders-horizontal",
+                                "pencil",
                                 self.t(Text::RenamePlaylist),
                                 theme,
                             )
@@ -120,76 +129,89 @@ impl Rap {
                 )
                 .child(
                     div()
-                        .px(rems(0.75))
+                        .px(crate::widgets::PAGE_INSET)
                         .flex()
-                        .flex_col()
-                        .gap(rems(0.5))
-                        .child(div().text_size(TEXT_DISPLAY).child(list.name.clone()))
+                        .items_center()
+                        .gap(crate::widgets::PAGE_SECTION_GAP)
+                        .child(cover(self.playlist_cover(list), 64., theme))
                         .child(
                             div()
-                                .font(crate::widgets::numeric_font())
-                                .text_color(theme.muted)
-                                .child(format!(
-                                    "{count} {} · {}",
-                                    self.t(Text::Tracks),
-                                    time(duration)
-                                )),
-                        )
-                        .child(
-                            div()
+                                .flex_1()
+                                .min_w_0()
                                 .flex()
-                                .gap(rems(0.5))
-                                .flex_wrap()
+                                .flex_col()
+                                .gap(rems(0.25))
                                 .child(
-                                    accent_button(
-                                        "playlist-play",
-                                        "play",
-                                        self.t(Text::Play),
-                                        theme,
-                                    )
-                                    .opacity(if playable { 1. } else { 0.4 })
-                                    .on_click(cx.listener(
-                                        move |this, _, _, cx| this.play_playlist(id, None, cx),
-                                    )),
+                                    div()
+                                        .text_size(crate::widgets::TEXT_TITLE)
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .w_full()
+                                        .truncate()
+                                        .whitespace_normal()
+                                        .line_clamp(1)
+                                        .child(list.name.clone()),
                                 )
                                 .child(
-                                    button(
-                                        "playlist-enqueue",
-                                        "list-end",
-                                        self.t(Text::AppendQueue),
-                                        theme,
-                                    )
-                                    .on_click(cx.listener(
-                                        move |this, _, _, cx| {
-                                            if let Some(p) =
-                                                this.playlists.lists.iter().find(|p| p.id == id)
-                                            {
-                                                let tracks = this.playlist_tracks(p);
-                                                if !tracks.is_empty() {
-                                                    this.audio_command(
-                                                        Command::Enqueue {
-                                                            tracks,
-                                                            next: false,
-                                                        },
-                                                        cx,
-                                                    );
-                                                }
-                                            }
-                                        },
-                                    )),
+                                    div()
+                                        .text_size(TEXT_SMALL)
+                                        .font(crate::widgets::numeric_font())
+                                        .text_color(theme.muted)
+                                        .child(format!(
+                                            "{count} {} · {}",
+                                            self.t(Text::Tracks),
+                                            time(duration)
+                                        )),
                                 ),
                         )
                         .child(
-                            div()
-                                .text_size(TEXT_SMALL)
-                                .text_color(theme.muted)
-                                .child(self.t(if count == 0 {
-                                    Text::PlaylistEmpty
-                                } else {
-                                    Text::QueueUnavailable
+                            accent_button("playlist-play", "play", self.t(Text::Play), theme)
+                                .opacity(if playable { 1. } else { 0.4 })
+                                .when(self.compact_controls, |button| {
+                                    crate::widgets::compact_button(button, false)
+                                })
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.play_playlist(id, None, cx)
                                 })),
+                        )
+                        .child(
+                            button(
+                                "playlist-enqueue",
+                                "list-end",
+                                self.t(Text::AppendQueue),
+                                theme,
+                            )
+                            .when(self.compact_controls, |button| {
+                                crate::widgets::compact_button(button, false)
+                            })
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    if let Some(p) =
+                                        this.playlists.lists.iter().find(|p| p.id == id)
+                                    {
+                                        let tracks = this.playlist_tracks(p);
+                                        if !tracks.is_empty() {
+                                            this.audio_command(
+                                                Command::Enqueue {
+                                                    tracks,
+                                                    next: false,
+                                                },
+                                                cx,
+                                            );
+                                        }
+                                    }
+                                },
+                            )),
                         ),
                 )
+                .when(count == 0, |page| {
+                    page.child(
+                        div()
+                            .px(crate::widgets::PAGE_INSET)
+                            .text_size(TEXT_SMALL)
+                            .text_color(theme.muted)
+                            .child(self.t(Text::PlaylistEmpty)),
+                    )
+                })
                 .child(crate::views::scroll_area(rows, &self.playlists.bar, theme))
                 .into_any_element();
         }
@@ -207,6 +229,9 @@ impl Rap {
                         div()
                             .id(("playlist", id as usize))
                             .tab_index(0)
+                            .border_2()
+                            .border_color(gpui::transparent_black())
+                            .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
                             .focus(move |s| {
                                 s.bg(theme.selected).border_2().border_color(theme.accent)
                             })
@@ -214,8 +239,9 @@ impl Rap {
                                 this.focus.focus(window);
                                 this.open_playlist(id, cx);
                             }))
-                            .h(rems(5.5))
-                            .px(rems(0.75))
+                            .h(rems(4.5))
+                            .w_full()
+                            .pl(rems(0.5))
                             .child(
                                 div()
                                     .h_full()
@@ -224,27 +250,20 @@ impl Rap {
                                     .gap(rems(0.75))
                                     .border_b_1()
                                     .border_color(theme.border)
-                                    .child(
-                                        div()
-                                            .size(rems(3.5))
-                                            .flex_none()
-                                            .bg(theme.selected)
-                                            .rounded(crate::widgets::RADIUS)
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .child(icon("list", theme)),
-                                    )
+                                    .child(cover(this.playlist_cover(p), 56., theme))
                                     .child(
                                         div()
                                             .flex_1()
-                                            .min_w_0()
+                                            .min_w(rems(12.))
                                             .flex()
                                             .flex_col()
                                             .child(
                                                 div()
                                                     .text_size(crate::widgets::TEXT_SUBTITLE)
+                                                    .w_full()
                                                     .truncate()
+                                                    .whitespace_normal()
+                                                    .line_clamp(1)
                                                     .child(p.name.clone()),
                                             )
                                             .child(
@@ -260,11 +279,56 @@ impl Rap {
                                     )
                                     .child(
                                         button(
+                                            ("playlist-rename", id as usize),
+                                            "pencil",
+                                            this.t(Text::RenamePlaylist),
+                                            theme,
+                                        )
+                                        .when(this.compact_controls, |button| {
+                                            crate::widgets::compact_button(button, false)
+                                        })
+                                        .on_click(
+                                            cx.listener(move |this, _, window, cx| {
+                                                cx.stop_propagation();
+                                                this.open_playlist_dialog(
+                                                    Dialog::Rename(id),
+                                                    window,
+                                                    cx,
+                                                );
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button(
+                                            ("playlist-delete", id as usize),
+                                            "x",
+                                            this.t(Text::Delete),
+                                            theme,
+                                        )
+                                        .when(this.compact_controls, |button| {
+                                            crate::widgets::compact_button(button, false)
+                                        })
+                                        .on_click(
+                                            cx.listener(move |this, _, window, cx| {
+                                                cx.stop_propagation();
+                                                this.open_playlist_dialog(
+                                                    Dialog::Delete(id),
+                                                    window,
+                                                    cx,
+                                                );
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button(
                                             ("playlist-open", id as usize),
                                             "list",
                                             this.t(Text::OpenPlaylist),
                                             theme,
                                         )
+                                        .when(this.compact_controls, |button| {
+                                            crate::widgets::compact_button(button, false)
+                                        })
                                         .on_click(
                                             cx.listener(move |this, _, window, cx| {
                                                 this.focus.focus(window);
@@ -279,6 +343,7 @@ impl Rap {
             }),
         )
         .track_scroll(self.playlists.scroll.clone())
+        .px(crate::widgets::PAGE_INSET)
         .flex_1()
         .min_h_0();
         div()
@@ -286,25 +351,18 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .child(
-                div()
-                    .p(rems(0.75))
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap(rems(0.75))
-                    .flex_wrap()
-                    .child(
-                        accent_button("new-playlist", "plus", self.t(Text::NewPlaylist), theme)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.open_playlist_dialog(Dialog::New(Vec::new()), window, cx)
-                            })),
-                    ),
-            )
+            .child(crate::widgets::page_toolbar().child(
+                accent_button("new-playlist", "plus", self.t(Text::NewPlaylist), theme).on_click(
+                    cx.listener(|this, _, window, cx| {
+                        this.open_playlist_dialog(Dialog::New(Vec::new()), window, cx)
+                    }),
+                ),
+            ))
             .when(count == 0, |v| {
                 v.child(
                     div()
-                        .p(rems(0.75))
+                        .px(crate::widgets::PAGE_INSET)
+                        .pb(crate::widgets::PAGE_SECTION_GAP)
                         .flex()
                         .flex_col()
                         .gap(rems(0.5))

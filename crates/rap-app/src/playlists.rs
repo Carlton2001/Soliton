@@ -199,18 +199,11 @@ impl Rap {
         if naming {
             panel = panel
                 .child(div().child(self.t(Text::PlaylistName)))
-                .child(
-                    div()
-                        .h(rems(2.5))
-                        .px(rems(0.75))
-                        .flex()
-                        .items_center()
-                        .bg(theme.control)
-                        .border_1()
-                        .border_color(theme.control_border)
-                        .rounded(RADIUS_LARGE)
-                        .child(self.playlists.name.clone()),
-                )
+                .child(crate::widgets::input_field(
+                    self.playlists.name.clone(),
+                    false,
+                    theme,
+                ))
                 .child(
                     div()
                         .text_size(crate::widgets::TEXT_SMALL)

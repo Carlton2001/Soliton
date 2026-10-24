@@ -480,7 +480,8 @@ impl Element for TextElement {
         let cursor = input.cursor_offset();
         let style = window.text_style();
 
-        let (display_text, text_color) = if content.is_empty() {
+        let placeholder = content.is_empty();
+        let (display_text, text_color) = if placeholder {
             (input.placeholder.clone(), style.color.opacity(0.6))
         } else {
             (content, style.color)
@@ -494,7 +495,7 @@ impl Element for TextElement {
             underline: None,
             strikethrough: None,
         };
-        let runs = if let Some(marked_range) = input.marked_range.as_ref() {
+        let mut runs = if let Some(marked_range) = input.marked_range.as_ref() {
             vec![
                 TextRun {
                     len: marked_range.start,
@@ -522,6 +523,14 @@ impl Element for TextElement {
         };
 
         let font_size = style.font_size.to_pixels(window.rem_size());
+        let display_text = if placeholder {
+            window
+                .text_system()
+                .line_wrapper(style.font(), font_size)
+                .truncate_line(display_text, bounds.size.width, "…", &mut runs)
+        } else {
+            display_text
+        };
         let line = window
             .text_system()
             .shape_line(display_text, font_size, &runs, None);

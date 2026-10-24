@@ -53,6 +53,7 @@ pub struct Rap {
     pub focus: FocusHandle,
     pub modal_focus: FocusHandle,
     pub keyboard_index: usize,
+    pub compact_controls: bool,
     pub album_scroll: UniformListScrollHandle,
     pub album_bar: Scrollbar,
     pub facet_scroll: UniformListScrollHandle,
@@ -61,6 +62,7 @@ pub struct Rap {
     pub track_bar: Scrollbar,
     pub settings_bar: Scrollbar,
     pub menu_scroll: UniformListScrollHandle,
+    pub menu_bar: Scrollbar,
     pub pending_removal: Option<i64>,
     pub settings: Settings,
     /// Operating system preference, used when the appearance follows the system.
@@ -148,7 +150,7 @@ impl Rap {
                 cx.notify();
             }),
         ];
-        let lists = [(); 3].map(|_| UniformListScrollHandle::new());
+        let lists = [(); 4].map(|_| UniformListScrollHandle::new());
         let bar =
             |list: &UniformListScrollHandle| Scrollbar::new(list.0.borrow().base_handle.clone());
         let mut last = settings.last_view.clone();
@@ -185,6 +187,7 @@ impl Rap {
             focus: cx.focus_handle(),
             modal_focus: cx.focus_handle(),
             keyboard_index: 0,
+            compact_controls: false,
             album_bar: bar(&lists[0]),
             album_scroll: lists[0].clone(),
             facet_scroll: lists[1].clone(),
@@ -192,7 +195,8 @@ impl Rap {
             facet_bar: bar(&lists[1]),
             track_bar: bar(&lists[2]),
             settings_bar: Scrollbar::default(),
-            menu_scroll: UniformListScrollHandle::new(),
+            menu_scroll: lists[3].clone(),
+            menu_bar: bar(&lists[3]),
             pending_removal: None,
             settings,
             system_dark: is_dark(window.appearance()),
@@ -613,10 +617,12 @@ impl Drop for Rap {
 impl Render for Rap {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::scale::apply(self.settings.ui_rem_size, window);
+        self.compact_controls =
+            f32::from(window.viewport_size().width) / f32::from(window.rem_size()) < 52.;
         // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
-        let reserved = crate::scale::scaled((2. * crate::views::CONTENT_PADDING - 1.) * 16. + 12.);
+        let reserved = crate::scale::scaled((2. * crate::views::CONTENT_PADDING) * 16. + 12.);
         let split = crate::collection::split_collection(
             f32::from(window.viewport_size().width) / f32::from(window.rem_size()),
             self.section,

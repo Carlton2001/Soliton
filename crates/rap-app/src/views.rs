@@ -3,15 +3,13 @@ use crate::{
     i18n::Text,
     scrollbar::Scrollbar,
     theme::Theme,
-    widgets::{
-        CONTROL_HEIGHT, RADIUS, TEXT_SMALL, TEXT_TITLE, button, cover, segment, segments, time,
-    },
+    widgets::{RADIUS, TEXT_SMALL, TEXT_TITLE, button, cover, segment, segments, time},
 };
 use gpui::{prelude::*, *};
 use rap_core::{config::CoverSize, text::fold};
 
 /// Horizontal padding of the album list and grid, in rems.
-pub const CONTENT_PADDING: f32 = 0.75;
+pub const CONTENT_PADDING: f32 = crate::widgets::PAGE_INSET.0;
 /// Gap between grid tiles, in rems.
 pub const TILE_GAP: f32 = 1.;
 
@@ -27,17 +25,7 @@ pub fn cover_side(size: CoverSize) -> f32 {
 impl Rap {
     pub fn search_field(&self) -> Div {
         let theme = self.theme();
-        div()
-            .min_w_0()
-            .flex()
-            .items_center()
-            .gap(rems(0.5))
-            .h(CONTROL_HEIGHT)
-            .bg(theme.card)
-            .rounded(RADIUS)
-            .px(rems(0.625))
-            .child(crate::widgets::icon("search", theme))
-            .child(div().flex_1().min_w_0().child(self.search.clone()))
+        crate::widgets::input_field(self.search.clone(), true, theme)
     }
 
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -51,17 +39,18 @@ impl Rap {
         div()
             .flex_none()
             .px(rems(CONTENT_PADDING))
-            .py(rems(1.25))
+            .pt(crate::widgets::PAGE_TOP_PADDING)
+            .pb(crate::widgets::PAGE_SECTION_GAP)
             .flex()
             .flex_col()
-            .gap(rems(1.))
+            .gap(crate::widgets::PAGE_SECTION_GAP)
             .child(
                 div()
                     .flex()
-                    .flex_wrap()
                     .items_center()
-                    .gap(rems(0.75))
+                    .gap(crate::widgets::CONTROL_GAP)
                     .child(self.search_field().w(rems(19.)).max_w_full())
+                    .when(albums, |row| row.child(self.filter_button(cx)))
                     .when(albums, |row| row.child(self.sort_button(cx)))
                     .when_some(grid, |row, grid| {
                         row.child(segments(
@@ -83,7 +72,9 @@ impl Rap {
                         ))
                     }),
             )
-            .when(albums, |view| view.child(self.filter_bar(cx)))
+            .when(albums && self.filter.active(), |view| {
+                view.child(self.filter_bar(cx))
+            })
     }
     fn empty_state(
         &self,
@@ -152,10 +143,10 @@ impl Rap {
                             .id(("album-row", row))
                             .flex()
                             .w_full()
-                            .px(rems(CONTENT_PADDING - 0.5))
+                            .px(rems(CONTENT_PADDING))
                             .gap(rems(TILE_GAP))
                             .when(columns == 1, |row| row.py(rems(0.0625)))
-                            .when(columns > 1, |row| row.py(rems(0.75)))
+                            .when(columns > 1, |row| row.pb(crate::widgets::PAGE_SECTION_GAP))
                             .children(
                                 (row * columns..((row + 1) * columns).min(this.visible.len()))
                                     .map(|index| this.album_tile(index, side, cx)),
@@ -178,6 +169,9 @@ impl Rap {
         let frame = div()
             .id(("album", id as usize))
             .tab_index(0)
+            .border_2()
+            .border_color(gpui::transparent_black())
+            .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
             .focus(move |s| s.bg(theme.selected).border_2().border_color(theme.accent))
             .rounded(RADIUS)
             .when(Some(id) == self.selected, |view| view.bg(theme.selected))
@@ -205,13 +199,19 @@ impl Rap {
                 .child(
                     div()
                         .mt(rems(0.25))
+                        .w_full()
                         .truncate()
+                        .whitespace_normal()
+                        .line_clamp(1)
                         .font_weight(FontWeight::SEMIBOLD)
                         .child(album.title.clone()),
                 )
                 .child(
                     div()
+                        .w_full()
                         .truncate()
+                        .whitespace_normal()
+                        .line_clamp(1)
                         .text_size(TEXT_SMALL)
                         .text_color(theme.muted)
                         .child(self.album_artist(album)),
@@ -236,13 +236,19 @@ impl Rap {
                     .gap(rems(0.25))
                     .child(
                         div()
+                            .w_full()
                             .truncate()
+                            .whitespace_normal()
+                            .line_clamp(1)
                             .font_weight(FontWeight::MEDIUM)
                             .child(album.title.clone()),
                     )
                     .child(
                         div()
+                            .w_full()
                             .truncate()
+                            .whitespace_normal()
+                            .line_clamp(1)
                             .text_size(TEXT_SMALL)
                             .text_color(theme.muted)
                             .child(self.album_artist(album)),
@@ -266,14 +272,28 @@ impl Rap {
                     .text_right()
                     .text_size(TEXT_SMALL)
                     .text_color(theme.muted)
-                    .child(div().truncate().child(format!(
-                        "{} · {}",
-                        first.year.map(|y| y.to_string()).unwrap_or_default(),
-                        first.genre
-                    )))
                     .child(
                         div()
+                            .w_full()
                             .truncate()
+                            .whitespace_normal()
+                            .line_clamp(1)
+                            .child(
+                                first
+                                    .year
+                                    .map(|y| y.to_string())
+                                    .into_iter()
+                                    .chain((!first.genre.is_empty()).then(|| first.genre.clone()))
+                                    .collect::<Vec<_>>()
+                                    .join(" · "),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .w_full()
+                            .truncate()
+                            .whitespace_normal()
+                            .line_clamp(1)
                             .font(crate::widgets::numeric_font())
                             .child(format!(
                                 "{} · {}",
@@ -326,8 +346,8 @@ impl Rap {
                             .id(("artist-row", row))
                             .flex()
                             .w_full()
-                            .px(rems(CONTENT_PADDING - 0.5))
-                            .when(grid, |row| row.py(rems(0.375)))
+                            .px(rems(CONTENT_PADDING))
+                            .when(grid, |row| row.pb(crate::widgets::PAGE_SECTION_GAP))
                             .when(!grid, |row| row.py(rems(0.0625)))
                             .gap(rems(TILE_GAP))
                             .children((row * columns..((row + 1) * columns).min(cards.len())).map(
@@ -341,6 +361,11 @@ impl Rap {
                                                 v.bg(theme.hover)
                                             })
                                             .tab_index(0)
+                                            .border_2()
+                                            .border_color(gpui::transparent_black())
+                                            .capture_any_mouse_down(
+                                                crate::widgets::keyboard_focus_only,
+                                            )
                                             .focus(move |s| {
                                                 s.bg(theme.selected)
                                                     .border_2()
@@ -359,7 +384,10 @@ impl Rap {
                                                 div()
                                                     .flex_1()
                                                     .min_w_0()
+                                                    .w_full()
                                                     .truncate()
+                                                    .whitespace_normal()
+                                                    .line_clamp(1)
                                                     .font_weight(FontWeight::MEDIUM)
                                                     .child(card.name.clone()),
                                             )
@@ -377,6 +405,9 @@ impl Rap {
                                         .id(("artist", index))
                                         .when(index == this.keyboard_index, |v| v.bg(theme.hover))
                                         .tab_index(0)
+                                        .border_2()
+                                        .border_color(gpui::transparent_black())
+                                        .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
                                         .focus(move |s| {
                                             s.bg(theme.selected)
                                                 .border_2()
@@ -395,7 +426,10 @@ impl Rap {
                                         .child(
                                             div()
                                                 .mt(rems(0.25))
+                                                .w_full()
                                                 .truncate()
+                                                .whitespace_normal()
+                                                .line_clamp(1)
                                                 .font_weight(FontWeight::SEMIBOLD)
                                                 .child(card.name.clone()),
                                         )
@@ -481,6 +515,7 @@ pub fn scroll_area(content: impl IntoElement, bar: &Scrollbar, theme: Theme) -> 
         .min_h_0()
         .flex()
         .flex_col()
+        .pr(bar.gutter())
         .child(content)
         .child(bar.render(theme))
         .into_any_element()

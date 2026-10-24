@@ -5,8 +5,8 @@ use crate::{
     theme::Theme,
     views::scroll_area,
     widgets::{
-        RADIUS, TEXT_SMALL, TEXT_SUBTITLE, button, checkbox, display_path, list_box, list_row,
-        segment, segments, tinted_icon, with_tooltip,
+        TEXT_SMALL, TEXT_SUBTITLE, button, checkbox, display_path, list_box, list_row, segment,
+        segments, tinted_icon, with_tooltip,
     },
 };
 use gpui::{prelude::*, *};
@@ -57,7 +57,7 @@ pub fn setting_row(
         .items_center()
         .justify_between()
         .gap(rems(0.75))
-        .px(rems(0.75))
+        .px(crate::widgets::PAGE_INSET)
         .py(rems(0.625))
         .child(
             div()
@@ -124,12 +124,12 @@ impl Rap {
                     .w(rems(52.))
                     .flex_shrink_0()
                     .max_w_full()
-                    .px(rems(0.75))
-                    .pt(rems(0.75))
-                    .pb(rems(0.75))
+                    .px(crate::widgets::PAGE_INSET)
+                    .pt(crate::widgets::PAGE_TOP_PADDING)
+                    .pb(crate::widgets::PAGE_SECTION_GAP)
                     .flex()
                     .flex_col()
-                    .gap(rems(0.75))
+                    .gap(crate::widgets::PAGE_SECTION_GAP)
                     .child(self.general_section(theme, cx))
                     .child(self.display_section(theme, cx))
                     .child(self.audio_preferences(cx))
@@ -164,35 +164,37 @@ impl Rap {
             .flex()
             .items_center()
             .gap(rems(0.5))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .rounded(RADIUS)
-                    .border_1()
-                    .border_color(theme.control_border)
-                    .bg(theme.control)
-                    .child(
-                        button("ui-smaller", "minus", self.t(Text::Smaller), theme)
+            .child(segments(
+                [
+                    with_tooltip(
+                        segment("ui-smaller", Some("minus"), "", false, theme)
+                            .gap(rems(0.))
                             .when(size <= Settings::MIN_REM_SIZE, |tool| tool.opacity(0.4))
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.set_ui_rem_size(size.saturating_sub(1), cx)
                             })),
-                    )
-                    .child(
-                        div()
-                            .w(rems(3.5))
-                            .text_center()
-                            .child(format!("{} %", size * 100 / Settings::DEFAULT_REM_SIZE)),
-                    )
-                    .child(
-                        button("ui-larger", "plus", self.t(Text::Larger), theme)
+                        self.t(Text::Smaller).into(),
+                        theme,
+                    ),
+                    div()
+                        .id("ui-size-value")
+                        .w(rems(3.5))
+                        .text_center()
+                        .font(crate::widgets::numeric_font())
+                        .child(format!("{} %", size * 100 / Settings::DEFAULT_REM_SIZE)),
+                    with_tooltip(
+                        segment("ui-larger", Some("plus"), "", false, theme)
+                            .gap(rems(0.))
                             .when(size >= Settings::MAX_REM_SIZE, |tool| tool.opacity(0.4))
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.set_ui_rem_size(size + 1, cx)
                             })),
+                        self.t(Text::Larger).into(),
+                        theme,
                     ),
-            )
+                ],
+                theme,
+            ))
             .child(
                 button(
                     "ui-default-size",
@@ -269,7 +271,7 @@ impl Rap {
             }),
             theme,
         );
-        let hide = div().px(rems(0.75)).py(rems(0.625)).child(
+        let hide = div().px(crate::widgets::PAGE_INSET).py(rems(0.625)).child(
             checkbox(
                 "hide-unavailable",
                 s.hide_unavailable,
@@ -302,6 +304,7 @@ impl Rap {
             div()
                 .id(("accent", accent as usize))
                 .tab_index(0)
+                .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
                 .focus(move |s| s.border_2().border_color(theme.accent))
                 .size(rems(1.75))
                 .rounded_full()
@@ -401,7 +404,13 @@ impl Rap {
                             .min_w_0()
                             .flex()
                             .flex_col()
-                            .child(div().truncate().child(display_path(&source.path)))
+                            .child(
+                                div()
+                                    .truncate()
+                                    .whitespace_normal()
+                                    .line_clamp(1)
+                                    .child(display_path(&source.path)),
+                            )
                             .when(!source.available, |v| {
                                 v.child(
                                     div()

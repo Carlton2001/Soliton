@@ -39,8 +39,7 @@ enum Action {
 pub struct TrackRow<'a> {
     pub selection: Selection,
     pub index: usize,
-    /// Prefix album track numbers with their disc; queues/playlists use positions.
-    pub multi_disc: bool,
+    pub cover: Option<&'a std::path::PathBuf>,
     pub metadata: &'a Metadata,
     pub available: bool,
     pub current: bool,
@@ -48,22 +47,15 @@ pub struct TrackRow<'a> {
     pub last: bool,
 }
 
-fn album_track_number(metadata: &Metadata, index: usize, multi_disc: bool) -> String {
+/// Source numbering is identical in albums, playlists and the playback queue.
+fn track_number(metadata: &Metadata, index: usize) -> String {
+    let disc = metadata.disc.filter(|&number| number > 0).unwrap_or(1);
     let track = metadata
         .track
-        .filter(|&n| n > 0)
-        .map_or_else(|| (index + 1).to_string(), |n| n.to_string());
-    if multi_disc {
-        format!(
-            "{}.{}",
-            metadata.disc.filter(|&n| n > 0).unwrap_or(1),
-            track
-        )
-    } else {
-        track
-    }
+        .filter(|&number| number > 0)
+        .map_or_else(|| (index + 1).to_string(), |number| number.to_string());
+    format!("{disc}.{track}")
 }
-
 impl Rap {
     pub fn selection_row(&self, row: TrackRow<'_>, cx: &mut Context<Self>) -> AnyElement {
         self.album_selection_row(row, false, cx)
@@ -96,7 +88,7 @@ impl Rap {
                 actions.push(("arrow-up", Text::MoveUp, Action::Up));
             }
             if !row.last {
-                actions.push(("chevron-down", Text::MoveDown, Action::Down));
+                actions.push(("arrow-down", Text::MoveDown, Action::Down));
             }
             if !row.current || matches!(selection, Selection::Playlist { .. }) {
                 actions.push(("x", Text::RemoveEntry, Action::Remove));
@@ -137,13 +129,18 @@ impl Rap {
                             }))
                     }),
             );
-        div()
+        let inset = if matches!(selection, Selection::Album { .. }) && !compact {
+            rems(0.)
+        } else {
+            crate::widgets::PAGE_INSET
+        };
+        let line = div()
             .id(("selection-row", key))
             .relative()
             .w_full()
+            .min_w_0()
             .h(rems(3.5))
-            .px(rems(0.75))
-            .pr(rems(0.75))
+            .px(rems(0.5))
             .flex()
             .items_center()
             .gap(rems(if compact { 0.375 } else { 0.75 }))
@@ -171,22 +168,15 @@ impl Rap {
             )
             .child(
                 div()
-                    .min_w(rems(if row.multi_disc {
-                        2.75
-                    } else if compact {
-                        1.25
-                    } else {
-                        1.75
-                    }))
+                    .w(rems(2.75))
                     .flex_none()
                     .text_color(theme.muted)
                     .font(crate::widgets::numeric_font())
-                    .child(if matches!(selection, Selection::Album { .. }) {
-                        album_track_number(row.metadata, row.index, row.multi_disc)
-                    } else {
-                        (row.index + 1).to_string()
-                    }),
+                    .child(track_number(row.metadata, row.index)),
             )
+            .when(!matches!(selection, Selection::Album { .. }), |line| {
+                line.child(crate::widgets::cover(row.cover, 32., theme))
+            })
             .child(
                 div()
                     .flex_1()
@@ -195,7 +185,10 @@ impl Rap {
                     .flex_col()
                     .child(
                         div()
+                            .w_full()
                             .truncate()
+                            .whitespace_normal()
+                            .line_clamp(1)
                             .font_weight(if row.current {
                                 FontWeight::SEMIBOLD
                             } else {
@@ -210,15 +203,32 @@ impl Rap {
                     )
                     .child(
                         div()
+                            .w_full()
                             .truncate()
+                            .whitespace_normal()
+                            .line_clamp(1)
                             .text_size(crate::widgets::TEXT_SMALL)
                             .text_color(theme.muted)
                             .child(if row.available {
                                 if matches!(selection, Selection::Album { .. }) {
                                     format!("{} · {}", quality(row.metadata), row.metadata.artist)
                                 } else {
-                                    row.metadata.artist.clone()
+                                    [row.metadata.artist.as_str(), row.metadata.album.as_str()]
+                                        .into_iter()
+                                        .filter(|value| !value.is_empty())
+                                        .collect::<Vec<_>>()
+                                        .join(" · ")
                                 }
+                            } else if !matches!(selection, Selection::Album { .. }) {
+                                [
+                                    row.metadata.artist.as_str(),
+                                    row.metadata.album.as_str(),
+                                    self.t(Text::Unavailable),
+                                ]
+                                .into_iter()
+                                .filter(|value| !value.is_empty())
+                                .collect::<Vec<_>>()
+                                .join(" · ")
                             } else {
                                 self.t(Text::Unavailable).into()
                             }),
@@ -227,6 +237,7 @@ impl Rap {
             .child(
                 div()
                     .w(rems(if compact { 2.5 } else { 3.5 }))
+                    .flex_none()
                     .text_right()
                     .font(crate::widgets::numeric_font())
                     .text_color(theme.muted)
@@ -235,7 +246,9 @@ impl Rap {
             .child(
                 div()
                     .relative()
-                    .flex_none()
+                    .flex_shrink()
+                    .min_w(rems(4.))
+                    .max_w(relative(0.24))
                     .child(
                         button(
                             ("selection-actions", key),
@@ -243,6 +256,11 @@ impl Rap {
                             self.t(Text::Actions),
                             theme,
                         )
+                        .max_w_full()
+                        .child(crate::widgets::icon("chevron-down", theme))
+                        .when(compact || self.compact_controls, |button| {
+                            crate::widgets::compact_button(button, true)
+                        })
                         .when(compact, |v| {
                             v.px(rems(0.375)).text_size(crate::widgets::TEXT_CAPTION)
                         })
@@ -271,7 +289,8 @@ impl Rap {
                         )
                     }),
             )
-            .into_any_element()
+            .into_any_element();
+        div().w_full().px(inset).child(line).into_any_element()
     }
 
     fn selection_track(&self, selection: Selection) -> Option<Track> {

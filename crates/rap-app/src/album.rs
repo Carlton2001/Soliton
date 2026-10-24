@@ -59,15 +59,7 @@ impl Rap {
             .flex()
             .flex_col()
             .min_w_0()
-            .gap(rems(0.5))
-            .when(!panel, |v| {
-                v.child(
-                    div()
-                        .text_size(crate::widgets::TEXT_SMALL)
-                        .text_color(theme.muted)
-                        .child(self.t(Text::Albums)),
-                )
-            })
+            .gap(rems(0.25))
             .child(
                 div()
                     .text_size(crate::widgets::TEXT_DISPLAY)
@@ -79,6 +71,9 @@ impl Rap {
                 div()
                     .id("album-artist")
                     .tab_index(0)
+                    .border_2()
+                    .border_color(gpui::transparent_black())
+                    .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
                     .focus(move |s| s.bg(theme.selected).border_2().border_color(theme.accent))
                     .text_size(crate::widgets::TEXT_SUBTITLE)
                     .text_color(theme.accent)
@@ -92,7 +87,6 @@ impl Rap {
             })
             .child(
                 div()
-                    .mt(rems(0.5))
                     .font(crate::widgets::numeric_font())
                     .text_color(theme.muted)
                     .child(summary),
@@ -128,9 +122,12 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .gap(rems(0.75))
+            .gap(crate::widgets::PAGE_SECTION_GAP)
             .when(album.editions.len() > 1, |v| {
-                v.child(self.editions_view(album, edition_index, cx))
+                v.child(
+                    self.editions_view(album, edition_index, cx)
+                        .when(panel, |view| view.px(crate::widgets::PAGE_INSET)),
+                )
             })
             .child(self.tracks_view(album_id, edition_index, panel, cx));
         if panel {
@@ -167,10 +164,13 @@ impl Rap {
                         .max_h(relative(0.65))
                         .min_h_0()
                         .overflow_y_scroll()
-                        .px(rems(0.75))
-                        .pb(rems(0.75))
+                        .px(crate::widgets::PAGE_INSET)
+                        .pb(crate::widgets::PAGE_SECTION_GAP)
                         .child(record)
-                        .child(self.panel_album_actions(album, edition_index, cx)),
+                        .child(
+                            self.panel_album_actions(album, edition_index, cx)
+                                .mt(crate::widgets::PAGE_SECTION_GAP),
+                        ),
                 )
                 .child(songs)
                 .into_any_element();
@@ -180,12 +180,14 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .gap(rems(0.75))
+            .gap(crate::widgets::PAGE_SECTION_GAP)
             .child(
                 div()
-                    .px(rems(0.75))
-                    .pt(rems(0.75))
+                    .px(crate::widgets::PAGE_INSET)
+                    .pt(crate::widgets::PAGE_TOP_PADDING)
+                    .flex_none()
                     .flex()
+                    .items_center()
                     .flex_wrap()
                     .gap(rems(0.5))
                     .child(
@@ -208,8 +210,8 @@ impl Rap {
                     .min_h_0()
                     .flex()
                     .gap(rems(0.75))
-                    .px(rems(0.75))
-                    .pb(rems(0.75))
+                    .pl(crate::widgets::PAGE_INSET)
+                    .pb(crate::widgets::PAGE_SECTION_GAP)
                     .when(!wide, |v| v.flex_col())
                     .child(record)
                     .child(songs),
@@ -232,9 +234,8 @@ impl Rap {
         div()
             .flex()
             .flex_wrap()
+            .items_center()
             .gap(rems(0.5))
-            .pt(rems(0.75))
-            .pb(rems(0.25))
             .child(
                 crate::widgets::accent_button(
                     "panel-play-album",
@@ -259,10 +260,11 @@ impl Rap {
                     .child(
                         button(
                             "panel-album-actions",
-                            "chevron-down",
+                            "sliders-horizontal",
                             self.t(Text::Actions),
                             theme,
                         )
+                        .child(crate::widgets::icon("chevron-down", theme))
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.menu = if open {
                                 None
@@ -340,7 +342,6 @@ impl Rap {
     ) -> Div {
         let theme = self.theme();
         div()
-            .px(rems(0.75))
             .flex()
             .flex_wrap()
             .items_center()
@@ -385,12 +386,6 @@ impl Rap {
         let count = self
             .selected_album()
             .map_or(0, |(a, i)| a.editions[i].tracks.len());
-        let multi_disc = self.selected_album().is_some_and(|(album, index)| {
-            album.editions[index]
-                .tracks
-                .iter()
-                .any(|track| track.metadata.disc.unwrap_or(1) > 1)
-        });
         let list = uniform_list(
             "tracks",
             count,
@@ -410,8 +405,8 @@ impl Rap {
                                     track: track.id,
                                 },
                                 index,
-                                multi_disc,
                                 metadata: &track.metadata,
+                                cover: track.cover.as_ref(),
                                 available: track.available,
                                 current: this
                                     .playback
@@ -428,6 +423,7 @@ impl Rap {
                     .collect()
             }),
         )
+        .when(!compact, |list| list.pr(crate::widgets::PAGE_INSET))
         .track_scroll(self.track_scroll.clone())
         .flex_1()
         .min_w_0()

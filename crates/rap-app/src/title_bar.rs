@@ -93,27 +93,10 @@ impl Rap {
             .flex_none()
             .items_center()
             .gap(rems(0.25))
-            .px(rems(0.75))
-            .py(rems(0.5))
+            .px(crate::widgets::PAGE_INSET)
+            // The page owns the full gap below navigation; do not add to it here.
+            .pt(rems(0.5))
             .bg(theme.background)
-            .child(
-                crate::widgets::icon_button(
-                    "history-back",
-                    "arrow-left",
-                    self.t(Text::BackToLibrary),
-                    false,
-                    theme,
-                )
-                .opacity(if self.history.can_go_back() || self.now_playing {
-                    1.
-                } else {
-                    0.4
-                })
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.focus.focus(window);
-                    this.go_back(cx);
-                })),
-            )
             .children(
                 entries
                     .into_iter()

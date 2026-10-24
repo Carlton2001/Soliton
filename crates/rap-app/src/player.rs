@@ -49,22 +49,31 @@ impl Rap {
                                     .flex()
                                     .flex_col()
                                     .child(
-                                        div().truncate().font_weight(FontWeight::SEMIBOLD).child(
-                                            track.map(|t| t.metadata.title.clone()).unwrap_or_else(
-                                                || {
-                                                    self.t(if self.audio.is_some() {
-                                                        Text::NothingPlaying
-                                                    } else {
-                                                        Text::AudioUnavailable
-                                                    })
-                                                    .into()
-                                                },
+                                        div()
+                                            .w_full()
+                                            .truncate()
+                                            .whitespace_normal()
+                                            .line_clamp(1)
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(
+                                                track
+                                                    .map(|t| t.metadata.title.clone())
+                                                    .unwrap_or_else(|| {
+                                                        self.t(if self.audio.is_some() {
+                                                            Text::NothingPlaying
+                                                        } else {
+                                                            Text::AudioUnavailable
+                                                        })
+                                                        .into()
+                                                    }),
                                             ),
-                                        ),
                                     )
                                     .child(
                                         div()
+                                            .w_full()
                                             .truncate()
+                                            .whitespace_normal()
+                                            .line_clamp(1)
                                             .text_size(TEXT_SMALL)
                                             .text_color(theme.muted)
                                             .child(
@@ -115,32 +124,66 @@ impl Rap {
                                             f32::from(window.viewport_size().width)
                                                 / f32::from(window.rem_size())
                                                 >= 90.,
-                                            |side| {
-                                                side.child(
-                                                    div()
-                                                        .w(rems(8.))
-                                                        .truncate()
-                                                        .text_size(TEXT_CAPTION)
-                                                        .text_color(theme.muted)
-                                                        .child(
-                                                            self.playback
-                                                                .output
-                                                                .as_ref()
-                                                                .map(|output| {
-                                                                    output.device_name.clone()
-                                                                })
-                                                                .unwrap_or_else(|| {
-                                                                    self.t(Text::AudioOutput).into()
-                                                                }),
-                                                        ),
-                                                )
-                                            },
+                                            |side| side.child(self.output_control(cx)),
                                         )
                                         .child(self.now_playing_button(cx)),
                                 )
                             }),
                     ),
             )
+    }
+    fn output_control(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let theme = self.theme();
+        let name = self
+            .playback
+            .network_output
+            .as_ref()
+            .map(|output| output.name.clone())
+            .or_else(|| {
+                self.playback
+                    .output
+                    .as_ref()
+                    .map(|output| output.device_name.clone())
+            })
+            .unwrap_or_else(|| self.t(Text::AudioOutput).into());
+        crate::widgets::with_tooltip(
+            div()
+                .id("player-output")
+                .tab_index(0)
+                .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
+                .h(CONTROL_HEIGHT)
+                .max_w(rems(10.))
+                .min_w_0()
+                .px(rems(0.625))
+                .flex()
+                .items_center()
+                .gap(rems(0.5))
+                .rounded(crate::widgets::RADIUS)
+                .border_1()
+                .border_color(theme.control_border)
+                .bg(theme.control)
+                .text_color(theme.text)
+                .text_size(TEXT_SMALL)
+                .focus(move |style| style.border_color(theme.accent))
+                .hover(move |style| style.bg(theme.control_hover))
+                .active(move |style| style.bg(theme.control_pressed))
+                .child(crate::widgets::tinted_icon("volume-2", theme.text))
+                .child(
+                    div()
+                        .min_w_0()
+                        .w_full()
+                        .truncate()
+                        .whitespace_normal()
+                        .line_clamp(1)
+                        .child(name.clone()),
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.focus.focus(window);
+                    this.navigate(crate::app::Section::Settings, cx);
+                })),
+            name.into(),
+            theme,
+        )
     }
     fn compact_volume(&self, cx: &mut Context<Self>) -> Div {
         let theme = self.theme();
@@ -225,7 +268,10 @@ impl Rap {
                     self.t(if playing { Text::Pause } else { Text::Play }),
                     true,
                     crate::theme::Theme {
+                        text: theme.on_accent,
                         accent: theme.on_accent,
+                        control_hover: theme.accent,
+                        control_pressed: theme.accent,
                         selected: theme.accent,
                         ..theme
                     },
@@ -317,7 +363,9 @@ impl Rap {
                     .id("seek-keyboard")
                     .tab_index(0)
                     .tab_stop(enabled)
-                    .focus(move |s| s.border_1().border_color(theme.accent))
+                    .border_1()
+                    .border_color(gpui::transparent_black())
+                    .focus(move |s| s.border_color(theme.accent))
                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                         if !enabled {
                             return;
@@ -382,7 +430,9 @@ impl Rap {
                     .id("volume-keyboard")
                     .tab_index(0)
                     .tab_stop(self.audio.is_some())
-                    .focus(move |s| s.border_1().border_color(theme.accent))
+                    .border_1()
+                    .border_color(gpui::transparent_black())
+                    .focus(move |s| s.border_color(theme.accent))
                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                         if let Some(value) = crate::slider::keyboard_value(
                             &event.keystroke.key,

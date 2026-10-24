@@ -173,7 +173,41 @@ impl Rap {
         cx.notify();
     }
 
-    /// Direct access to each filter, removable active chips, and a reset.
+    pub fn filter_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let open = matches!(self.menu, Some(Menu::Filters(_)));
+        let kind = match self.menu {
+            Some(Menu::Filters(kind)) => kind,
+            _ => FilterKind::Genre,
+        };
+        div()
+            .relative()
+            .child(
+                toggle_button(
+                    "filters",
+                    "tag",
+                    self.t(Text::Filters),
+                    open || self.filter.active(),
+                    self.theme(),
+                )
+                .child(tinted_icon("chevron-down", self.theme().text))
+                .when(self.compact_controls, |button| {
+                    crate::widgets::compact_button(button, true)
+                })
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if open {
+                        this.menu = None;
+                        cx.notify();
+                    } else {
+                        this.open_menu(Menu::Filters(kind), cx);
+                    }
+                })),
+            )
+            .when(open, |anchor| {
+                anchor.child(dropdown(self.filters_menu(kind, cx), false))
+            })
+    }
+
+    /// Removable active filters and a reset, shown only while filtering.
     pub fn filter_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let active = self.filter.active();
@@ -182,31 +216,6 @@ impl Rap {
             .flex_wrap()
             .gap(rems(0.5))
             .items_center()
-            .children(FilterKind::ALL.into_iter().map(|kind| {
-                let open = matches!(self.menu, Some(Menu::Filters(current)) if current == kind);
-                div()
-                    .relative()
-                    .child(
-                        nav_item(
-                            ("filter-kind", kind as usize),
-                            "chevron-down",
-                            self.t(kind.label()),
-                            open || self.current(kind).is_some(),
-                            theme,
-                        )
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            if open {
-                                this.menu = None;
-                                cx.notify();
-                            } else {
-                                this.open_menu(Menu::Filters(kind), cx);
-                            }
-                        })),
-                    )
-                    .when(open, |view| {
-                        view.child(dropdown(self.filters_menu(kind, cx), false))
-                    })
-            }))
             .children(FilterKind::ALL.into_iter().filter_map(|kind| {
                 let value = self.current(kind)?;
                 Some(
@@ -252,6 +261,10 @@ impl Rap {
                     self.menu == Some(Menu::Sort),
                     self.theme(),
                 )
+                .child(tinted_icon("chevron-down", self.theme().text))
+                .when(self.compact_controls, |button| {
+                    crate::widgets::compact_button(button, true)
+                })
                 .on_click(cx.listener(|this, _, _, cx| this.open_menu(Menu::Sort, cx))),
             )
             .when(self.menu == Some(Menu::Sort), |anchor| {
@@ -283,6 +296,7 @@ impl Rap {
     fn filters_menu(&self, kind: FilterKind, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         popover(theme)
+            .pr_0()
             .w(rems(36.))
             .h(rems(24.))
             .flex()
@@ -366,16 +380,12 @@ impl Rap {
             .gap(rems(0.25))
             .when(searchable, |column| {
                 column.child(
-                    div()
-                        .rounded(RADIUS)
-                        .border_1()
-                        .border_color(theme.control_border)
-                        .bg(theme.background)
-                        .px(rems(0.5))
-                        .child(self.menu_search.clone()),
+                    crate::widgets::input_field(self.menu_search.clone(), true, theme)
+                        .mb(rems(0.25))
+                        .mr(rems(0.25)),
                 )
             })
-            .child(
+            .child(crate::views::scroll_area(
                 uniform_list(
                     "filter-values",
                     entries.len(),
@@ -389,6 +399,7 @@ impl Rap {
                                 };
                                 menu_item(("filter-value", index), label, selected, this.theme())
                                     .w_full()
+                                    .pr(crate::widgets::PAGE_INSET)
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.apply(kind, value.clone(), cx)
                                     }))
@@ -397,8 +408,11 @@ impl Rap {
                     }),
                 )
                 .track_scroll(self.menu_scroll.clone())
-                .flex_1(),
-            )
+                .flex_1()
+                .min_h_0(),
+                &self.menu_bar,
+                theme,
+            ))
     }
 }
 
@@ -411,7 +425,7 @@ fn dropdown(menu: AnyElement, align_right: bool) -> AnyElement {
             .mt(rems(0.25))
             .when(align_right, |anchor| anchor.right_0())
             .when(!align_right, |anchor| anchor.left_0())
-            .child(menu),
+            .child(anchored().snap_to_window().child(menu)),
     )
     .with_priority(1)
     .into_any_element()

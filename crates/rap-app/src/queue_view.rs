@@ -21,10 +21,10 @@ impl Rap {
                     .map(|(index, e)| {
                         this.selection_row(
                             TrackRow {
-                                multi_disc: false,
                                 selection: Selection::Queue(e.id),
                                 index,
                                 metadata: &e.track.metadata,
+                                cover: e.track.cover.as_ref(),
                                 available: if e.track.id > 0 {
                                     this.tracks.get(&e.track.id).is_some_and(|t| t.available)
                                 } else {
@@ -52,12 +52,7 @@ impl Rap {
             .flex()
             .flex_col()
             .child(
-                div()
-                    .p(rems(0.75))
-                    .flex()
-                    .items_center()
-                    .gap(rems(0.75))
-                    .flex_wrap()
+                crate::widgets::page_toolbar()
                     .child(
                         button("save-queue", "list-plus", self.t(Text::SaveQueue), theme)
                             .opacity(if count > 0 { 1. } else { 0.4 })
@@ -78,69 +73,95 @@ impl Rap {
                     .child(
                         button(
                             "clear-upcoming",
-                            "minus",
+                            "arrow-down-from-line",
                             self.t(Text::ClearUpcoming),
                             theme,
                         )
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.audio_command(Command::ClearUpcoming, cx)
                         })),
+                    )
+                    .child(
+                        button("clear-queue", "eraser", self.t(Text::ClearQueue), theme)
+                            .opacity(if count > 0 { 1. } else { 0.4 })
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.audio_command(
+                                    Command::Load {
+                                        tracks: Vec::new(),
+                                        start: 0,
+                                        position_ms: 0,
+                                    },
+                                    cx,
+                                );
+                            })),
                     ),
             )
             .when_some(track, |v, track| {
                 v.child(
                     div()
-                        .mx(rems(0.75))
-                        .mb(rems(0.75))
-                        .pb(rems(0.75))
-                        .border_b_1()
-                        .border_color(theme.border)
+                        .mx(crate::widgets::PAGE_INSET)
+                        .mb(crate::widgets::PAGE_SECTION_GAP)
                         .flex()
                         .items_center()
                         .gap(rems(0.75))
-                        .child(cover(track.cover.as_ref(), 64., theme))
+                        .child(crate::widgets::with_tooltip(
+                            div().id("queue-track-details").flex_none().child(cover(
+                                track.cover.as_ref(),
+                                48.,
+                                theme,
+                            )),
+                            output
+                                .as_ref()
+                                .map_or_else(
+                                    || quality(&track.metadata),
+                                    |output| {
+                                        format!(
+                                            "{} · {}",
+                                            quality(&track.metadata),
+                                            self.labelled(self.t(Text::Output), output)
+                                        )
+                                    },
+                                )
+                                .into(),
+                            theme,
+                        ))
                         .child(
                             div()
                                 .flex_1()
                                 .min_w_0()
                                 .flex()
                                 .flex_col()
+                                .gap(rems(0.25))
                                 .child(
                                     div()
-                                        .text_size(TEXT_SMALL)
-                                        .text_color(theme.muted)
-                                        .child(self.t(Text::NowPlaying)),
-                                )
-                                .child(
-                                    div()
-                                        .text_size(crate::widgets::TEXT_SUBTITLE)
+                                        .text_size(crate::widgets::TEXT_BODY)
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .w_full()
                                         .truncate()
+                                        .whitespace_normal()
+                                        .line_clamp(1)
                                         .child(track.metadata.title.clone()),
                                 )
                                 .child(
                                     div()
                                         .text_size(TEXT_SMALL)
                                         .text_color(theme.muted)
+                                        .w_full()
                                         .truncate()
+                                        .whitespace_normal()
+                                        .line_clamp(1)
                                         .child(format!(
                                             "{} · {}",
-                                            track.metadata.artist,
-                                            quality(&track.metadata)
+                                            track.metadata.artist, track.metadata.album
                                         )),
-                                )
-                                .when_some(output, |v, output| {
-                                    v.child(
-                                        div()
-                                            .text_size(TEXT_SMALL)
-                                            .text_color(theme.muted)
-                                            .truncate()
-                                            .child(self.labelled(self.t(Text::Output), &output)),
-                                    )
-                                }),
+                                ),
                         )
                         .when_some(album, |v, id| {
                             v.child(
                                 button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
+                                    .when(self.compact_controls, |button| {
+                                        crate::widgets::compact_button(button, false)
+                                    })
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         this.focus.focus(window);
                                         this.open_album(id, cx);
@@ -152,7 +173,8 @@ impl Rap {
             .when(count == 0, |v| {
                 v.child(
                     div()
-                        .p(rems(0.75))
+                        .px(crate::widgets::PAGE_INSET)
+                        .pb(crate::widgets::PAGE_SECTION_GAP)
                         .text_color(theme.muted)
                         .child(self.t(Text::QueueEmpty)),
                 )
