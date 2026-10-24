@@ -137,7 +137,7 @@ impl Engine {
                         Err(_) => {}
                     }
                     if let Err(error) = worker.pump() {
-                        worker.fail(error);
+                        worker.recover(error);
                     }
                     if last.elapsed() >= Duration::from_millis(200) {
                         let _ = events.try_send(worker.snapshot());
@@ -197,6 +197,8 @@ struct Session {
     pending: VecDeque<f32>,
     eof: bool,
     base_ms: u64,
+    /// Skipped passages are reported once per track.
+    warned: bool,
 }
 
 impl Session {
@@ -224,6 +226,7 @@ impl Session {
             converter,
             pending: VecDeque::new(),
             eof: false,
+            warned: false,
             base_ms,
         })
     }
@@ -532,6 +535,35 @@ impl Worker {
         Ok(())
     }
 
+    /// A track that cannot be read is skipped during automatic playback, as long
+    /// as another one can start. Output and network failures stop playback.
+    fn recover(&mut self, mut error: anyhow::Error) {
+        for _ in 0..self.queue.snapshot.entries.len() {
+            let failure = Failure::of(&error);
+            let track_failed = matches!(
+                failure.kind,
+                Kind::TrackUnavailable | Kind::UnreadableAudio | Kind::UnsupportedAudio
+            );
+            if !track_failed || self.remote_generation.is_some() {
+                break;
+            }
+            self.playback.warning = Some(failure);
+            self.session = None;
+            self.playback.output = None;
+            // Repeating a track that cannot be read would never end.
+            if !self.queue.next(false) {
+                self.playback.state = PlaybackState::Stopped;
+                self.playback.position_ms = 0;
+                return;
+            }
+            match self.start_current() {
+                Ok(()) => return,
+                Err(next) => error = next,
+            }
+        }
+        self.fail(error);
+    }
+
     fn pump(&mut self) -> Result<()> {
         self.poll_network()?;
         if self.remote_generation.is_some() {
@@ -562,6 +594,14 @@ impl Worker {
                         .pending
                         .extend(session.converter.process(&[], true)?);
                 }
+            }
+            if session.reader.skipped > 0 && !session.warned {
+                session.warned = true;
+                let mut warning = Failure::new(Kind::SkippedAudio);
+                if let Some(track) = &self.playback.track {
+                    warning = warning.about(track.path.display());
+                }
+                self.playback.warning = Some(warning);
             }
         }
         let channels = session.output.frame_channels;

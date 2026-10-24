@@ -15,8 +15,15 @@ use symphonia::core::{
     units::Time,
 };
 
+/// Consecutive undecodable packets skipped before the file counts as unreadable.
+/// An isolated broken packet only loses a few milliseconds.
+const CORRUPT_RUN: usize = 8;
+
 pub(crate) struct Reader {
     path: PathBuf,
+    /// Packets skipped because they could not be decoded, since opening.
+    pub skipped: u64,
+    corrupt_run: usize,
     format: Box<dyn FormatReader>,
     decoder: Box<dyn Decoder>,
     track_id: u32,
@@ -73,6 +80,8 @@ impl Reader {
         let time_base = parameters.time_base;
         let mut reader = Self {
             path: path.to_path_buf(),
+            skipped: 0,
+            corrupt_run: 0,
             track_id: track.id,
             format,
             decoder,
@@ -112,16 +121,22 @@ impl Reader {
                 Err(Error::IoError(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof => {
                     return Ok(None);
                 }
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    self.skip(error)?;
+                    continue;
+                }
             };
             if packet.track_id() != self.track_id {
                 continue;
             }
             let decoded = match self.decoder.decode(&packet) {
                 Ok(decoded) => decoded,
-                // A broken packet is reported instead of silently hiding corruption.
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    self.skip(error)?;
+                    continue;
+                }
             };
+            self.corrupt_run = 0;
             if self.rate == 0 {
                 self.rate = decoded.spec().rate;
                 self.channels = decoded.spec().channels.count();
@@ -166,6 +181,17 @@ impl Reader {
         }
     }
 
+    /// Counts a corrupted packet as skipped; other errors, and a run of corrupted
+    /// packets, stop decoding.
+    fn skip(&mut self, error: Error) -> Result<()> {
+        if !matches!(error, Error::DecodeError(_)) || self.corrupt_run >= CORRUPT_RUN {
+            return Err(error.into());
+        }
+        self.corrupt_run += 1;
+        self.skipped += 1;
+        Ok(())
+    }
+
     pub fn seek(&mut self, milliseconds: u64) -> Result<u64> {
         self.seek_to(milliseconds)
             .map_err(|error| in_file(&self.path, error))
@@ -186,6 +212,7 @@ impl Reader {
         )?;
         self.decoder.reset();
         self.primed = None;
+        self.corrupt_run = 0;
         // Discard samples before required_ts after the decoder's preceding seek point.
         let delta = seeked.required_ts.saturating_sub(seeked.actual_ts);
         self.discard_frames = if let Some(base) = self.time_base {

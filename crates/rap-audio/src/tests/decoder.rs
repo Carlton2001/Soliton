@@ -59,3 +59,32 @@ fn generated_codec_fixtures_decode_in_rust() {
         );
     }
 }
+
+#[test]
+#[ignore = "Generate local synthetic fixtures with scripts/generate-audio-fixtures.ps1 first"]
+fn isolated_corruption_is_skipped_and_counted() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/codec-fixtures");
+    let dir = tempfile::tempdir().unwrap();
+    for extension in ["flac", "mp3"] {
+        let mut bytes = std::fs::read(root.join(format!("tone.{extension}"))).unwrap();
+        // A damaged region in the middle, as a bad sector or transfer would leave.
+        let middle = bytes.len() / 2;
+        bytes[middle..middle + 64].fill(0x55);
+        let path = dir.path().join(format!("damaged.{extension}"));
+        std::fs::write(&path, bytes).unwrap();
+        let mut reader = Reader::open(&path).unwrap_or_else(|e| panic!("{extension}: {e:#}"));
+        let mut frames = 0;
+        while let Some(samples) = reader
+            .next()
+            .unwrap_or_else(|e| panic!("{extension}: {e:#}"))
+        {
+            frames += samples.len() / reader.channels;
+        }
+        assert!(frames > 80000, "{extension}: {frames}");
+        // The FLAC reader resynchronises on the next frame by itself; the MP3
+        // decoder rejects the damaged packet, which used to stop playback.
+        if extension == "mp3" {
+            assert!(reader.skipped > 0);
+        }
+    }
+}

@@ -69,6 +69,8 @@ pub struct Playback {
     pub output_error: Option<Failure>,
     pub output_changing: bool,
     pub error: Option<Failure>,
+    /// Latest problem playback went past: skipped passages or unreadable tracks.
+    pub warning: Option<Failure>,
 }
 
 pub enum Command {

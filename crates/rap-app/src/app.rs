@@ -292,12 +292,18 @@ impl Rap {
                 || playback.network_discovering != self.playback.network_discovering
                 || playback.network_enabled != self.playback.network_enabled
                 || playback.network_error != self.playback.network_error
+                || playback.warning != self.playback.warning
                 || playback.track.as_ref().map(|t| t.id)
                     != self.playback.track.as_ref().map(|t| t.id);
             if let Some(error) = &playback.error
                 && playback.error != self.playback.error
             {
                 self.report_failure(Level::Error, Text::Playback, error);
+            }
+            if let Some(warning) = &playback.warning
+                && playback.warning != self.playback.warning
+            {
+                self.report_failure(Level::Warning, Text::Playback, warning);
             }
             let output_errors: Vec<_> = [
                 (

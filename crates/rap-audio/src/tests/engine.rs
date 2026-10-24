@@ -401,3 +401,53 @@ fn loading_a_queue_stays_paused_at_its_position_without_a_device() {
     }
     engine.shutdown();
 }
+
+fn missing(id: i64, name: &str) -> rap_core::model::Track {
+    rap_core::model::Track {
+        id,
+        source_id: 1,
+        path: name.into(),
+        metadata: Default::default(),
+        cover: None,
+        available: true,
+    }
+}
+
+#[test]
+fn automatic_playback_skips_unreadable_tracks_until_the_end_of_the_queue() {
+    let mut worker = Worker::default();
+    worker
+        .queue
+        .set(vec![missing(1, "a.wav"), missing(2, "b.wav")], 0);
+    let error = worker.start_current().unwrap_err();
+    worker.recover(error);
+    // Both tracks were tried; the queue then ends instead of failing.
+    assert_eq!(worker.playback.state, PlaybackState::Stopped);
+    assert!(worker.playback.error.is_none());
+    let warning = worker.playback.warning.unwrap();
+    assert_eq!(warning.kind, Kind::UnreadableAudio);
+    assert!(warning.detail.starts_with("b.wav"));
+    assert_eq!(worker.queue.current().unwrap().id, 2);
+}
+
+#[test]
+fn skipping_stops_after_one_round_and_never_for_output_failures() {
+    let mut worker = Worker::default();
+    worker
+        .queue
+        .set(vec![missing(1, "a.wav"), missing(2, "b.wav")], 0);
+    worker.queue.repeat = crate::Repeat::All;
+    let error = worker.start_current().unwrap_err();
+    worker.recover(error);
+    assert_eq!(worker.playback.state, PlaybackState::Failed);
+    assert_eq!(worker.playback.error.unwrap().kind, Kind::UnreadableAudio);
+
+    let mut worker = Worker::default();
+    worker
+        .queue
+        .set(vec![missing(1, "a.wav"), missing(2, "b.wav")], 0);
+    worker.recover(Failure::new(Kind::OutputDisconnected).into());
+    assert_eq!(worker.playback.state, PlaybackState::Failed);
+    assert!(worker.playback.warning.is_none());
+    assert_eq!(worker.queue.current().unwrap().id, 1);
+}

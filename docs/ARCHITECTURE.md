@@ -87,6 +87,11 @@ deux callbacks complets, vide le tampon puis réinitialise décodeur et
 convertisseur ; les seeks successifs sont regroupés. La position vient des
 samples réellement consommés.
 
+Un paquet impossible à décoder est sauté et signalé une fois par piste ; huit de
+suite rendent le fichier illisible. En lecture automatique, une piste illisible ou
+indisponible est passée, au plus un tour de file ; une panne de sortie ou de
+réseau arrête la lecture.
+
 Le moteur possède la file : occurrences à identifiant stable, dédoublonnage par
 chemin, provenance de playlist conservée, instantanés immuables partagés par `Arc`.
 Modifier la suite ne rouvre pas le flux courant.
