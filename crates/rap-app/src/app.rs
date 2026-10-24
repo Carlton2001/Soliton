@@ -94,6 +94,8 @@ pub struct Rap {
     pub seek_preview: Option<f32>,
     /// Volume restored when sound is turned back on.
     pub muted_volume: Option<f32>,
+    /// Last keyboard seek target and when it was sent.
+    pub seek_target: Option<(u64, Instant)>,
     query_pending: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -222,6 +224,7 @@ impl Rap {
             volume_slider: Slider::default(),
             seek_preview: None,
             muted_volume: None,
+            seek_target: None,
             query_pending: true,
             _subscriptions: subscriptions,
         };

@@ -82,8 +82,10 @@ restent silencieux.
 
 Le callback ne fait que des lectures atomiques, dépile un tampon lock-free
 préalloué de trames complètes et applique le volume. PCM en attente borné à deux
-secondes. Le seek réinitialise décodeur, convertisseur et flux. La position vient
-des samples réellement consommés.
+secondes. Le seek garde le flux ouvert : le worker arrête la consommation, attend
+deux callbacks complets, vide le tampon puis réinitialise décodeur et
+convertisseur ; les seeks successifs sont regroupés. La position vient des
+samples réellement consommés.
 
 Le moteur possède la file : occurrences à identifiant stable, dédoublonnage par
 chemin, provenance de playlist conservée, instantanés immuables partagés par `Arc`.

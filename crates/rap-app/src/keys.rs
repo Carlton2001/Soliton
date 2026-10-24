@@ -5,6 +5,9 @@ use rap_audio::Command;
 
 /// Step of the keyboard seek shortcuts.
 const SEEK_STEP_MS: u64 = 10_000;
+/// Repeated keys within this delay step from the previous target: the engine
+/// reports positions later than keys repeat.
+const SEEK_REPEAT: std::time::Duration = std::time::Duration::from_millis(500);
 
 impl Rap {
     pub fn key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -129,12 +132,19 @@ impl Rap {
                 return;
             }
             "left" | "right" if control => {
-                let position = self.playback.position_ms;
-                let target = if key == "left" {
+                let position = self
+                    .seek_target
+                    .filter(|(_, sent)| sent.elapsed() < SEEK_REPEAT)
+                    .map_or(self.playback.position_ms, |(target, _)| target);
+                let mut target = if key == "left" {
                     position.saturating_sub(SEEK_STEP_MS)
                 } else {
                     position.saturating_add(SEEK_STEP_MS)
                 };
+                if self.playback.duration_ms > 0 {
+                    target = target.min(self.playback.duration_ms);
+                }
+                self.seek_target = Some((target, std::time::Instant::now()));
                 return self.audio_command(Command::Seek(target), cx);
             }
             _ => {}

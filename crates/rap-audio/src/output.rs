@@ -5,10 +5,16 @@ use cpal::{
     traits::{DeviceTrait, StreamTrait},
 };
 use crossbeam_queue::ArrayQueue;
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    },
+    time::{Duration, Instant},
 };
+
+/// A stalled device fails through `failed`; a flush never waits longer.
+const CALLBACK_WAIT: Duration = Duration::from_millis(200);
 
 pub(crate) struct Output {
     _stream: cpal::Stream,
@@ -16,6 +22,8 @@ pub(crate) struct Output {
     pub playing: Arc<AtomicBool>,
     pub volume: Arc<AtomicU32>,
     pub played: Arc<AtomicU64>,
+    /// Completed callbacks, so the worker knows when none still consumes frames.
+    callbacks: Arc<AtomicU64>,
     pub failed: Arc<AtomicBool>,
     pub rate: u32,
     /// Channels carried by queued frames: mono, or stereo for any wider device,
@@ -52,6 +60,7 @@ impl Output {
         let playing = Arc::new(AtomicBool::new(false));
         let volume = Arc::new(AtomicU32::new(volume.clamp(0., 1.).to_bits()));
         let played = Arc::new(AtomicU64::new(0));
+        let callbacks = Arc::new(AtomicU64::new(0));
         let failed = Arc::new(AtomicBool::new(false));
         let stream_config = config.config();
         macro_rules! build {
@@ -59,10 +68,14 @@ impl Output {
                 build::<$sample>(
                     &device,
                     &stream_config,
-                    samples.clone(),
-                    playing.clone(),
-                    volume.clone(),
-                    played.clone(),
+                    Callback {
+                        channels: usize::from(stream_config.channels),
+                        samples: samples.clone(),
+                        playing: playing.clone(),
+                        volume: volume.clone(),
+                        played: played.clone(),
+                        callbacks: callbacks.clone(),
+                    },
                     failed.clone(),
                 )?
             };
@@ -82,6 +95,7 @@ impl Output {
             playing,
             volume,
             played,
+            callbacks,
             failed,
             rate,
             frame_channels,
@@ -91,33 +105,68 @@ impl Output {
     pub fn position_ms(&self) -> u64 {
         self.played.load(Ordering::Relaxed) * 1000 / self.rate as u64
     }
+
+    /// Drops queued frames and restarts the position count, keeping the stream.
+    /// Consumption stays stopped until `playing` is set again.
+    pub fn flush(&self) {
+        flush(&self.samples, &self.playing, &self.played, &self.callbacks);
+    }
+}
+
+/// Once two callbacks have completed after `playing` is cleared, the second one
+/// started after the first ended and saw it cleared: no callback pops any more,
+/// so no frame from before the flush can be played after it.
+fn flush(
+    samples: &ArrayQueue<[f32; 2]>,
+    playing: &AtomicBool,
+    played: &AtomicU64,
+    callbacks: &AtomicU64,
+) {
+    playing.store(false, Ordering::SeqCst);
+    let seen = callbacks.load(Ordering::SeqCst);
+    let start = Instant::now();
+    while callbacks.load(Ordering::SeqCst).wrapping_sub(seen) < 2 && start.elapsed() < CALLBACK_WAIT
+    {
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    while samples.pop().is_some() {}
+    played.store(0, Ordering::SeqCst);
+}
+
+/// State moved into the device callback.
+struct Callback {
+    channels: usize,
+    samples: Arc<ArrayQueue<[f32; 2]>>,
+    playing: Arc<AtomicBool>,
+    volume: Arc<AtomicU32>,
+    played: Arc<AtomicU64>,
+    callbacks: Arc<AtomicU64>,
+}
+
+impl Callback {
+    /// Callback contract: only atomics and nonblocking preallocated queue access.
+    fn fill<T: SizedSample + FromSample<f32>>(&self, output: &mut [T]) {
+        let active = self.playing.load(Ordering::SeqCst);
+        let gain = f32::from_bits(self.volume.load(Ordering::Relaxed));
+        let consumed = render(output, self.channels, &self.samples, active, gain);
+        self.played.fetch_add(consumed, Ordering::Relaxed);
+        self.callbacks.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 fn build<T>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    samples: Arc<ArrayQueue<[f32; 2]>>,
-    playing: Arc<AtomicBool>,
-    volume: Arc<AtomicU32>,
-    played: Arc<AtomicU64>,
+    callback: Callback,
     failed: Arc<AtomicBool>,
 ) -> Result<cpal::Stream>
 where
     T: SizedSample + FromSample<f32>,
 {
-    let channels = config.channels as usize;
     Ok(device.build_output_stream(
         config,
-        move |output: &mut [T], _| {
-            // Callback contract: only atomics and nonblocking preallocated queue access.
-            let active = playing.load(Ordering::Relaxed);
-            let gain = f32::from_bits(volume.load(Ordering::Relaxed));
-            let consumed = render(output, channels, &samples, active, gain);
-            played.fetch_add(consumed, Ordering::Relaxed);
-        },
-        move |_| {
-            failed.store(true, Ordering::Relaxed);
-        },
+        move |output: &mut [T], _| callback.fill(output),
+        move |_| failed.store(true, Ordering::Relaxed),
         None,
     )?)
 }

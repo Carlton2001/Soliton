@@ -102,11 +102,12 @@ impl Engine {
                     };
                     match received {
                         Ok(mut command) => {
-                            // A network round-trip must not turn slider updates
-                            // into a backlog of obsolete volume commands.
-                            if matches!(command, Command::Volume(_)) {
+                            // A network round-trip or a held key must not turn
+                            // repeated volume or seek commands into a backlog.
+                            if matches!(command, Command::Volume(_) | Command::Seek(_)) {
+                                let kind = std::mem::discriminant(&command);
                                 while let Ok(next) = receiver.try_recv() {
-                                    if matches!(next, Command::Volume(_)) {
+                                    if std::mem::discriminant(&next) == kind {
                                         command = next;
                                     } else {
                                         deferred = Some(next);
@@ -467,7 +468,7 @@ impl Worker {
         if self.remote_generation.is_some() {
             return self.remote_command(rap_network::Command::Seek(position));
         }
-        let Some(session) = self.session.take() else {
+        let Some(session) = self.session.as_mut() else {
             // A loaded queue has no stream yet: it will start at this position.
             if self.resume_at.is_some() {
                 let position = position.min(self.playback.duration_ms);
@@ -476,20 +477,19 @@ impl Worker {
             }
             return Ok(());
         };
-        // Stop and drop the previous stream before publishing a new queue; samples
-        // from before the seek can never leak into the replacement callback.
-        session.output.playing.store(false, Ordering::Relaxed);
-        let reader = session.reader;
-        drop(session.output);
-        let session = Session::open(
-            reader,
-            self.playback.volume,
-            self.playback.selected_output.as_deref(),
-            Some(position),
+        // The device stream stays open: reopening it is slow, notably over
+        // Bluetooth. Frames from before the seek are dropped, never played.
+        session.output.flush();
+        session.base_ms = session.reader.seek(position)?;
+        session.converter = Converter::new(
+            session.reader.rate,
+            session.reader.channels,
+            session.output.rate,
+            session.output.frame_channels,
         )?;
+        session.pending.clear();
+        session.eof = false;
         self.playback.position_ms = session.base_ms;
-        self.playback.output = Some(session.output.info.clone());
-        self.session = Some(session);
         Ok(())
     }
 
