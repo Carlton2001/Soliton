@@ -1,99 +1,75 @@
-# Soliton — Lecteur audio en Rust
+# Soliton
 
-Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7 et 9 implémentées,
-validées sous Windows avec Rust 1.98.1 MSVC. Distribution Windows préparée ;
-restent la validation des paquets et les validations matérielles.
-La phase 8 (API locale de contrôle) est reportée.
+<p align="center">
+  <img src="screenshots/hero.webp" alt="Soliton music library interface" width="100%" />
+</p>
 
-## Lancer
+Soliton is a native music player built in **Rust** with **GPUI**. It brings your local music collection into a responsive desktop interface, with rich metadata, album artwork, multiple editions, and playback on local or network devices.
 
-Installer Rust MSVC, les Build Tools C++ et le SDK Windows, puis :
+Windows is the current build and validation target. Windows distribution is prepared, with package and hardware validation still pending. Linux is not currently validated.
+
+## Your Music, Kept Local
+
+Browse music from multiple folders, external drives, or mounted network shares in one library. Soliton reads metadata and artwork from your files and stores its database and caches separately. **Your music files, tags, and embedded artwork remain untouched.**
+
+Background indexing and filesystem monitoring keep the library up to date. When a source goes offline, its albums stay in your library and are marked unavailable until it returns.
+
+## Key Features
+
+- **Album and Artist Browsing**: Explore grid or list views, open album details, and browse compilations under Various Artists.
+- **Multiple Editions**: Group matching album editions and put the best available edition first.
+- **Search and Filters**: Search regardless of case or accents. Filter by genre, period, artist, format, or quality, and sort by artist, title, year, or recent additions.
+- **Playback and Queue**: Use a persistent player bar, Now Playing, fullscreen mode, shuffle, repeat, manual playlists, and an editable queue.
+- **Local and Network Outputs**: Choose a local audio device, use Bluetooth through Windows, or play to DLNA / UPnP and Google Cast receivers. Cast has been validated on NVIDIA SHIELD; DLNA has only been tested with a simulated receiver.
+- **Windows Integration**: Use media keys, system media controls, taskbar thumbnail controls, and the notification area. Configure closing behavior and automatic startup.
+- **Personalization**: Choose English or French, system/light/dark appearance, accent color, artwork size, and the application icon.
+
+Tested formats include **WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, and AIFF**. Local playback uses shared audio output; exclusive mode, bit-perfect playback, and an equalizer are not currently available. See the [development guide](docs/DEVELOPMENT.md#limites) for playback and network limitations.
+
+## Technology Stack
+
+- **Application and UI**: Rust and [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui), with native GPU-accelerated rendering.
+- **Audio**: Symphonia for decoding, CPAL for local output, and an audio engine independent of the interface.
+- **Library**: SQLite through rusqlite, Lofty for tags and artwork, and background indexing with cancellation and bounded concurrency.
+- **System Integration**: Dedicated platform interfaces with Windows-specific implementations.
+- **Icons**: Official [Lucide](https://lucide.dev/) SVG assets.
+
+## Getting Started
+
+### Prerequisites
+
+For the current Windows build:
+
+- Rust with the MSVC x64 toolchain. The current validation baseline is Rust 1.98.1.
+- Visual Studio Build Tools with the Visual C++ build tools and Windows SDK.
+
+### Build and Run
+
+From the repository root:
 
 ```powershell
 cargo run -p soliton-app
 ```
 
-## Fonctions
+For release builds, Windows packaging, and update behavior, see the [distribution guide](docs/DISTRIBUTION.md). Development checks, smoke tests, and hardware probes are documented in the [development guide](docs/DEVELOPMENT.md).
 
-- **Bibliothèque** : plusieurs dossiers sources, indexation en arrière-plan
-  annulable, surveillance des changements, analyse au démarrage et toutes les
-  30 minutes. Une source hors ligne garde ses albums, signalés indisponibles.
-- **Albums et artistes** : grille ou liste, fiche album, éditions multiples
-  réunies (la meilleure disponible en premier), compilations sous « Artistes divers ».
-- **Recherche et filtres** : sans casse ni accents ; filtres genre, période,
-  artiste, format et qualité ; tri par artiste, titre, année ou ajout récent.
-- **Lecture** : barre permanente, Lecture en cours, plein écran `F11`, aléatoire,
-  répétition, playlists manuelles et file modifiable.
-- **Sorties** : périphérique local mémorisé, Bluetooth via les paramètres Windows,
-  DLNA / UPnP et Google Cast (validé sur NVIDIA SHIELD).
-- **Windows** : SMTC et touches multimédias, vignette de barre des tâches avec
-  commandes, zone de notification, fermeture configurable, démarrage automatique.
-- **Paramètres** : français/anglais, thème système/clair/sombre, accent, taille des
-  pochettes, icône de l'application.
+## Keyboard Shortcuts
 
-Clavier : `Ctrl+F` recherche, `Espace` lecture/pause, `Ctrl+←/→` ±10 s,
-`Ctrl+↑/↓` volume, `Alt+←/→` historique, `Échap` retour, `Tab` et `Entrée` pour
-les contrôles.
+| Action | Shortcut |
+| --- | --- |
+| Search | Ctrl + F |
+| Play / Pause | Space |
+| Seek backward / forward 10 seconds | Ctrl + Left / Right |
+| Adjust volume | Ctrl + Up / Down |
+| Navigate history | Alt + Left / Right |
+| Fullscreen | F11 |
+| Go back | Escape |
+| Navigate / activate controls | Tab / Enter |
 
-## Données
+## Documentation
 
-SQLite, paramètres et pochettes sont dans `%LOCALAPPDATA%\Soliton` (`SOLITON_DATA_DIR`
-pour isoler le développement), hors des sources musicales. Soliton ouvre la musique
-en lecture seule et ne modifie ni tags ni pochettes intégrées.
+See the [documentation index](docs/README.md) for development and validation details, architecture, dependencies, distribution, and product specifications.
 
-## Vérifier
+## License
 
-```powershell
-cargo fmt --check
-cargo check --workspace --locked
-cargo test --workspace --locked
-```
-
-Tests natifs et matériels (FFmpeg sert uniquement à générer les fixtures) :
-
-```powershell
-./scripts/generate-audio-fixtures.ps1
-cargo test -p soliton-audio -- --include-ignored
-cargo test -p soliton-platform -- --include-ignored
-./scripts/smoke-windows.ps1
-./scripts/smoke-icons-windows.ps1
-```
-
-`smoke-windows.ps1` ouvre Soliton sur des données synthétiques dans `target/`, capture
-sa fenêtre et échoue sur un code de sortie ou une erreur de journal. Options :
-`-Language English -Light -List`, `-CloseScenario Early|Minimized|Hidden|Ask`,
-`-Taskbar`, `-Collections`, `-AudioOutputs [-AudioOutputRow n]`,
-`-NetworkOutputs -LocalOutputCount n`.
-
-Exemples matériels explicites (volume nul ou faible, récepteur Cast inactif) :
-
-```powershell
-cargo run -p soliton-audio --example bluetooth_probe -- "<nom de sortie>"
-cargo run -p soliton-network --example discover
-cargo run -p soliton-network --example smoke_cast -- <identifiant> <fichier>
-cargo run -p soliton-audio --example network_session -- <identifiant> <fichier>
-cargo run -p soliton-app --bin Soliton-index -- <dossier-donnees-Soliton> [dossier-musique]
-```
-
-Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de liens durs.
-
-## Limites
-
-- Sortie partagée, sources mono/stéréo (stéréo à l'avant sur une sortie 5.1/7.1) ; pas d'égaliseur, de mode exclusif ni de bit-perfect.
-- Formats testés : WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, AIFF. Pas d'Opus, WMA, APE.
-- Les sorties CPAL sont identifiées par leur nom : une sortie renommée doit être
-  choisie à nouveau. Le format affiché est celui envoyé par Soliton au système.
-- Bluetooth : codec choisi par Windows, ni lossless ni bit-perfect garantis.
-- Réseau : IPv4 local, une sortie active, sans transcodage ni multiroom ; DLNA
-  testé seulement sur récepteur simulé.
-- Éditions fusionnées seulement si artiste, titre et année sont identiques ; le
-  choix d'édition n'est pas mémorisé.
-- Distribution Windows et vérification des mises à jour : voir le
-  [guide de distribution](docs/DISTRIBUTION.md). Linux non validé.
-- Validations matérielles en attente : voir la phase 11 des spécifications.
-
-Voir [les spécifications](docs/SOLITON_SPECIFICATIONS.md), [l'architecture](docs/ARCHITECTURE.md),
-[les dépendances](docs/DEPENDENCIES.md) et [les correctifs GPUI](vendor/README.md).
-Attributions dans [assets/NOTICE.md](assets/NOTICE.md).
-Collecte et vérification des licences des crates et ressources :
-[licenses/dependencies/README.md](licenses/dependencies/README.md).
+Soliton is licensed under the **GNU GPL v3 (GPL-3.0-only)**. See [LICENSE](LICENSE) for details, [asset attributions](assets/NOTICE.md), and [dependency license notices](licenses/dependencies/README.md).
