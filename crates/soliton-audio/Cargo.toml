@@ -1,0 +1,21 @@
+[package]
+name = "soliton-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+soliton-core.workspace = true
+soliton-network.workspace = true
+anyhow.workspace = true
+symphonia = { version = "=0.5.5", features = ["all"] }
+cpal = "=0.16.0"
+rubato = { version = "=0.16.2", default-features = false }
+crossbeam-channel = "0.5"
+crossbeam-queue = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
+oxicast = { version = "=0.0.3", default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

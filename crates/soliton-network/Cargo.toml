@@ -1,0 +1,26 @@
+[package]
+name = "soliton-network"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+soliton-core.workspace = true
+crossbeam-channel = "0.5"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros", "fs", "io-util"] }
+axum = { version = "=0.8.9", default-features = false, features = ["tokio", "http1"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["stream"] }
+oxicast = { version = "=0.0.3", default-features = false }
+mdns-sd = "=0.20.3"
+roxmltree = "=0.20.0"
+uuid = { version = "1", features = ["v4"] }
+if-addrs = "0.15"
+socket2 = { version = "0.6", features = ["all"] }
+futures-util = "0.3"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

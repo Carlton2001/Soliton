@@ -1,7 +1,7 @@
-# RAP - Rust Audio Player
+# Soliton - Audio Player
 
 ## Présentation
-RAP est un lecteur de musique haute performance écrit en **Rust**, conçu pour gérer de grandes collections de fichiers audio (FLAC, MP3, WAV, etc) avec une interface fluide et réactive. Le projet met l'accent sur la richesse des métadonnées et la rapidité de navigation via une base de données locale.
+Soliton est un lecteur de musique haute performance écrit en **Rust**, conçu pour gérer de grandes collections de fichiers audio (FLAC, MP3, WAV, etc) avec une interface fluide et réactive. Le projet met l'accent sur la richesse des métadonnées et la rapidité de navigation via une base de données locale.
 
 ## Stack Technique
 
@@ -15,9 +15,9 @@ Les versions exactes restent à valider. Une fois le workspace initialisé, les 
 
 ## Références
 
-- [Spécifications de RAP](docs/RAP_SPECIFICATIONS.md) : périmètre fonctionnel, contraintes et phases de développement. Ce fichier `AGENTS.md` porte les consignes de travail ; éviter de dupliquer les spécifications. Signaler les contradictions avant d'implémenter le comportement concerné.
+- [Spécifications de Soliton](docs/SOLITON_SPECIFICATIONS.md) : périmètre fonctionnel, contraintes et phases de développement. Ce fichier `AGENTS.md` porte les consignes de travail ; éviter de dupliquer les spécifications. Signaler les contradictions avant d'implémenter le comportement concerné.
 - Lire intégralement les spécifications avant l'initialisation du projet, puis consulter les sections pertinentes pour chaque changement. Présenter les choix ayant un impact important sur l'architecture avant implémentation.
-- **Référence GPUI :** examiner le projet voisin `../Oxyde-GPUI` pour les composants, conventions visuelles et usages GPUI pertinents, notamment les closures `cx.listener`. Vérifier leur compatibilité avec la version retenue dans RAP. Réutiliser sélectivement après examen du code, en respectant licences et attributions, sans dépendance directe à l'application Oxyde.
+- **Référence GPUI :** examiner le projet voisin `../Oxyde-GPUI` pour les composants, conventions visuelles et usages GPUI pertinents, notamment les closures `cx.listener`. Vérifier leur compatibilité avec la version retenue dans Soliton. Réutiliser sélectivement après examen du code, en respectant licences et attributions, sans dépendance directe à l'application Oxyde.
 
 ## Règles permanentes
 
@@ -30,7 +30,7 @@ Les versions exactes restent à valider. Une fois le workspace initialisé, les 
 - Écrire les messages de commit en anglais. **Chaque push vers GitHub exige une demande explicite pour cette opération**, y compris branches et tags, quel que soit l’outil. Une demande de modification, commit ou fusion ne l’autorise pas ; une autorisation antérieure ne vaut pas pour le push suivant.
 - Prévoir les textes d'interface en français et en anglais dès leur introduction.
 
-## Invariants de RAP
+## Invariants de Soliton
 
 - Ne jamais modifier, déplacer, renommer ou supprimer les fichiers de la bibliothèque musicale, leurs tags ou leurs pochettes intégrées. Stocker bases, caches et fichiers temporaires hors des dossiers sources.
 - Une source inaccessible ne constitue pas une preuve de suppression de ses fichiers : conserver ses entrées et signaler leur indisponibilité.

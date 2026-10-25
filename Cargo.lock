@@ -4795,115 +4795,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a611d15b50743feb4c76b7d03edcb0e64f399c26961e4efe6975bc398be6aa3d"
 
 [[package]]
-name = "rap-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossbeam-channel",
- "embed-resource",
- "gpui",
- "rap-audio",
- "rap-core",
- "rap-library",
- "rap-platform",
- "raw-window-handle",
- "resvg",
- "tempfile",
- "tracing",
- "tracing-subscriber",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "rap-audio"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cpal",
- "crossbeam-channel",
- "crossbeam-queue",
- "oxicast",
- "rap-core",
- "rap-network",
- "rubato",
- "symphonia",
- "tempfile",
- "tokio",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "rap-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "tempfile",
- "unicode-normalization",
-]
-
-[[package]]
-name = "rap-library"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "crossbeam-channel",
- "dua-core",
- "image",
- "lofty",
- "notify",
- "rap-core",
- "rusqlite",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "rap-network"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "crossbeam-channel",
- "futures-util",
- "if-addrs",
- "mdns-sd",
- "oxicast",
- "rap-core",
- "reqwest",
- "roxmltree",
- "socket2",
- "tempfile",
- "tokio",
- "tower",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "rap-platform"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "crossbeam-channel",
- "dirs 7.0.0",
- "image",
- "minisign-verify",
- "rap-core",
- "raw-window-handle",
- "resvg",
- "tempfile",
- "windows 0.61.3",
- "windows-collections",
- "windows-future",
- "windows-registry 0.5.3",
-]
-
-[[package]]
 name = "rav1e"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5800,6 +5691,115 @@ checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "soliton-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossbeam-channel",
+ "embed-resource",
+ "gpui",
+ "raw-window-handle",
+ "resvg",
+ "soliton-audio",
+ "soliton-core",
+ "soliton-library",
+ "soliton-platform",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "soliton-audio"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cpal",
+ "crossbeam-channel",
+ "crossbeam-queue",
+ "oxicast",
+ "rubato",
+ "soliton-core",
+ "soliton-network",
+ "symphonia",
+ "tempfile",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "soliton-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "soliton-library"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "crossbeam-channel",
+ "dua-core",
+ "image",
+ "lofty",
+ "notify",
+ "rusqlite",
+ "serde_json",
+ "soliton-core",
+ "tempfile",
+]
+
+[[package]]
+name = "soliton-network"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "crossbeam-channel",
+ "futures-util",
+ "if-addrs",
+ "mdns-sd",
+ "oxicast",
+ "reqwest",
+ "roxmltree",
+ "socket2",
+ "soliton-core",
+ "tempfile",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "soliton-platform"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "crossbeam-channel",
+ "dirs 7.0.0",
+ "image",
+ "minisign-verify",
+ "raw-window-handle",
+ "resvg",
+ "soliton-core",
+ "tempfile",
+ "windows 0.61.3",
+ "windows-collections",
+ "windows-future",
+ "windows-registry 0.5.3",
 ]
 
 [[package]]

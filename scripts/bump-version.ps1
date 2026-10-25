@@ -42,7 +42,7 @@ try {
 
     Invoke-Git add Cargo.toml Cargo.lock | Out-Null
     Invoke-Git commit -m "Release $tag" | Out-Null
-    Invoke-Git tag -a $tag -m "RAP $tag" | Out-Null
+    Invoke-Git tag -a $tag -m "Soliton $tag" | Out-Null
     Write-Host "Version $current -> $Version committed and tagged $tag." -ForegroundColor Green
     Write-Host "Publish with: git push origin main $tag" -ForegroundColor Yellow
 } finally { Pop-Location }

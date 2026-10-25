@@ -21,7 +21,7 @@ binaire Windows. Les copies locales de `vendor/` sont incluses. Une section
 complémentaire conserve les fichiers NOTICE, COPYRIGHT et AUTHORS amont.
 
 `assets/` conserve les licences Lucide, Inter, JetBrains Mono et GPUI ainsi que
-les attributions de RAP. Les chemins du NOTICE copié sont relatifs au dossier
+les attributions de Soliton. Les chemins du NOTICE copié sont relatifs au dossier
 `assets/` du projet source ; la licence Lucide est ici `LUCIDE-LICENSE.txt`.
 JetBrains Mono est incluse par prudence même si elle n'est pas embarquée.
 
@@ -38,10 +38,10 @@ conversion CRLF de Git sous Windows ne rende pas les notices périmées.
 crates mal empaquetées nécessitent des licences récupérées sur leurs dépôts
 amont ; ce mode peut perdre leurs copyrights spécifiques. Préférer le mode en
 ligne pour une livraison. La future distribution devra exécuter la génération
-et la vérification, puis inclure ce dossier et le LICENSE de RAP.
+et la vérification, puis inclure ce dossier et le LICENSE de Soliton.
 
-The commands above generate and verify dependency notices for the entire RAP
+The commands above generate and verify dependency notices for the entire Soliton
 workspace. The report preserves upstream license texts and supplemental notices;
 `assets/` contains resource licenses and attributions. Regenerate after dependency
 or attribution changes. Prefer online generation for releases. Future packages
-must include this directory and RAP's root LICENSE.
+must include this directory and Soliton's root LICENSE.

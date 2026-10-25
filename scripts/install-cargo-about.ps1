@@ -24,7 +24,7 @@ $cached = (Test-Path -LiteralPath $executable -PathType Leaf) -and
 
 if (-not $cached) {
     $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
-    $temporaryName = "rap-cargo-about-$([Guid]::NewGuid().ToString('N'))"
+    $temporaryName = "soliton-cargo-about-$([Guid]::NewGuid().ToString('N'))"
     $temporaryDirectory = Join-Path $temporaryRoot $temporaryName
     New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
     try {

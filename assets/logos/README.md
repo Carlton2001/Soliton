@@ -1,4 +1,4 @@
-# Logos rap
+# Logos soliton
 
 Onde continue inversée horizontalement, d’après la référence fournie par
 l’utilisateur le 24 octobre 2026. Les six SVG sont les sources de production :

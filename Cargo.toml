@@ -13,11 +13,11 @@ rust-version = "1.89"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rap-core = { path = "crates/rap-core" }
-rap-platform = { path = "crates/rap-platform" }
-rap-library = { path = "crates/rap-library" }
-rap-audio = { path = "crates/rap-audio" }
-rap-network = { path = "crates/rap-network" }
+soliton-core = { path = "crates/soliton-core" }
+soliton-platform = { path = "crates/soliton-platform" }
+soliton-library = { path = "crates/soliton-library" }
+soliton-audio = { path = "crates/soliton-audio" }
+soliton-network = { path = "crates/soliton-network" }
 
 [profile.dev]
 opt-level = 1

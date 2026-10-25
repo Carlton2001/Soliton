@@ -11,16 +11,16 @@ $output=Join-Path $project ('target\icon-qa-' + $Language + $(if($Light){'-light
 New-Item -ItemType Directory -Force -Path $data,$output | Out-Null
 $settings=Join-Path $data 'settings.json'
 @{language=$Language;appearance=$(if($Light){'Light'}else{'Dark'});volume=0;close_behavior='Hide';last_view=@{view='Settings'};window=@{x=100;y=100;width=1180;height=880;maximized=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
-$previousData=$env:RAP_DATA_DIR
+$previousData=$env:SOLITON_DATA_DIR
 $previousLog=$env:RUST_LOG
-$env:RAP_DATA_DIR=$data
+$env:SOLITON_DATA_DIR=$data
 $env:RUST_LOG='info'
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
 using System;
 using System.Text;
 using System.Runtime.InteropServices;
-public class RapIconsSmoke {
+public class SolitonIconsSmoke {
  public delegate bool Callback(IntPtr h,IntPtr p);
  [DllImport("user32.dll")] public static extern bool EnumWindows(Callback cb,IntPtr p);
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
@@ -49,54 +49,54 @@ public class RapIconsSmoke {
 $process=$null
 $handle=[IntPtr]::Zero
 function Start-IconTest([string]$suffix) {
-    $script:process=Start-Process -FilePath (Join-Path $project 'target\debug\rap.exe') -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $output ($suffix+'-out.log')) -RedirectStandardError (Join-Path $output ($suffix+'-error.log'))
+    $script:process=Start-Process -FilePath (Join-Path $project 'target\debug\Soliton.exe') -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $output ($suffix+'-out.log')) -RedirectStandardError (Join-Path $output ($suffix+'-error.log'))
     for($attempt=0;$attempt -lt 40;$attempt++) {
         Start-Sleep -Milliseconds 150
-        $script:handle=[RapIconsSmoke]::Find($process.Id,'rap',0)
+        $script:handle=[SolitonIconsSmoke]::Find($process.Id,'Soliton',0)
         if($handle -ne [IntPtr]::Zero){break}
     }
-    if($handle -eq [IntPtr]::Zero){throw 'Main rap window missing or title is not lowercase'}
-    [RapIconsSmoke]::ShowWindow($handle,9) | Out-Null
+    if($handle -eq [IntPtr]::Zero){throw 'Main soliton window missing or title is not Soliton'}
+    [SolitonIconsSmoke]::ShowWindow($handle,9) | Out-Null
     Start-Sleep -Seconds 1
 }
 function Save-IconFrame([string]$name) {
-    $oldDpi=[RapIconsSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
+    $oldDpi=[SolitonIconsSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
     try {
-        $rect=New-Object RapIconsSmoke+Rect
-        [RapIconsSmoke]::GetWindowRect($handle,[ref]$rect) | Out-Null
+        $rect=New-Object SolitonIconsSmoke+Rect
+        [SolitonIconsSmoke]::GetWindowRect($handle,[ref]$rect) | Out-Null
         $bitmap=[Drawing.Bitmap]::new($rect.Right-$rect.Left,$rect.Bottom-$rect.Top)
         $graphics=[Drawing.Graphics]::FromImage($bitmap)
         try {
             $dc=$graphics.GetHdc()
-            try {if(-not [RapIconsSmoke]::PrintWindow($handle,$dc,2)){throw 'Capture failed'}} finally {$graphics.ReleaseHdc($dc)}
+            try {if(-not [SolitonIconsSmoke]::PrintWindow($handle,$dc,2)){throw 'Capture failed'}} finally {$graphics.ReleaseHdc($dc)}
             $bitmap.Save((Join-Path $output ($name+'.png')))
         } finally {$graphics.Dispose();$bitmap.Dispose()}
-    } finally {[RapIconsSmoke]::SetThreadDpiAwarenessContext($oldDpi) | Out-Null}
+    } finally {[SolitonIconsSmoke]::SetThreadDpiAwarenessContext($oldDpi) | Out-Null}
 }
 function Click-Icon([int]$index) {
     # Centers of the six icon cards, measured at the fixed QA window/rem size.
-    $scale=[RapIconsSmoke]::GetDpiForWindow($handle)/96.0
-    $oldDpi=[RapIconsSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
+    $scale=[SolitonIconsSmoke]::GetDpiForWindow($handle)/96.0
+    $oldDpi=[SolitonIconsSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
     try {
-        $rect=New-Object RapIconsSmoke+Rect
-        $origin=New-Object RapIconsSmoke+Point
-        [RapIconsSmoke]::GetWindowRect($handle,[ref]$rect) | Out-Null
-        [RapIconsSmoke]::ClientToScreen($handle,[ref]$origin) | Out-Null
+        $rect=New-Object SolitonIconsSmoke+Rect
+        $origin=New-Object SolitonIconsSmoke+Point
+        [SolitonIconsSmoke]::GetWindowRect($handle,[ref]$rect) | Out-Null
+        [SolitonIconsSmoke]::ClientToScreen($handle,[ref]$origin) | Out-Null
         $x=[int]((90+$index*124)*$scale)-($origin.X-$rect.Left)
         $y=[int](520*$scale)-($origin.Y-$rect.Top)
         $point=($y -shl 16) -bor ($x -band 0xffff)
-        [RapIconsSmoke]::PostMessage($handle,0x200,[IntPtr]0,[IntPtr]$point) | Out-Null
-        [RapIconsSmoke]::PostMessage($handle,0x201,[IntPtr]1,[IntPtr]$point) | Out-Null
-        [RapIconsSmoke]::PostMessage($handle,0x202,[IntPtr]0,[IntPtr]$point) | Out-Null
-    } finally {[RapIconsSmoke]::SetThreadDpiAwarenessContext($oldDpi) | Out-Null}
+        [SolitonIconsSmoke]::PostMessage($handle,0x200,[IntPtr]0,[IntPtr]$point) | Out-Null
+        [SolitonIconsSmoke]::PostMessage($handle,0x201,[IntPtr]1,[IntPtr]$point) | Out-Null
+        [SolitonIconsSmoke]::PostMessage($handle,0x202,[IntPtr]0,[IntPtr]$point) | Out-Null
+    } finally {[SolitonIconsSmoke]::SetThreadDpiAwarenessContext($oldDpi) | Out-Null}
 }
 function Assert-IconColor([string]$color) {
     # WM_GETICON covers both the main window and its hidden taskbar thumbnail.
-    $proxy=[RapIconsSmoke]::Find($process.Id,'rap',1)
+    $proxy=[SolitonIconsSmoke]::Find($process.Id,'Soliton',1)
     if($proxy -eq [IntPtr]::Zero){throw 'Taskbar thumbnail proxy missing'}
     foreach($window in @($handle,$proxy)) {
         foreach($kind in @(0,1)) {
-            $iconHandle=[RapIconsSmoke]::SendMessage($window,0x7f,[IntPtr]$kind,[IntPtr]0)
+            $iconHandle=[SolitonIconsSmoke]::SendMessage($window,0x7f,[IntPtr]$kind,[IntPtr]0)
             if($iconHandle -eq [IntPtr]::Zero){throw 'Native icon missing'}
             $icon=[Drawing.Icon]::FromHandle($iconHandle)
             $bitmap=$icon.ToBitmap()
@@ -111,11 +111,11 @@ function Assert-IconColor([string]$color) {
     }
 }
 function Quit-IconTest {
-    $owner=[RapIconsSmoke]::Find($process.Id,'RAP notification owner',-1)
+    $owner=[SolitonIconsSmoke]::Find($process.Id,'Soliton notification owner',-1)
     if($owner -eq [IntPtr]::Zero){throw 'Tray owner missing'}
-    [RapIconsSmoke]::PostMessage($owner,0x111,[IntPtr]5,[IntPtr]0) | Out-Null
-    if(-not $process.WaitForExit(5000)){throw 'rap did not exit cleanly'}
-    if($process.ExitCode -ne 0){throw ('rap exited with '+$process.ExitCode)}
+    [SolitonIconsSmoke]::PostMessage($owner,0x111,[IntPtr]5,[IntPtr]0) | Out-Null
+    if(-not $process.WaitForExit(5000)){throw 'soliton did not exit cleanly'}
+    if($process.ExitCode -ne 0){throw ('soliton exited with '+$process.ExitCode)}
 }
 try {
     Start-IconTest 'first'
@@ -137,13 +137,13 @@ try {
         Save-IconFrame $palettes[$index]
     }
     # A successful tray update must keep close-to-tray and restoration available.
-    [RapIconsSmoke]::PostMessage($handle,0x10,[IntPtr]0,[IntPtr]0) | Out-Null
+    [SolitonIconsSmoke]::PostMessage($handle,0x10,[IntPtr]0,[IntPtr]0) | Out-Null
     Start-Sleep -Milliseconds 500
-    if($process.HasExited -or [RapIconsSmoke]::IsWindowVisible($handle)){throw 'Close-to-tray failed after changing icons'}
-    $owner=[RapIconsSmoke]::Find($process.Id,'RAP notification owner',-1)
-    [RapIconsSmoke]::PostMessage($owner,0x8006,[IntPtr]0,[IntPtr]0x400) | Out-Null
+    if($process.HasExited -or [SolitonIconsSmoke]::IsWindowVisible($handle)){throw 'Close-to-tray failed after changing icons'}
+    $owner=[SolitonIconsSmoke]::Find($process.Id,'Soliton notification owner',-1)
+    [SolitonIconsSmoke]::PostMessage($owner,0x8006,[IntPtr]0,[IntPtr]0x400) | Out-Null
     Start-Sleep -Milliseconds 500
-    if(-not [RapIconsSmoke]::IsWindowVisible($handle)){throw 'Tray did not restore rap'}
+    if(-not [SolitonIconsSmoke]::IsWindowVisible($handle)){throw 'Tray did not restore soliton'}
     Quit-IconTest
     Start-IconTest 'restored'
     Assert-IconColor '#EEE6D7'
@@ -151,13 +151,13 @@ try {
     Quit-IconTest
     $errors=Select-String -Path (Join-Path $output '*-out.log'),(Join-Path $output '*-error.log') -Pattern 'ERROR|panicked at|Window icon:|Tray icon:|Taskbar icon:'
     if($errors){throw ('Unexpected icon diagnostics: '+($errors.Line -join '; '))}
-    Write-Output "Six icon choices, native window/proxy icons, persistence, lowercase title and tray lifecycle: OK ($Language, Light=$Light)"
+    Write-Output "Six icon choices, native window/proxy icons, persistence, Soliton title and tray lifecycle: OK ($Language, Light=$Light)"
 } finally {
     if($process -and -not $process.HasExited) {
-        $owner=[RapIconsSmoke]::Find($process.Id,'RAP notification owner',-1)
-        if($owner -ne [IntPtr]::Zero){[RapIconsSmoke]::PostMessage($owner,0x111,[IntPtr]5,[IntPtr]0)|Out-Null}
+        $owner=[SolitonIconsSmoke]::Find($process.Id,'Soliton notification owner',-1)
+        if($owner -ne [IntPtr]::Zero){[SolitonIconsSmoke]::PostMessage($owner,0x111,[IntPtr]5,[IntPtr]0)|Out-Null}
         if(-not $process.WaitForExit(3000)){$process.Kill()}
     }
-    $env:RAP_DATA_DIR=$previousData
+    $env:SOLITON_DATA_DIR=$previousData
     $env:RUST_LOG=$previousLog
 }

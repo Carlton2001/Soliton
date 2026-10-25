@@ -1,4 +1,4 @@
-# RAP — Rust Audio Player
+# Soliton — Lecteur audio en Rust
 
 Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7 et 9 implémentées,
 validées sous Windows avec Rust 1.98.1 MSVC. Distribution Windows préparée ;
@@ -10,7 +10,7 @@ La phase 8 (API locale de contrôle) est reportée.
 Installer Rust MSVC, les Build Tools C++ et le SDK Windows, puis :
 
 ```powershell
-cargo run -p rap-app
+cargo run -p soliton-app
 ```
 
 ## Fonctions
@@ -37,8 +37,8 @@ les contrôles.
 
 ## Données
 
-SQLite, paramètres et pochettes sont dans `%LOCALAPPDATA%\RAP` (`RAP_DATA_DIR`
-pour isoler le développement), hors des sources musicales. RAP ouvre la musique
+SQLite, paramètres et pochettes sont dans `%LOCALAPPDATA%\Soliton` (`SOLITON_DATA_DIR`
+pour isoler le développement), hors des sources musicales. Soliton ouvre la musique
 en lecture seule et ne modifie ni tags ni pochettes intégrées.
 
 ## Vérifier
@@ -53,13 +53,13 @@ Tests natifs et matériels (FFmpeg sert uniquement à générer les fixtures) :
 
 ```powershell
 ./scripts/generate-audio-fixtures.ps1
-cargo test -p rap-audio -- --include-ignored
-cargo test -p rap-platform -- --include-ignored
+cargo test -p soliton-audio -- --include-ignored
+cargo test -p soliton-platform -- --include-ignored
 ./scripts/smoke-windows.ps1
 ./scripts/smoke-icons-windows.ps1
 ```
 
-`smoke-windows.ps1` ouvre RAP sur des données synthétiques dans `target/`, capture
+`smoke-windows.ps1` ouvre Soliton sur des données synthétiques dans `target/`, capture
 sa fenêtre et échoue sur un code de sortie ou une erreur de journal. Options :
 `-Language English -Light -List`, `-CloseScenario Early|Minimized|Hidden|Ask`,
 `-Taskbar`, `-Collections`, `-AudioOutputs [-AudioOutputRow n]`,
@@ -68,11 +68,11 @@ sa fenêtre et échoue sur un code de sortie ou une erreur de journal. Options :
 Exemples matériels explicites (volume nul ou faible, récepteur Cast inactif) :
 
 ```powershell
-cargo run -p rap-audio --example bluetooth_probe -- "<nom de sortie>"
-cargo run -p rap-network --example discover
-cargo run -p rap-network --example smoke_cast -- <identifiant> <fichier>
-cargo run -p rap-audio --example network_session -- <identifiant> <fichier>
-cargo run -p rap-app --bin rap-index -- <dossier-donnees-RAP> [dossier-musique]
+cargo run -p soliton-audio --example bluetooth_probe -- "<nom de sortie>"
+cargo run -p soliton-network --example discover
+cargo run -p soliton-network --example smoke_cast -- <identifiant> <fichier>
+cargo run -p soliton-audio --example network_session -- <identifiant> <fichier>
+cargo run -p soliton-app --bin Soliton-index -- <dossier-donnees-Soliton> [dossier-musique]
 ```
 
 Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de liens durs.
@@ -82,7 +82,7 @@ Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de l
 - Sortie partagée, sources mono/stéréo (stéréo à l'avant sur une sortie 5.1/7.1) ; pas d'égaliseur, de mode exclusif ni de bit-perfect.
 - Formats testés : WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, AIFF. Pas d'Opus, WMA, APE.
 - Les sorties CPAL sont identifiées par leur nom : une sortie renommée doit être
-  choisie à nouveau. Le format affiché est celui envoyé par RAP au système.
+  choisie à nouveau. Le format affiché est celui envoyé par Soliton au système.
 - Bluetooth : codec choisi par Windows, ni lossless ni bit-perfect garantis.
 - Réseau : IPv4 local, une sortie active, sans transcodage ni multiroom ; DLNA
   testé seulement sur récepteur simulé.
@@ -92,7 +92,7 @@ Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de l
   [guide de distribution](docs/DISTRIBUTION.md). Linux non validé.
 - Validations matérielles en attente : voir la phase 11 des spécifications.
 
-Voir [les spécifications](docs/RAP_SPECIFICATIONS.md), [l'architecture](docs/ARCHITECTURE.md),
+Voir [les spécifications](docs/SOLITON_SPECIFICATIONS.md), [l'architecture](docs/ARCHITECTURE.md),
 [les dépendances](docs/DEPENDENCIES.md) et [les correctifs GPUI](vendor/README.md).
 Attributions dans [assets/NOTICE.md](assets/NOTICE.md).
 Collecte et vérification des licences des crates et ressources :

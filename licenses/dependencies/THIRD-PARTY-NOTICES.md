@@ -2463,12 +2463,12 @@ express Statement of Purpose.
 
 ## GNU General Public License v3.0 only
 
-- rap-app 0.1.0
-- rap-audio 0.1.0
-- rap-core 0.1.0
-- rap-library 0.1.0
-- rap-network 0.1.0
-- rap-platform 0.1.0
+- soliton-app 0.1.0
+- soliton-audio 0.1.0
+- soliton-core 0.1.0
+- soliton-library 0.1.0
+- soliton-network 0.1.0
+- soliton-platform 0.1.0
 
 ```text
 GNU GENERAL PUBLIC LICENSE

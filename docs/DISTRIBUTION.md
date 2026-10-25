@@ -7,11 +7,11 @@ Carlton2001, sous GPL-3.0. Ils ne dépendent pas de son checkout.
 
 Le dépôt de référence est `Carlton2001/Soliton`. Les builds locaux utilisent cette
 destination par défaut. Les workflows passent automatiquement `github.repository`
-au build via `RAP_UPDATE_REPOSITORY`. Pour un build local visant un autre dépôt :
+au build via `SOLITON_UPDATE_REPOSITORY`. Pour un build local visant un autre dépôt :
 
 ```powershell
-$env:RAP_UPDATE_REPOSITORY = 'proprietaire/depot'
-cargo run -p rap-app
+$env:SOLITON_UPDATE_REPOSITORY = 'proprietaire/depot'
+cargo run -p soliton-app
 ```
 
 Cette variable se définit **à la compilation** ; la modifier déclenche la
@@ -19,18 +19,18 @@ recompilation du binaire. Tant qu'aucune release stable avec `latest.json` n'est
 publiée, la vérification ne peut pas proposer de mise à jour. Ne pas employer le
 dépôt Oxyde.
 
-RAP vérifie une fois au démarrage, si l'option est activée, et sur demande dans
+Soliton vérifie une fois au démarrage, si l'option est activée, et sur demande dans
 la dernière section des paramètres. La requête WinHTTP s'exécute sur un worker,
 avec délais réseau et réponse limitée à 64 Kio. Les erreurs restent visibles
 dans les paramètres et la vérification peut être relancée.
 
 `latest.json`, joint à la dernière release stable publiée, contient une version
 numérique `major.minor.patch`. Les versions égales ou plus anciennes ne sont pas
-proposées. Le manifeste contient l'URL exacte de l'installateur RAP de cette
+proposées. Le manifeste contient l'URL exacte de l'installateur Soliton de cette
 version dans le dépôt compilé et sa signature Minisign au format Tauri. Sur clic
-explicite, RAP télécharge au maximum 512 Mio, vérifie la signature avec la clé
-publique compilée, puis lance Setup. Setup attend la fin du processus RAP avant
-de remplacer les fichiers et relance l'application. En cas d'échec, RAP reste
+explicite, Soliton télécharge au maximum 512 Mio, vérifie la signature avec la clé
+publique compilée, puis lance Setup. Setup attend la fin du processus Soliton avant
+de remplacer les fichiers et relance l'application. En cas d'échec, Soliton reste
 ouvert et permet de réessayer. Les paquets ne sont pas signés Authenticode.
 
 L'icône `info.svg` dans la sidebar apparaît uniquement lorsqu'une mise à jour
@@ -58,10 +58,10 @@ dépendance résiduelle aux DLL vcruntime/msvcp. `-SkipBuild` réassemble les bi
 existants, toujours avec actualisation des licences ; il faut avoir compilé
 avec les mêmes options et la destination de mises à jour voulue.
 
-Extraire le ZIP en entier. Son dossier `RAP/data` active le mode portable ; les
+Extraire le ZIP en entier. Son dossier `Soliton/data` active le mode portable ; les
 données et caches restent à côté de l'exécutable. L'installation classique est
-par utilisateur dans `%LOCALAPPDATA%/Programs/RAP`, sans élévation, avec données
-dans `%LOCALAPPDATA%/RAP`. La désinstallation conserve ces données. `RAP_DATA_DIR`
+par utilisateur dans `%LOCALAPPDATA%/Programs/Soliton`, sans élévation, avec données
+dans `%LOCALAPPDATA%/Soliton`. La désinstallation conserve ces données. `SOLITON_DATA_DIR`
 reste prioritaire pour le développement. Les fichiers musicaux restent en lecture
 seule dans les deux modes.
 
@@ -81,13 +81,13 @@ seule dans les deux modes.
 Les actions tierces sont épinglées aux révisions reprises d'Oxyde. Les permissions
 sont en lecture, sauf le job final de release. Les jobs réutilisables sont partagés
 entre main, PR et tags. L'environnement GitHub `release` peut recevoir des règles
-de protection. Configurer une paire de clés propre à RAP, sans réutiliser celles
-d'Oxyde. La variable **du dépôt** `RAP_UPDATE_PUBLIC_KEY` contient la clé publique
+de protection. Configurer une paire de clés propre à Soliton, sans réutiliser celles
+d'Oxyde. La variable **du dépôt** `SOLITON_UPDATE_PUBLIC_KEY` contient la clé publique
 Tauri (texte Minisign encodé en base64) et est compilée dans les distributions.
-Les secrets de l'environnement `release` `RAP_SIGNING_PRIVATE_KEY` et
-`RAP_SIGNING_PRIVATE_KEY_PASSWORD` sont transmis au signer Tauri épinglé 2.10.1.
+Les secrets de l'environnement `release` `SOLITON_SIGNING_PRIVATE_KEY` et
+`SOLITON_SIGNING_PRIVATE_KEY_PASSWORD` sont transmis au signer Tauri épinglé 2.10.1.
 Le workflow refuse de publier sans clé/signature. Pour un build local, passer
-aussi `RAP_UPDATE_PUBLIC_KEY` à la compilation. Aucune clé privée n'est embarquée.
+aussi `SOLITON_UPDATE_PUBLIC_KEY` à la compilation. Aucune clé privée n'est embarquée.
 La rotation de la clé doit préserver la capacité des anciennes versions à
 vérifier la signature des nouveaux installateurs.
 
@@ -106,10 +106,10 @@ une demande explicite de l'utilisateur dans une session Codex.
 ## English
 
 Release builds get their update repository from `github.repository`. Local builds
-default to `Carlton2001/Soliton`; set `RAP_UPDATE_REPOSITORY` before compilation to override it.
+default to `Carlton2001/Soliton`; set `SOLITON_UPDATE_REPOSITORY` before compilation to override it.
 Checks run off the UI thread and can be disabled. Clicking the notification
 downloads and verifies the signed installer before starting Setup and closing
-RAP cleanly. Setup waits for RAP to exit and relaunches it. Portable builds open
+Soliton cleanly. Setup waits for Soliton to exit and relaunches it. Portable builds open
 the release page instead, keeping updates manual to preserve their data folder.
 The sidebar icon is visible in the accent color only when an update is available.
 Startup checks are enabled by default and respect the saved preference. Configure the repository public key

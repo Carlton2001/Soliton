@@ -7,7 +7,7 @@ param(
     [Parameter(Mandatory)][string]$Setup
 )
 $ErrorActionPreference = 'Stop'
-$expectedName = "RAP_${Version}_x64-setup.exe"
+$expectedName = "Soliton_${Version}_x64-setup.exe"
 if ([IO.Path]::GetFileName($Setup) -ne $expectedName -or -not (Test-Path -LiteralPath $Setup)) { throw 'Unexpected installer name or missing installer.' }
 $signature = (Get-Content -LiteralPath "$Setup.sig" -Raw).Trim()
 if (-not $signature) { throw 'Missing installer signature.' }

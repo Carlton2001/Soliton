@@ -4,15 +4,15 @@
 
 | Crate | Rôle |
 | --- | --- |
-| `rap-core` | Types métier, contrats, commandes, événements, configuration, clé de comparaison du texte. Sans GPUI. |
-| `rap-library` | Parcours, tags, SQLite, regroupement, cache des pochettes, surveillance, recherche. |
-| `rap-audio` | Décodage, sortie CPAL, file de lecture, arbitrage entre sortie locale et réseau. |
-| `rap-network` | Découverte SSDP/mDNS, contrôle DLNA et Cast, serveur HTTP des médias. Sans GPUI ni décodage. |
-| `rap-platform` | Intégrations système derrière `Desktop` ; types Windows confinés à `windows/`. |
-| `rap-app` | Assemblage des services et interface GPUI. |
+| `soliton-core` | Types métier, contrats, commandes, événements, configuration, clé de comparaison du texte. Sans GPUI. |
+| `soliton-library` | Parcours, tags, SQLite, regroupement, cache des pochettes, surveillance, recherche. |
+| `soliton-audio` | Décodage, sortie CPAL, file de lecture, arbitrage entre sortie locale et réseau. |
+| `soliton-network` | Découverte SSDP/mDNS, contrôle DLNA et Cast, serveur HTTP des médias. Sans GPUI ni décodage. |
+| `soliton-platform` | Intégrations système derrière `Desktop` ; types Windows confinés à `windows/`. |
+| `soliton-app` | Assemblage des services et interface GPUI. |
 
-SQLite reste un module de `rap-library`. Paramètres, base et pochettes sont dans
-le dossier local RAP (`RAP_DATA_DIR` pour isoler le développement), jamais dans
+SQLite reste un module de `soliton-library`. Paramètres, base et pochettes sont dans
+le dossier local Soliton (`SOLITON_DATA_DIR` pour isoler le développement), jamais dans
 une source. Un fichier de configuration invalide est signalé, pas écrasé ; chaque
 écriture est synchronisée sur le disque avant de remplacer la précédente.
 
@@ -64,13 +64,13 @@ compilation (drapeau ou artistes différents, « Artistes divers »), sinon arti
 piste ou dossier. Fusion entre dossiers seulement si artiste, titre, compilation et
 année majoritaire sont identiques ; titre déduit ou année absente : jamais de fusion.
 
-**Texte.** `rap_core::text::fold` (NFKD, sans diacritiques, ligatures développées,
+**Texte.** `soliton_core::text::fold` (NFKD, sans diacritiques, ligatures développées,
 minuscules, espaces normalisés) sert au regroupement, aux tris, à la recherche et
 aux facettes, qui affichent la graphie la plus fréquente.
 
 **Pochettes.** Cache adressé par contenu, miniatures 160 et 512 px ; entrée
 manquante régénérée ; miniatures orphelines et temporaires de plus d'une heure
-supprimées après chaque analyse complète, dans le cache RAP uniquement.
+supprimées après chaque analyse complète, dans le cache Soliton uniquement.
 
 ## Audio
 
@@ -124,7 +124,7 @@ ConnectionManager pour les types MIME.
 
 **Cast.** `oxicast` et Default Media Receiver, reconnexion automatique désactivée.
 Seul FINISHED enchaîne la piste suivante ; un IDLE pendant LOADING reste en
-Buffering. RAP ne pilote ni ne ferme une session qu'il n'a pas ouverte.
+Buffering. Soliton ne pilote ni ne ferme une session qu'il n'a pas ouverte.
 
 La sortie réseau vaut pour la session ; le retour local reprend à la position
 distante. Aucune panne ne bascule vers une autre sortie.
@@ -133,7 +133,7 @@ distante. Aucune panne ne bascule vers une autre sortie.
 
 Listes, grilles et sélecteurs virtualisés (`uniform_list`). Textes centralisés FR/EN
 dans `i18n.rs`, y compris les erreurs : moteur et bibliothèque produisent des
-`rap_core::failure::Failure` (nature sans texte, détail système conservé) que
+`soliton_core::failure::Failure` (nature sans texte, détail système conservé) que
 l'interface traduit sous le libellé de leur origine. Inter embarquée, chiffres tabulaires (`tnum`). Champ de texte issu
 de l'exemple GPUI (Apache-2.0). SVG Lucide officiels non modifiés. Accents vérifiés
 à un contraste d'au moins 4,5:1. Erreurs conservées (50 au plus) dans un bandeau.
@@ -155,7 +155,7 @@ commandes système dans une file de 64. Les touches multimédias passent par SMT
   appliqués à la fenêtre, à l'aperçu et à la notification. Si l'interface ne
   répond pas encore, l'icône de la fenêtre est retentée toutes les 250 ms ; un
   échec n'est signalé qu'après 10 s.
-- **Démarrage** : valeur RAP sous `HKCU\…\CurrentVersion\Run`, écrite seulement par
+- **Démarrage** : valeur Soliton sous `HKCU\…\CurrentVersion\Run`, écrite seulement par
   une action de l'utilisateur.
 - **Fermeture** : annulation des travaux, arrêt du moteur, retrait des abonnements
   et de l'icône, sauvegarde finale, puis `cx.quit()`.

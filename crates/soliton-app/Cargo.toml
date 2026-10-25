@@ -1,0 +1,35 @@
+[package]
+name = "soliton-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autobins = false
+default-run = "Soliton"
+
+[[bin]]
+name = "Soliton"
+path = "src/main.rs"
+
+[[bin]]
+name = "Soliton-index"
+path = "src/bin/soliton-index.rs"
+
+[dependencies]
+soliton-core.workspace = true
+soliton-platform.workspace = true
+soliton-library.workspace = true
+soliton-audio.workspace = true
+anyhow.workspace = true
+gpui = "=0.2.2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+crossbeam-channel = "0.5"
+unicode-segmentation = "1"
+raw-window-handle = "0.6"
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "=3.0.12"
+resvg = { version = "=0.45.1", default-features = false }
