@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 40 810 920" width="810" height="920">
-  <!-- Simplified RAP logo used for every application icon size. -->
-  <path id="note" fill="#B9653F" d="M280 220 L815 50 L815 620 L715 620 L715 195 L380 300 L380 740 L280 740 Z"/>
-  <circle id="rond-rouille" fill="#B9653F" cx="215" cy="760" r="175"/>
-  <circle id="rond-argent" fill="#95A4AD" cx="650" cy="650" r="165"/>
-</svg>
