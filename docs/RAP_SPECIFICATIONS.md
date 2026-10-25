@@ -191,7 +191,10 @@ d'architecture avant implémentation.
 
 **10.4 Vérification des mises à jour**
 - Désactivable, hors thread UI, sans installation automatique.
-- Notification avec la version disponible et ouverture de la page de téléchargement.
+- Notification avec la version disponible. Sur clic explicite, téléchargement
+  de l'installateur Windows, vérification de sa signature, fermeture propre de
+  RAP et relance après installation. En mode portable, ouverture de la page de
+  téléchargement pour remplacer l'archive en conservant le dossier `data`.
 
 **10.5 Documentation et licences**
 - Guide utilisateur court (FR/EN).

@@ -5,6 +5,22 @@ use rap_core::{
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Text {
+    About,
+    UpdateNotification,
+    InstallUpdate,
+    InstallingUpdate,
+    UpdateInstallFailed,
+    UpdateKeyMissing,
+    PortableUpdate,
+    Version,
+    CheckUpdates,
+    AutoCheckUpdates,
+    UpdateHint,
+    CheckingUpdates,
+    UpdateAvailable,
+    UpToDate,
+    UpdateFailed,
+    UpdateNotConfigured,
     Actions,
     Playlists,
     NewPlaylist,
@@ -179,6 +195,46 @@ pub enum Text {
 
 pub fn text(language: Language, key: Text) -> &'static str {
     let (fr, en) = match key {
+        Text::About => ("À propos de RAP", "About RAP"),
+        Text::UpdateNotification => (
+            "Une mise à jour est disponible. Cliquer pour l’installer.",
+            "An update is available. Click to install it.",
+        ),
+        Text::InstallUpdate => ("Mettre à jour RAP", "Update RAP"),
+        Text::InstallingUpdate => (
+            "Téléchargement et vérification de la mise à jour…",
+            "Downloading and verifying the update…",
+        ),
+        Text::UpdateInstallFailed => (
+            "La mise à jour a échoué. RAP reste ouvert ; vous pouvez réessayer.",
+            "The update failed. RAP remains open; you can try again.",
+        ),
+        Text::UpdateKeyMissing => (
+            "La clé de signature des mises à jour n’est pas encore configurée.",
+            "The update signing key is not configured yet.",
+        ),
+        Text::PortableUpdate => (
+            "En mode portable, téléchargez et extrayez la nouvelle archive à la place de l’ancienne, en conservant le dossier data.",
+            "In portable mode, download and extract the new archive over the old one, keeping the data directory.",
+        ),
+        Text::Version => ("Version installée", "Installed version"),
+        Text::CheckUpdates => ("Vérifier les mises à jour", "Check for updates"),
+        Text::AutoCheckUpdates => ("Vérifier au démarrage", "Check on startup"),
+        Text::UpdateHint => (
+            "L’installation démarre uniquement sur votre demande, après vérification de la signature. RAP redémarre ensuite.",
+            "Installation starts only at your request, after signature verification. RAP then restarts.",
+        ),
+        Text::CheckingUpdates => ("Vérification en cours…", "Checking for updates…"),
+        Text::UpdateAvailable => ("Nouvelle version disponible", "New version available"),
+        Text::UpToDate => ("RAP est à jour", "RAP is up to date"),
+        Text::UpdateFailed => (
+            "Impossible de vérifier les mises à jour. Réessayez plus tard.",
+            "Unable to check for updates. Try again later.",
+        ),
+        Text::UpdateNotConfigured => (
+            "Le dépôt des mises à jour n’est pas encore configuré.",
+            "The update repository is not configured yet.",
+        ),
         Text::Actions => ("Actions", "Actions"),
         Text::Playlists => ("Playlists", "Playlists"),
         Text::NewPlaylist => ("Créer une playlist", "Create playlist"),

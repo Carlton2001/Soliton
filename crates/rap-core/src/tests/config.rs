@@ -1,6 +1,18 @@
 use super::*;
 
 #[test]
+fn update_checks_default_on_and_can_be_disabled_persistently() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, b"{}").unwrap();
+    let mut settings = Settings::load(&path).unwrap();
+    assert!(settings.check_updates);
+    settings.check_updates = false;
+    settings.save(&path).unwrap();
+    assert!(!Settings::load(&path).unwrap().check_updates);
+}
+
+#[test]
 fn icon_defaults_for_older_settings_and_all_palettes_persist_independently() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");

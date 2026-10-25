@@ -1,0 +1,75 @@
+# Adapted from Oxyde-GPUI (Carlton2001, GPL-3.0).
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  version:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: version
+        shell: pwsh
+        run: |
+          $metadata = cargo metadata --offline --locked --no-deps --format-version 1
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read Cargo metadata.' }
+          $version = (($metadata | ConvertFrom-Json).packages | Where-Object name -eq 'rap-app').version
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or "v$version" -ne $env:GITHUB_REF_NAME) { throw 'Release tag does not match Cargo version.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+  tests:
+    needs: version
+    uses: ./.github/workflows/_tests.yml
+  audit:
+    needs: version
+    uses: ./.github/workflows/_audit.yml
+  distribution:
+    needs: version
+    uses: ./.github/workflows/_distribution.yml
+  release:
+    needs: [version, tests, audit, distribution]
+    runs-on: windows-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: RAP-windows-x64
+          path: target/distribution/output
+      - name: Sign setup and write update manifest
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.RAP_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.RAP_SIGNING_PRIVATE_KEY_PASSWORD }}
+          RAP_UPDATE_PUBLIC_KEY: ${{ vars.RAP_UPDATE_PUBLIC_KEY }}
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY -or -not $env:RAP_UPDATE_PUBLIC_KEY) { throw 'Configure RAP signing secrets and the repository variable RAP_UPDATE_PUBLIC_KEY.' }
+          $setup = "target/distribution/output/RAP_$($env:RELEASE_VERSION)_x64-setup.exe"
+          npx --yes @tauri-apps/cli@2.10.1 signer sign $setup
+          if ($LASTEXITCODE -ne 0) { throw 'Installer signature failed.' }
+          ./scripts/write-update-manifest.ps1 -Version $env:RELEASE_VERSION -Setup $setup -Repository $env:GITHUB_REPOSITORY -Destination target/distribution/output/latest.json
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $version = $env:RELEASE_VERSION
+          $files = @(Get-ChildItem target/distribution/output -File | ForEach-Object FullName)
+          gh release create "v$version" --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title "RAP v$version" --generate-notes @files
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }

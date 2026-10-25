@@ -16,6 +16,8 @@ const PALETTES: [&str; 6] = [
 const SIZES: [u32; 7] = [16, 20, 24, 32, 48, 64, 256];
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=RAP_UPDATE_REPOSITORY");
+    println!("cargo:rerun-if-env-changed=RAP_UPDATE_PUBLIC_KEY");
     for palette in PALETTES {
         println!("cargo:rerun-if-changed=../../assets/logos/{palette}.svg");
     }
@@ -33,6 +35,34 @@ fn main() {
         }
         resources.push_str(&format!("{} ICON \"{ico_path}\"\n", index + 2));
     }
+    let version = env::var("CARGO_PKG_VERSION").expect("package version");
+    let numeric = version.split('.').take(3).collect::<Vec<_>>().join(",");
+    resources.push_str(&format!(
+        r#"
+1 VERSIONINFO
+FILEVERSION {numeric},0
+PRODUCTVERSION {numeric},0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "RAP - Rust Audio Player\0"
+      VALUE "FileVersion", "{version}\0"
+      VALUE "ProductName", "RAP\0"
+      VALUE "ProductVersion", "{version}\0"
+      VALUE "OriginalFilename", "rap.exe\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
+"#
+    ));
     let rc = out.join("rap.rc");
     fs::write(&rc, resources).expect("write rap.rc");
     embed_resource::compile(&rc, embed_resource::NONE)

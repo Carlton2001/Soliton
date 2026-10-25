@@ -80,6 +80,21 @@ impl Rap {
                     .child(entry(2, Section::Playlists, "list", Text::Playlists, cx))
                     .child(entry(3, Section::Queue, "list-end", Text::Queue, cx))
                     .child(div().flex_1())
+                    .when(self.updates.is_available(), |rail| {
+                        rail.child(
+                            nav_icon(
+                                "nav-info",
+                                "info",
+                                self.t(self.update_tooltip()),
+                                false,
+                                crate::theme::Theme {
+                                    muted: theme.accent,
+                                    ..theme
+                                },
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.install_update(cx))),
+                        )
+                    })
                     .child(entry(4, Section::Settings, "settings", Text::Settings, cx)),
             )
     }

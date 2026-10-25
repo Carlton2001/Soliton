@@ -33,6 +33,7 @@ pub enum Section {
 }
 
 pub struct Rap {
+    pub updates: crate::updates::Updates,
     pub now_playing: bool,
     pub volume_popup: bool,
     pub tracks: Arc<std::collections::HashMap<i64, rap_core::model::Track>>,
@@ -176,6 +177,7 @@ impl Rap {
             ..Default::default()
         };
         let mut this = Self {
+            updates: Default::default(),
             now_playing: false,
             volume_popup: false,
             tracks: Arc::default(),
@@ -244,6 +246,9 @@ impl Rap {
         this.queue_bar = bar(&this.queue_scroll);
         this.start_desktop(window);
         this.scan(Vec::new(), cx);
+        if this.settings.check_updates {
+            this.check_for_updates(cx);
+        }
         cx.spawn_in(window, async move |this, cx| {
             let mut last_refresh = Instant::now();
             loop {

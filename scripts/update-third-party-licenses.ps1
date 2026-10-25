@@ -3,6 +3,7 @@ param([switch]$Offline)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'license-hash.ps1')
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $destination = Join-Path $projectRoot 'licenses/dependencies'
 $temporary = Join-Path $destination 'THIRD-PARTY-NOTICES.md.tmp'
@@ -40,6 +41,7 @@ try {
     [IO.File]::AppendAllText($temporary, $supplement.ToString(), [Text.UTF8Encoding]::new($false))
     Move-Item -LiteralPath $temporary -Destination (Join-Path $destination 'THIRD-PARTY-NOTICES.md') -Force
     $inputs = @('Cargo.lock', 'Cargo.toml', 'about.toml', 'scripts/third-party-notices.hbs', 'scripts/update-third-party-licenses.ps1')
+    $inputs += 'scripts/license-hash.ps1'
     $inputs += @(Get-ChildItem -Path 'crates/*/Cargo.toml', 'vendor/*/Cargo.toml' -File | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
     $inputs += @(Get-ChildItem -LiteralPath 'vendor' -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|LICENCE|NOTICE|NOTICES|COPYRIGHT|AUTHORS)([-_.].*)?$' } | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
     $inputs += @('assets/NOTICE.md', 'assets/icons/LICENSE', 'assets/fonts/Inter-LICENSE.txt', 'assets/fonts/JetBrainsMono-LICENSE.txt', 'assets/GPUI-APACHE-2.0')
@@ -50,10 +52,10 @@ try {
         Copy-Item -LiteralPath $asset -Destination (Join-Path $assetsDestination $name) -Force
     }
     $hashes = [ordered]@{}
-    foreach ($inputPath in $inputs) { $hashes[$inputPath] = (Get-FileHash -LiteralPath $inputPath -Algorithm SHA256).Hash }
-    $hashes['licenses/dependencies/THIRD-PARTY-NOTICES.md'] = (Get-FileHash -LiteralPath (Join-Path $destination 'THIRD-PARTY-NOTICES.md') -Algorithm SHA256).Hash
+    foreach ($inputPath in $inputs) { $hashes[$inputPath] = Get-LicenseHash $inputPath }
+    $hashes['licenses/dependencies/THIRD-PARTY-NOTICES.md'] = Get-LicenseHash (Join-Path $destination 'THIRD-PARTY-NOTICES.md')
     foreach ($file in (Get-ChildItem -LiteralPath $assetsDestination -File | Sort-Object Name)) {
-        $hashes['licenses/dependencies/assets/' + $file.Name] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+        $hashes['licenses/dependencies/assets/' + $file.Name] = Get-LicenseHash $file.FullName
     }
     [IO.File]::WriteAllText((Join-Path $destination 'inputs.json'), ($hashes | ConvertTo-Json) + "`n", [Text.UTF8Encoding]::new($false))
 } finally {

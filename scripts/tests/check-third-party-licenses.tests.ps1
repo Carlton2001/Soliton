@@ -7,12 +7,20 @@ foreach ($directory in @('scripts', 'licenses/dependencies', 'crates/example', '
 }
 $checker = Join-Path $fixture 'scripts/check-third-party-licenses.ps1'
 Copy-Item -LiteralPath (Join-Path $projectRoot 'scripts/check-third-party-licenses.ps1') -Destination $checker
+Copy-Item -LiteralPath (Join-Path $projectRoot 'scripts/license-hash.ps1') -Destination (Join-Path $fixture 'scripts')
 $report = Join-Path $fixture 'licenses/dependencies/THIRD-PARTY-NOTICES.md'
 [IO.File]::WriteAllText($report, 'Original license text')
 $hashes = [ordered]@{ 'licenses/dependencies/THIRD-PARTY-NOTICES.md' = (Get-FileHash $report).Hash }
 $inventory = Join-Path $fixture 'licenses/dependencies/inputs.json'
 [IO.File]::WriteAllText($inventory, ($hashes | ConvertTo-Json))
 & $checker
+
+. (Join-Path $fixture 'scripts/license-hash.ps1')
+$eolFile = Join-Path $fixture 'line-endings.txt'
+[IO.File]::WriteAllText($eolFile, "Copyright`nLicense text`n")
+$lfHash = Get-LicenseHash $eolFile
+[IO.File]::WriteAllText($eolFile, "Copyright`r`nLicense text`r`n")
+if ((Get-LicenseHash $eolFile) -ne $lfHash) { throw 'Git CRLF conversion changed the license hash.' }
 
 function Assert-Rejected([string]$Scenario) {
     $rejected = $false

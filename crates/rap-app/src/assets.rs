@@ -58,6 +58,7 @@ impl AssetSource for Assets {
             "tag",
             "calendar",
             "settings",
+            "info",
             "folder-plus",
             "folder-minus",
             "refresh-cw",

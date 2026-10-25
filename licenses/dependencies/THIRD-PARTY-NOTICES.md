@@ -10300,6 +10300,7 @@ SOFTWARE.
 - lyon_tessellation 1.0.23
 - mac 0.1.1
 - malloc_buf 0.0.6
+- minisign-verify 0.2.5
 - naga 25.0.1
 - ndk-context 0.1.1
 - ndk-sys 0.6.0+11769913

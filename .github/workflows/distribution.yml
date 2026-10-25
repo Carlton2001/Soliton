@@ -1,0 +1,14 @@
+name: Windows distribution
+on:
+  push:
+    branches: [main]
+    paths: ['**/Cargo.toml', Cargo.toml, Cargo.lock, '.github/actions/setup-distribution/**', '.github/workflows/*distribution*', 'scripts/build-distribution.ps1', 'scripts/*licenses*', 'scripts/license-hash.ps1', 'scripts/third-party-notices.hbs', 'scripts/write-update-manifest.ps1', 'installer/**', about.toml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  distribution:
+    uses: ./.github/workflows/_distribution.yml

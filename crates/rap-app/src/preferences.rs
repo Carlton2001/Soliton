@@ -20,6 +20,7 @@ pub fn section(
 ) -> AnyElement {
     div()
         .w_full()
+        .flex_shrink_0()
         .flex()
         .flex_col()
         .gap(rems(0.625))
@@ -120,12 +121,12 @@ impl Rap {
             .flex_col()
             .child(self.page_title(Text::Settings, cx))
             .child(
-                // A definite width lets wrapped hints be measured at their real width;
-                // otherwise the scroll range stops short of the last section.
+                // Resolve the available width before measuring wrapped rows, and
+                // preserve every section's height in the scrollable content.
                 div()
-                    .w(rems(52.))
+                    .w_full()
                     .flex_shrink_0()
-                    .max_w_full()
+                    .max_w(rems(52.))
                     .px(crate::widgets::PAGE_INSET)
                     .pt(crate::widgets::PAGE_TOP_PADDING)
                     .pb(crate::widgets::PAGE_SECTION_GAP)
@@ -138,7 +139,8 @@ impl Rap {
                     .children(self.bluetooth_preferences(cx))
                     .child(self.network_preferences(cx))
                     .children(self.system_preferences(cx))
-                    .child(self.sources_section(theme, cx)),
+                    .child(self.sources_section(theme, cx))
+                    .child(self.update_preferences(cx)),
             );
         scroll_area(content, &self.settings_bar, theme)
     }

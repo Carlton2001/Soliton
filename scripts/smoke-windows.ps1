@@ -7,6 +7,9 @@ param(
     [switch]$AudioOutputs,
     [switch]$NetworkOutputs,
     [switch]$Collections,
+    [switch]$Updates,
+    [int]$WindowWidth=0,
+    [int]$WindowHeight=0,
     [ValidateRange(1,16)][int]$LocalOutputCount=1,
     [ValidateRange(0,16)][int]$AudioOutputRow=0,
     [string]$Executable='rap.exe',
@@ -21,7 +24,9 @@ New-Item -ItemType Directory -Force $data | Out-Null
 & cargo run -p rap-app --bin rap-index --offline -- $data $fixtures
 if ($LASTEXITCODE -ne 0) { throw 'Library smoke test failed' }
 $closeBehavior = switch ($CloseScenario) { 'Hidden' { 'Hide' } 'Ask' { 'Ask' } default { 'Quit' } }
-@{language=$Language;dark=(-not $Light);album_grid=(-not $List);volume=0.0;close_behavior=$closeBehavior} | ConvertTo-Json | Set-Content -Encoding utf8NoBOM (Join-Path $data 'settings.json')
+$initialSettings = @{language=$Language;dark=(-not $Light);album_grid=(-not $List);volume=0.0;close_behavior=$closeBehavior}
+if ($Updates) { $initialSettings.last_view = @{view='Settings'}; $initialSettings.check_updates = $false }
+$initialSettings | ConvertTo-Json | Set-Content -Encoding utf8NoBOM (Join-Path $data 'settings.json')
 $previousData = $env:RAP_DATA_DIR
 $previousLog = $env:RUST_LOG
 $env:RAP_DATA_DIR = $data
@@ -82,6 +87,11 @@ try {
     [RapNativeQa]::ShowWindow($handle,9) | Out-Null
     # Raise only this QA window while capturing, then restore normal ordering.
     [RapNativeQa]::SetWindowPos($handle,[IntPtr](-1),0,0,0,0,0x0013) | Out-Null
+    if ($WindowWidth -gt 0 -and $WindowHeight -gt 0) {
+        $previousDpi = [RapNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
+        try { [RapNativeQa]::SetWindowPos($handle,[IntPtr]0,0,0,$WindowWidth,$WindowHeight,0x0016) | Out-Null }
+        finally { [RapNativeQa]::SetThreadDpiAwarenessContext($previousDpi) | Out-Null }
+    }
     Start-Sleep -Seconds 2
     function Save-RapFrame([string]$name) {
         $rect = [RapNativeQa]::PhysicalRect($handle)
@@ -95,6 +105,25 @@ try {
         } finally { $graphics.Dispose(); $bitmap.Dispose() }
     }
     Save-RapFrame 'qa-albums'
+    if ($Updates) {
+        $rect = [RapNativeQa]::PhysicalRect($handle)
+        $scale = [RapNativeQa]::GetDpiForWindow($handle) / 96.0
+        Save-RapFrame 'qa-update-settings-top'
+        # Position over the settings content, then scroll to its final section.
+        $scrollX = [int](($rect.Right-$rect.Left) / 2)
+        $scrollY = [int](($rect.Bottom-$rect.Top) / 3)
+        $screenPoint = ([int]($rect.Top + $scrollY) -shl 16) -bor [int]($rect.Left + $scrollX)
+        $previousDpi = [RapNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
+        try {
+            $clientPoint = ($scrollY -shl 16) -bor $scrollX
+            [RapNativeQa]::PostMessage($handle,0x0200,[IntPtr]0,[IntPtr]$clientPoint) | Out-Null
+            for ($i=0; $i -lt 30; $i++) {
+                [RapNativeQa]::PostMessage($handle,0x020A,[IntPtr](-7864320),[IntPtr]$screenPoint) | Out-Null
+            }
+        } finally { [RapNativeQa]::SetThreadDpiAwarenessContext($previousDpi) | Out-Null }
+        Start-Sleep -Milliseconds 600
+        Save-RapFrame 'qa-update-settings-bottom'
+    }
     [RapNativeQa]::PostMessage($handle,0x0100,[IntPtr]13,[IntPtr]0) | Out-Null
     [RapNativeQa]::PostMessage($handle,0x0101,[IntPtr]13,[IntPtr]0) | Out-Null
     Start-Sleep -Milliseconds 600

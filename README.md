@@ -1,8 +1,9 @@
 # RAP — Rust Audio Player
 
 Lecteur audio local Rust / GPUI, GPL-3.0-only. Phases 0 à 7 et 9 implémentées,
-validées sous Windows avec Rust 1.98.1 MSVC. Reste : distribution et validations
-matérielles. La phase 8 (API locale de contrôle) est reportée.
+validées sous Windows avec Rust 1.98.1 MSVC. Distribution Windows préparée ;
+restent la validation des paquets et les validations matérielles.
+La phase 8 (API locale de contrôle) est reportée.
 
 ## Lancer
 
@@ -87,7 +88,8 @@ Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de l
   testé seulement sur récepteur simulé.
 - Éditions fusionnées seulement si artiste, titre et année sont identiques ; le
   choix d'édition n'est pas mémorisé.
-- Pas d'installateur ni de version portable. Linux non validé.
+- Distribution Windows et vérification des mises à jour : voir le
+  [guide de distribution](docs/DISTRIBUTION.md). Linux non validé.
 - Validations matérielles en attente : voir la phase 11 des spécifications.
 
 Voir [les spécifications](docs/RAP_SPECIFICATIONS.md), [l'architecture](docs/ARCHITECTURE.md),

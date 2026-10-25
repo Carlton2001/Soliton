@@ -4,3 +4,4 @@ pub mod failure;
 pub mod model;
 pub mod playlist;
 pub mod text;
+pub mod updates;

@@ -31,6 +31,8 @@ attributions et des résultats. La vérification refuse les entrées modifiées,
 supprimées et les nouveaux manifestes. Régénérer après une mise à jour des
 dépendances ou des attributions. Cette vérification ne refait pas l'analyse des
 sources locales : régénérer aussi après toute modification de leurs notices.
+Les empreintes portent sur le texte UTF-8 avec fins de ligne LF, afin que la
+conversion CRLF de Git sous Windows ne rende pas les notices périmées.
 
 `-Offline` permet une génération avec les sources déjà en cache, mais certaines
 crates mal empaquetées nécessitent des licences récupérées sur leurs dépôts

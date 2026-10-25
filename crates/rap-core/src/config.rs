@@ -168,6 +168,7 @@ pub enum CloseBehavior {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    pub check_updates: bool,
     pub language: Language,
     pub appearance: Appearance,
     pub accent: Accent,
@@ -203,6 +204,7 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            check_updates: true,
             language: Language::French,
             appearance: Appearance::System,
             accent: Accent::Teal,

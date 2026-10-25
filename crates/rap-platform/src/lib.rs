@@ -1,6 +1,4 @@
 //! Platform boundaries. Native APIs must stay behind target-specific modules.
-use anyhow::{Context, Result};
-use std::path::PathBuf;
 
 mod bluetooth;
 pub use bluetooth::{Bluetooth, BluetoothDevice};
@@ -16,33 +14,25 @@ pub use desktop::{
 #[cfg(target_os = "windows")]
 mod windows;
 
-#[derive(Clone, Debug)]
-pub struct AppPaths {
-    pub root: PathBuf,
-    pub database: PathBuf,
-    pub covers: PathBuf,
-    pub settings: PathBuf,
-}
+#[cfg(target_os = "windows")]
+mod windows_download;
 
-impl AppPaths {
-    pub fn discover() -> Result<Self> {
-        let root = dirs::data_local_dir()
-            .context("No local application data directory")?
-            .join("RAP");
-        Ok(Self::at(root))
+/// Bounded HTTPS request. Call only from a worker, never from the UI thread.
+pub fn download_https(url: &str, limit: usize) -> std::io::Result<Vec<u8>> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_download::download(url, limit)
     }
-
-    pub fn at(root: PathBuf) -> Self {
-        Self {
-            database: root.join("library.sqlite3"),
-            covers: root.join("covers"),
-            settings: root.join("settings.json"),
-            root,
-        }
-    }
-
-    pub fn create(&self) -> Result<()> {
-        std::fs::create_dir_all(&self.covers)?;
-        Ok(())
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (url, limit);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Update checks require Windows",
+        ))
     }
 }
+
+mod paths;
+pub use paths::AppPaths;
+pub mod updater;
