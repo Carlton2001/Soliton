@@ -93,6 +93,12 @@ impl Rap {
                     text: rgb(theme.text),
                     muted: rgb(theme.muted),
                     accent: rgb(theme.accent),
+                    progress_background: rgb(Rgba {
+                        r: theme.muted.r * 0.3 + theme.background.r * 0.7,
+                        g: theme.muted.g * 0.3 + theme.background.g * 0.7,
+                        b: theme.muted.b * 0.3 + theme.background.b * 0.7,
+                        a: 1.,
+                    }),
                 },
             };
             desktop.publish(state, self.settings.language, self.settings.app_icon);

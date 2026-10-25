@@ -58,6 +58,8 @@ pub struct PreviewColors {
     pub text: u32,
     pub muted: u32,
     pub accent: u32,
+    /// Opaque progress rail color, composited by the application design system.
+    pub progress_background: u32,
 }
 
 impl Default for PreviewColors {
@@ -67,6 +69,7 @@ impl Default for PreviewColors {
             text: 0xeef2f7,
             muted: 0x9ba8b8,
             accent: 0x68d4b3,
+            progress_background: 0x40474f,
         }
     }
 }

@@ -4,10 +4,13 @@ use windows::Win32::UI::WindowsAndMessaging::{CreateIcon, DestroyIcon, HICON};
 pub(super) struct Icon(pub HICON);
 
 impl Icon {
-    pub fn new(bytes: &[u8]) -> Result<Self> {
+    pub fn new(bytes: &[u8], accent: u32) -> Result<Self> {
         let options = resvg::usvg::Options {
-            // Neutral gray stays legible on Windows' light and dark flyouts.
-            style_sheet: Some("svg { color: #808080; }".into()),
+            // Style the official Lucide paths only for the native toolbar.
+            style_sheet: Some(format!(
+                "svg {{ color: #{:06x}; stroke-width: 3; }}",
+                accent & 0xffffff
+            )),
             ..Default::default()
         };
         let tree = resvg::usvg::Tree::from_data(bytes, &options)?;
@@ -37,4 +40,29 @@ impl Drop for Icon {
             let _ = DestroyIcon(self.0);
         }
     }
+}
+
+pub(super) fn toolbar(accent: u32) -> Result<[Icon; 5]> {
+    Ok([
+        Icon::new(
+            include_bytes!("../../../../../assets/icons/skip-back.svg"),
+            accent,
+        )?,
+        Icon::new(
+            include_bytes!("../../../../../assets/icons/play.svg"),
+            accent,
+        )?,
+        Icon::new(
+            include_bytes!("../../../../../assets/icons/pause.svg"),
+            accent,
+        )?,
+        Icon::new(
+            include_bytes!("../../../../../assets/icons/skip-forward.svg"),
+            accent,
+        )?,
+        Icon::new(
+            include_bytes!("../../../../../assets/icons/square.svg"),
+            accent,
+        )?,
+    ])
 }

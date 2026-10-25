@@ -79,7 +79,7 @@ impl Renderer {
         unsafe {
             windows::Win32::Graphics::Gdi::GdiFlush().ok()?;
         }
-        surface.rect(24, 310, 592, 6, colors.muted);
+        surface.rect(24, 310, 592, 6, colors.progress_background);
         let filled = progress(state.position_ms, state.duration_ms, 592);
         surface.rect(24, 310, filled, 6, colors.accent);
         surface.frame()

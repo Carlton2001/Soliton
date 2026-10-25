@@ -54,6 +54,7 @@ pub(super) struct Taskbar {
     shared: Arc<Shared>,
     api: ITaskbarList4,
     icons: [Icon; 5],
+    accent: u32,
     renderer: Renderer,
     last_frame: Option<(MediaState, Language)>,
     last_buttons: Option<(bool, bool, Language)>,
@@ -72,20 +73,14 @@ impl Taskbar {
         unsafe {
             api.HrInit()?;
         }
-        let icons = [
-            Icon::new(include_bytes!("../../../../../assets/icons/skip-back.svg"))?,
-            Icon::new(include_bytes!("../../../../../assets/icons/play.svg"))?,
-            Icon::new(include_bytes!("../../../../../assets/icons/pause.svg"))?,
-            Icon::new(include_bytes!(
-                "../../../../../assets/icons/skip-forward.svg"
-            ))?,
-            Icon::new(include_bytes!("../../../../../assets/icons/square.svg"))?,
-        ];
+        let accent = crate::PreviewColors::default().accent;
+        let icons = icons::toolbar(accent)?;
         Ok(Self {
             proxy: proxy::Proxy::new(window, shared.clone())?,
             shared,
             api,
             icons,
+            accent,
             renderer: Renderer::default(),
             last_frame: None,
             last_buttons: None,
@@ -97,6 +92,11 @@ impl Taskbar {
     pub fn update(&mut self, state: &MediaState, language: Language) -> Result<()> {
         if !self.shared.enabled.load(Ordering::Acquire) {
             return Ok(());
+        }
+        if self.accent != state.preview.accent {
+            self.icons = icons::toolbar(state.preview.accent)?;
+            self.accent = state.preview.accent;
+            self.last_buttons = None;
         }
         let mut display = state.clone();
         // Refresh at most once per second, and immediately on state/metadata/theme changes.
