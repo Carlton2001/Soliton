@@ -83,15 +83,19 @@ Ces règles restent en vigueur pour toute évolution.
   Éviter panneaux inutiles et options excessives.
 - Les contrôles d'un même type partagent dimensions, typographie et états. La
   sélection utilise un fond teinté sans changement de graisse ni de bordure.
-  Focus visible au clavier. Espacements : 0,75 rem sous la navigation, entre la
-  rangée de contrôles et le contenu, et entre sections (sans cumul) ; 0,5 rem entre
-  actions liées.
+  Focus visible au clavier. Titres de page remontés sous la barre de titre par
+  une marge haute négative calculée sur la police, sans couper lettres ni accents.
+  Espacements : 0,75 rem au-dessus et au-dessous du contenu des pages, entre les
+  sections (sans cumul), avec les mêmes marges extérieures en liste et en grille ;
+  0,5 rem entre actions liées. Le logo de la sidebar garde une marge haute dédiée.
 - Navigation toujours visible dans la sidebar, prolongée jusqu'au bord supérieur
   avec l'icône RAP au-dessus des boutons ; barre de titre sans nom à sa droite.
   Icônes et libellés :
   Artistes, Albums, Playlists, File de lecture, Paramètres. Pas de bouton Retour ;
   `Alt+←/→` parcourent l'historique. Chaque section principale affiche son titre
-  au-dessus de ses contrôles ; les fiches (album, playlist) et « Lecture en cours »
+  sous la barre de titre compacte et au-dessus de ses contrôles ; la barre de titre
+  reste indépendante, haute de 32 pixels logiques avec des symboles système de
+  12 pixels logiques. Les fiches (album, playlist) et « Lecture en cours »
   gardent leur propre en-tête.
 - Barre de titre, navigation et lecteur partagent le fond de l'application. Un trait
   sépare la navigation, le lecteur et l'en-tête de chaque page du contenu.

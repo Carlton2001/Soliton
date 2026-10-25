@@ -14,6 +14,8 @@ use rap_core::{config::CoverSize, text::fold};
 pub const CONTENT_PADDING: f32 = crate::widgets::PAGE_INSET.0;
 /// Gap between grid tiles, in rems.
 pub const TILE_GAP: f32 = 1.;
+// Equal half-gaps keep virtual grid rows uniform and their outer insets symmetric.
+const GRID_ROW_PADDING: Rems = Rems(crate::widgets::PAGE_SECTION_GAP.0 / 2.);
 
 /// Side of album covers in the grid, in pixels at the 16 px reference.
 pub fn cover_side(size: CoverSize) -> f32 {
@@ -30,14 +32,49 @@ impl Rap {
         crate::widgets::input_field(self.search.clone(), true, theme)
     }
 
-    /// Name of the current section, above its toolbar.
-    pub fn page_title(&self, label: Text) -> Div {
+    /// Name of the current section, below the title bar and above its toolbar.
+    pub fn page_title(&self, label: Text, cx: &App) -> Div {
+        let title_font = Font {
+            weight: FontWeight::SEMIBOLD,
+            ..font("Inter")
+        };
+        let font_size = crate::scale::scaled_px(crate::widgets::TEXT_DISPLAY.0 * 16.);
+        let line_height = font_size * 1.5;
+        let text_system = cx.text_system();
+        let font_id = text_system.resolve_font(&title_font);
+        // A shared offset keeps sections aligned. Include accents, and preserve
+        // one logical pixel for antialiasing; unknown glyphs keep the normal inset.
+        let ink_ascent = [
+            Text::Artists,
+            Text::Albums,
+            Text::Playlists,
+            Text::Queue,
+            Text::Settings,
+        ]
+        .into_iter()
+        .flat_map(|key| self.t(key).chars())
+        .try_fold(px(0.), |ascent, ch| {
+            text_system
+                .typographic_bounds(font_id, font_size, ch)
+                .map(|bounds| ascent.max(bounds.bottom()))
+        });
+        let inset = ink_ascent.map_or(px(0.), |ascent| {
+            if ascent <= px(0.) {
+                return px(0.);
+            }
+            let font_ascent = text_system.ascent(font_id, font_size);
+            // Font metrics use a signed descent; GPUI paints with its positive depth.
+            let descent = px(f32::from(text_system.descent(font_id, font_size)).abs());
+            let baseline = (line_height - font_ascent - descent) / 2. + font_ascent;
+            px(f32::from(baseline - ascent - px(1.)).max(0.).floor())
+        });
         div()
             .flex_none()
             .px(rems(CONTENT_PADDING))
-            .pt(crate::widgets::PAGE_TOP_PADDING)
+            .mt(-inset)
             .text_size(crate::widgets::TEXT_DISPLAY)
-            .font_weight(FontWeight::SEMIBOLD)
+            .line_height(line_height)
+            .font(title_font)
             .child(self.t(label))
     }
 
@@ -156,11 +193,8 @@ impl Rap {
                 Some(clear.into_any_element()),
             );
         }
-        let columns = if self.settings.album_grid {
-            self.columns
-        } else {
-            1
-        };
+        let grid = self.settings.album_grid;
+        let columns = if grid { self.columns } else { 1 };
         let side = cover_side(self.settings.cover_size);
         let rows = self.visible.len().div_ceil(columns);
         let list = uniform_list(
@@ -175,8 +209,7 @@ impl Rap {
                             .w_full()
                             .px(rems(CONTENT_PADDING))
                             .gap(rems(TILE_GAP))
-                            .when(columns == 1, |row| row.py(rems(0.0625)))
-                            .when(columns > 1, |row| row.pb(crate::widgets::PAGE_SECTION_GAP))
+                            .when(grid, |row| row.py(GRID_ROW_PADDING))
                             .children(
                                 (row * columns..((row + 1) * columns).min(this.visible.len()))
                                     .map(|index| this.album_tile(index, side, cx)),
@@ -188,7 +221,7 @@ impl Rap {
         .track_scroll(self.album_scroll.clone())
         .flex_1()
         .min_h_0();
-        scroll_area(list, &self.album_bar, theme)
+        collection_scroll_area(list, &self.album_bar, theme, grid)
     }
 
     fn album_tile(&self, index: usize, side: f32, cx: &mut Context<Self>) -> AnyElement {
@@ -377,8 +410,7 @@ impl Rap {
                             .flex()
                             .w_full()
                             .px(rems(CONTENT_PADDING))
-                            .when(grid, |row| row.pb(crate::widgets::PAGE_SECTION_GAP))
-                            .when(!grid, |row| row.py(rems(0.0625)))
+                            .when(grid, |row| row.py(GRID_ROW_PADDING))
                             .gap(rems(TILE_GAP))
                             .children((row * columns..((row + 1) * columns).min(cards.len())).map(
                                 |index| {
@@ -482,7 +514,7 @@ impl Rap {
         .track_scroll(self.facet_scroll.clone())
         .flex_1()
         .min_h_0();
-        scroll_area(list, &self.facet_bar, theme)
+        collection_scroll_area(list, &self.facet_bar, theme, grid)
     }
 
     /// Search text narrowing the artist, genre or year list.
@@ -535,6 +567,23 @@ impl Rap {
             })
             .child(self.player(window, cx))
     }
+}
+
+/// Keep padding outside GPUI's virtual list so it cannot shift row scroll offsets.
+fn collection_scroll_area(
+    content: impl IntoElement,
+    bar: &Scrollbar,
+    theme: Theme,
+    grid: bool,
+) -> AnyElement {
+    crate::widgets::page_body()
+        .py(if grid {
+            GRID_ROW_PADDING
+        } else {
+            crate::widgets::PAGE_SECTION_GAP
+        })
+        .child(scroll_area(content, bar, theme))
+        .into_any_element()
 }
 
 /// Hosts a scrollable element with a draggable scrollbar on its right edge.

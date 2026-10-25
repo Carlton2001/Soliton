@@ -44,6 +44,7 @@ impl Rap {
             .flex()
             .flex_col()
             .items_center()
+            .pt(rems(0.5))
             .bg(theme.background)
             .border_r_1()
             .border_color(theme.border)
@@ -60,7 +61,7 @@ impl Rap {
                     .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window())
                     .child(
                         img(crate::assets::Assets::logo_path(self.settings.app_icon))
-                            .size(rems(1.5))
+                            .size(px(24.))
                             .flex_none(),
                     ),
             )

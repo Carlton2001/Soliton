@@ -723,7 +723,7 @@ impl Render for Rap {
             .when(
                 !self.now_playing && self.section == Section::Artists && self.selected.is_none(),
                 |v| {
-                    v.child(self.page_title(Text::Artists))
+                    v.child(self.page_title(Text::Artists, cx))
                         .child(self.header(cx))
                 },
             )

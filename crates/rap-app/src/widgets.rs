@@ -17,8 +17,9 @@ pub const TEXT_DISPLAY: Rems = Rems(1.75);
 
 /// Height shared by buttons, fields and segmented controls so they align.
 pub const CONTROL_HEIGHT: Rems = Rems(2.);
-/// Space below navigation before a page's first controls or heading.
+/// Horizontal inset shared by page headings, controls and content.
 pub const PAGE_INSET: Rems = Rems(0.75);
+/// Space above controls, below a heading or the window title bar.
 pub const PAGE_TOP_PADDING: Rems = Rems(0.75);
 /// One owner for the gap between a page toolbar and its content or sections.
 pub const PAGE_SECTION_GAP: Rems = Rems(0.75);
@@ -28,6 +29,18 @@ pub const ROW_HEIGHT: Rems = Rems(2.5);
 pub const RADIUS: Rems = Rems(0.3125);
 pub const RADIUS_LARGE: Rems = Rems(0.5);
 const ICON: Rems = Rems(1.);
+
+/// Content below a page toolbar: symmetric outer insets and one gap between blocks.
+pub fn page_body() -> Div {
+    div()
+        .flex_1()
+        .min_h_0()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .py(PAGE_SECTION_GAP)
+        .gap(PAGE_SECTION_GAP)
+}
 
 /// First row of page actions, with one owner for its surrounding space.
 pub fn page_toolbar(theme: Theme) -> Div {

@@ -59,6 +59,7 @@ impl Rap {
             .flex()
             .flex_col()
             .min_w_0()
+            .when(!wide, |view| view.flex_1())
             .gap(rems(0.25))
             .child(
                 div()
@@ -102,6 +103,7 @@ impl Rap {
             .gap(rems(0.75))
             .min_w_0()
             .when(wide, |v| v.flex_col().w(rems(19.)).flex_none())
+            .when(!wide, |v| v.w_full().flex_none())
             .when(!wide && !panel, |v| v.items_center())
             // The panel keeps the cover beside its summary to leave room for tracks.
             .when(panel, |v| v.items_start().flex_none())
@@ -124,6 +126,7 @@ impl Rap {
             .flex()
             .flex_col()
             .gap(crate::widgets::PAGE_SECTION_GAP)
+            .when(panel, |view| view.py(crate::widgets::PAGE_SECTION_GAP))
             .when(album.editions.len() > 1, |v| {
                 v.child(
                     self.editions_view(album, edition_index, cx)
@@ -180,6 +183,8 @@ impl Rap {
         }
         div()
             .flex_1()
+            .w_full()
+            .min_w_0()
             .min_h_0()
             .flex()
             .flex_col()
@@ -213,6 +218,8 @@ impl Rap {
             .child(
                 div()
                     .flex_1()
+                    .w_full()
+                    .min_w_0()
                     .min_h_0()
                     .flex()
                     .gap(rems(0.75))

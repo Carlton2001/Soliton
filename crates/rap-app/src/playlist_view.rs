@@ -82,6 +82,7 @@ impl Rap {
                 .flex()
                 .flex_col()
                 .gap(crate::widgets::PAGE_SECTION_GAP)
+                .pb(crate::widgets::PAGE_SECTION_GAP)
                 .child(
                     div()
                         .px(crate::widgets::PAGE_INSET)
@@ -360,7 +361,7 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .child(self.page_title(Text::Playlists))
+            .child(self.page_title(Text::Playlists, cx))
             .child(crate::widgets::page_toolbar(theme).child(
                 accent_button("new-playlist", "plus", self.t(Text::NewPlaylist), theme).on_click(
                     cx.listener(|this, _, window, cx| {
@@ -368,27 +369,29 @@ impl Rap {
                     }),
                 ),
             ))
-            .when(count == 0, |v| {
-                v.child(
-                    div()
-                        .px(crate::widgets::PAGE_INSET)
-                        .pb(crate::widgets::PAGE_SECTION_GAP)
-                        .flex()
-                        .flex_col()
-                        .gap(rems(0.5))
-                        .child(
+            .child(
+                crate::widgets::page_body()
+                    .when(count == 0, |v| {
+                        v.child(
                             div()
-                                .text_size(crate::widgets::TEXT_TITLE)
-                                .child(self.t(Text::NoPlaylists)),
+                                .px(crate::widgets::PAGE_INSET)
+                                .flex()
+                                .flex_col()
+                                .gap(rems(0.5))
+                                .child(
+                                    div()
+                                        .text_size(crate::widgets::TEXT_TITLE)
+                                        .child(self.t(Text::NoPlaylists)),
+                                )
+                                .child(
+                                    div()
+                                        .text_color(theme.muted)
+                                        .child(self.t(Text::NoPlaylistsHint)),
+                                ),
                         )
-                        .child(
-                            div()
-                                .text_color(theme.muted)
-                                .child(self.t(Text::NoPlaylistsHint)),
-                        ),
-                )
-            })
-            .child(crate::views::scroll_area(rows, &self.playlists.bar, theme))
+                    })
+                    .child(crate::views::scroll_area(rows, &self.playlists.bar, theme)),
+            )
             .into_any_element()
     }
 }

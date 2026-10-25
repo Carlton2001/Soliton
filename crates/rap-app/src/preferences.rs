@@ -117,7 +117,7 @@ impl Rap {
             .track_scroll(&self.settings_bar.handle)
             .flex()
             .flex_col()
-            .child(self.page_title(Text::Settings))
+            .child(self.page_title(Text::Settings, cx))
             .child(
                 // A definite width lets wrapped hints be measured at their real width;
                 // otherwise the scroll range stops short of the last section.

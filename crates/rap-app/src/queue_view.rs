@@ -51,7 +51,7 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .child(self.page_title(Text::Queue))
+            .child(self.page_title(Text::Queue, cx))
             .child(
                 crate::widgets::page_toolbar(theme)
                     .child(
@@ -97,87 +97,95 @@ impl Rap {
                             })),
                     ),
             )
-            .when_some(track, |v, track| {
-                v.child(
-                    div()
-                        .mx(crate::widgets::PAGE_INSET)
-                        .mb(crate::widgets::PAGE_SECTION_GAP)
-                        .flex()
-                        .items_center()
-                        .gap(rems(0.75))
-                        .child(crate::widgets::with_tooltip(
-                            div().id("queue-track-details").flex_none().child(cover(
-                                track.cover.as_ref(),
-                                48.,
-                                theme,
-                            )),
-                            output
-                                .as_ref()
-                                .map_or_else(
-                                    || quality(&track.metadata),
-                                    |output| {
-                                        format!(
-                                            "{} · {}",
-                                            quality(&track.metadata),
-                                            self.labelled(self.t(Text::Output), output)
-                                        )
-                                    },
-                                )
-                                .into(),
-                            theme,
-                        ))
-                        .child(
+            .child(
+                crate::widgets::page_body()
+                    .when_some(track, |v, track| {
+                        v.child(
                             div()
-                                .flex_1()
-                                .min_w_0()
+                                .mx(crate::widgets::PAGE_INSET)
                                 .flex()
-                                .flex_col()
-                                .gap(rems(0.25))
+                                .items_center()
+                                .gap(rems(0.75))
+                                .child(crate::widgets::with_tooltip(
+                                    div().id("queue-track-details").flex_none().child(cover(
+                                        track.cover.as_ref(),
+                                        48.,
+                                        theme,
+                                    )),
+                                    output
+                                        .as_ref()
+                                        .map_or_else(
+                                            || quality(&track.metadata),
+                                            |output| {
+                                                format!(
+                                                    "{} · {}",
+                                                    quality(&track.metadata),
+                                                    self.labelled(self.t(Text::Output), output)
+                                                )
+                                            },
+                                        )
+                                        .into(),
+                                    theme,
+                                ))
                                 .child(
                                     div()
-                                        .text_size(crate::widgets::TEXT_BODY)
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .w_full()
-                                        .truncate()
-                                        .whitespace_normal()
-                                        .line_clamp(1)
-                                        .child(track.metadata.title.clone()),
+                                        .flex_1()
+                                        .min_w_0()
+                                        .flex()
+                                        .flex_col()
+                                        .gap(rems(0.25))
+                                        .child(
+                                            div()
+                                                .text_size(crate::widgets::TEXT_BODY)
+                                                .font_weight(FontWeight::MEDIUM)
+                                                .w_full()
+                                                .truncate()
+                                                .whitespace_normal()
+                                                .line_clamp(1)
+                                                .child(track.metadata.title.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_size(TEXT_SMALL)
+                                                .text_color(theme.muted)
+                                                .w_full()
+                                                .truncate()
+                                                .whitespace_normal()
+                                                .line_clamp(1)
+                                                .child(format!(
+                                                    "{} · {}",
+                                                    track.metadata.artist, track.metadata.album
+                                                )),
+                                        ),
                                 )
-                                .child(
-                                    div()
-                                        .text_size(TEXT_SMALL)
-                                        .text_color(theme.muted)
-                                        .w_full()
-                                        .truncate()
-                                        .whitespace_normal()
-                                        .line_clamp(1)
-                                        .child(format!(
-                                            "{} · {}",
-                                            track.metadata.artist, track.metadata.album
-                                        )),
-                                ),
+                                .when_some(album, |v, id| {
+                                    v.child(
+                                        button(
+                                            "queue-album",
+                                            "disc-3",
+                                            self.t(Text::GoToAlbum),
+                                            theme,
+                                        )
+                                        .on_click(
+                                            cx.listener(move |this, _, window, cx| {
+                                                this.focus.focus(window);
+                                                this.open_album(id, cx);
+                                            }),
+                                        ),
+                                    )
+                                }),
                         )
-                        .when_some(album, |v, id| {
-                            v.child(
-                                button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.focus.focus(window);
-                                        this.open_album(id, cx);
-                                    })),
-                            )
-                        }),
-                )
-            })
-            .when(count == 0, |v| {
-                v.child(
-                    div()
-                        .px(crate::widgets::PAGE_INSET)
-                        .pb(crate::widgets::PAGE_SECTION_GAP)
-                        .text_color(theme.muted)
-                        .child(self.t(Text::QueueEmpty)),
-                )
-            })
-            .child(crate::views::scroll_area(rows, &self.queue_bar, theme))
+                    })
+                    .when(count == 0, |v| {
+                        v.child(
+                            div()
+                                .px(crate::widgets::PAGE_INSET)
+                                .text_color(theme.muted)
+                                .child(self.t(Text::QueueEmpty)),
+                        )
+                    })
+                    .child(crate::views::scroll_area(rows, &self.queue_bar, theme)),
+            )
             .into_any_element()
     }
 }

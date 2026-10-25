@@ -24,6 +24,10 @@ Source : https://crates.io/crates/gpui/0.2.2
   vérification est effectuée à l'exécution de la tâche de destruction différée.
 - `src/taffy.rs` : préciser les deux littéraux `f32` pour éviter le repli de types
   que Rust 1.98 signale comme incompatibilité future (rust-lang/rust#154024).
+- `src/elements/text.rs` et `src/text_system/line_wrapper.rs` : chaque mesure de
+  texte tronqué utilise ses propres runs. Une première mesure étroite ne doit pas
+  laisser des longueurs périmées lors d'une seconde mesure plus large, au risque
+  de découper un caractère UTF-8 et de provoquer un panic DirectWrite.
 
 Ces changements corrigent les diagnostics au démarrage et la double destruction
 observés sous Windows. Aucun filtre global des journaux, aucun désarmement des

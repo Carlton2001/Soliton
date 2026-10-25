@@ -32,7 +32,7 @@ impl Rap {
                     .min_h_0()
                     .flex()
                     .flex_col()
-                    .child(self.page_title(crate::i18n::Text::Albums))
+                    .child(self.page_title(crate::i18n::Text::Albums, cx))
                     .child(self.header(cx))
                     .child(self.albums_view(cx)),
             )

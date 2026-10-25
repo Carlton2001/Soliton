@@ -1,7 +1,7 @@
 use crate::app::Rap;
 use gpui::{prelude::*, *};
 
-pub(crate) const TITLE_BAR_HEIGHT: f32 = 40.;
+pub(crate) const TITLE_BAR_HEIGHT: f32 = 32.;
 const CAPTION_BUTTON_WIDTH: f32 = 46.;
 /// Hover color of the close caption button, as in native Windows title bars.
 const CLOSE_HOVER: u32 = 0xc42b1c;
@@ -22,7 +22,7 @@ impl Rap {
                 .items_center()
                 .justify_center()
                 .window_control_area(area)
-                .child(svg().path(icon).size_3().text_color(theme.text))
+                .child(svg().path(icon).size(px(12.)).text_color(theme.text))
         };
         let maximize_icon = if window.is_maximized() {
             "window-controls/restore.svg"

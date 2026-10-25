@@ -128,6 +128,19 @@ impl LineWrapper {
         })
     }
 
+    /// Measure a truncation without changing the runs used by later measurements.
+    pub(crate) fn truncate_line_with_runs(
+        &mut self,
+        line: SharedString,
+        truncate_width: Pixels,
+        truncation_suffix: &str,
+        source_runs: &[TextRun],
+    ) -> (SharedString, Vec<TextRun>) {
+        let mut runs = source_runs.to_vec();
+        let text = self.truncate_line(line, truncate_width, truncation_suffix, &mut runs);
+        (text, runs)
+    }
+
     /// Truncate a line of text to the given width with this wrapper's font and font size.
     pub fn truncate_line(
         &mut self,
@@ -310,6 +323,10 @@ impl Boundary {
         Self { ix, next_indent }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/line_wrapper_truncation.rs"]
+mod truncation_tests;
 
 #[cfg(test)]
 mod tests {
