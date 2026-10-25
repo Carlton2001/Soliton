@@ -86,7 +86,9 @@ Ces règles restent en vigueur pour toute évolution.
   Focus visible au clavier. Espacements : 0,75 rem sous la navigation, entre la
   rangée de contrôles et le contenu, et entre sections (sans cumul) ; 0,5 rem entre
   actions liées.
-- Navigation toujours visible sous la barre de titre, icônes et libellés :
+- Navigation toujours visible dans la sidebar, prolongée jusqu'au bord supérieur
+  avec l'icône RAP au-dessus des boutons ; barre de titre sans nom à sa droite.
+  Icônes et libellés :
   Artistes, Albums, Playlists, File de lecture, Paramètres. Pas de bouton Retour ;
   `Alt+←/→` parcourent l'historique. Pas de titre de page redondant.
 - Barre de titre, navigation et lecteur partagent le fond de l'application.

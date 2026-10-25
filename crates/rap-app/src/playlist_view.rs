@@ -4,7 +4,7 @@ use crate::{
     i18n::Text,
     playlists::Dialog,
     track_list::{Selection, TrackRow},
-    widgets::{TEXT_SMALL, accent_button, button, cover, time},
+    widgets::{TEXT_SMALL, accent_button, button, cover, icon_button, time},
 };
 use gpui::{prelude::*, *};
 use rap_audio::Command;
@@ -86,6 +86,9 @@ impl Rap {
                     div()
                         .px(crate::widgets::PAGE_INSET)
                         .pt(crate::widgets::PAGE_TOP_PADDING)
+                        .pb(crate::widgets::PAGE_SECTION_GAP)
+                        .border_b_1()
+                        .border_color(theme.border)
                         .flex_none()
                         .flex()
                         .flex_wrap()
@@ -103,6 +106,39 @@ impl Rap {
                                     this.focus.focus(window);
                                     this.playlists.selected = None;
                                     cx.notify();
+                                },
+                            )),
+                        )
+                        .child(
+                            accent_button("playlist-play", "play", self.t(Text::Play), theme)
+                                .opacity(if playable { 1. } else { 0.4 })
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.play_playlist(id, None, cx)
+                                })),
+                        )
+                        .child(
+                            button(
+                                "playlist-enqueue",
+                                "list-end",
+                                self.t(Text::AppendQueue),
+                                theme,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    if let Some(p) =
+                                        this.playlists.lists.iter().find(|p| p.id == id)
+                                    {
+                                        let tracks = this.playlist_tracks(p);
+                                        if !tracks.is_empty() {
+                                            this.audio_command(
+                                                Command::Enqueue {
+                                                    tracks,
+                                                    next: false,
+                                                },
+                                                cx,
+                                            );
+                                        }
+                                    }
                                 },
                             )),
                         )
@@ -162,45 +198,6 @@ impl Rap {
                                             time(duration)
                                         )),
                                 ),
-                        )
-                        .child(
-                            accent_button("playlist-play", "play", self.t(Text::Play), theme)
-                                .opacity(if playable { 1. } else { 0.4 })
-                                .when(self.compact_controls, |button| {
-                                    crate::widgets::compact_button(button, false)
-                                })
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    this.play_playlist(id, None, cx)
-                                })),
-                        )
-                        .child(
-                            button(
-                                "playlist-enqueue",
-                                "list-end",
-                                self.t(Text::AppendQueue),
-                                theme,
-                            )
-                            .when(self.compact_controls, |button| {
-                                crate::widgets::compact_button(button, false)
-                            })
-                            .on_click(cx.listener(
-                                move |this, _, _, cx| {
-                                    if let Some(p) =
-                                        this.playlists.lists.iter().find(|p| p.id == id)
-                                    {
-                                        let tracks = this.playlist_tracks(p);
-                                        if !tracks.is_empty() {
-                                            this.audio_command(
-                                                Command::Enqueue {
-                                                    tracks,
-                                                    next: false,
-                                                },
-                                                cx,
-                                            );
-                                        }
-                                    }
-                                },
-                            )),
                         ),
                 )
                 .when(count == 0, |page| {
@@ -226,6 +223,11 @@ impl Rap {
                     .map(|i| {
                         let p = &this.playlists.lists[i];
                         let id = p.id;
+                        let playable = p.entries.iter().any(|e| {
+                            e.track_id
+                                .and_then(|id| this.tracks.get(&id))
+                                .is_some_and(|t| t.available)
+                        });
                         div()
                             .id(("playlist", id as usize))
                             .tab_index(0)
@@ -250,6 +252,22 @@ impl Rap {
                                     .gap(rems(0.75))
                                     .border_b_1()
                                     .border_color(theme.border)
+                                    .child(
+                                        icon_button(
+                                            ("playlist-row-play", id as usize),
+                                            "play",
+                                            this.t(Text::Play),
+                                            false,
+                                            theme,
+                                        )
+                                        .opacity(if playable { 1. } else { 0.35 })
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| {
+                                                cx.stop_propagation();
+                                                this.play_playlist(id, None, cx)
+                                            }),
+                                        ),
+                                    )
                                     .child(cover(this.playlist_cover(p), 56., theme))
                                     .child(
                                         div()
@@ -284,9 +302,6 @@ impl Rap {
                                             this.t(Text::RenamePlaylist),
                                             theme,
                                         )
-                                        .when(this.compact_controls, |button| {
-                                            crate::widgets::compact_button(button, false)
-                                        })
                                         .on_click(
                                             cx.listener(move |this, _, window, cx| {
                                                 cx.stop_propagation();
@@ -305,9 +320,6 @@ impl Rap {
                                             this.t(Text::Delete),
                                             theme,
                                         )
-                                        .when(this.compact_controls, |button| {
-                                            crate::widgets::compact_button(button, false)
-                                        })
                                         .on_click(
                                             cx.listener(move |this, _, window, cx| {
                                                 cx.stop_propagation();
@@ -326,9 +338,6 @@ impl Rap {
                                             this.t(Text::OpenPlaylist),
                                             theme,
                                         )
-                                        .when(this.compact_controls, |button| {
-                                            crate::widgets::compact_button(button, false)
-                                        })
                                         .on_click(
                                             cx.listener(move |this, _, window, cx| {
                                                 this.focus.focus(window);
@@ -351,7 +360,8 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
-            .child(crate::widgets::page_toolbar().child(
+            .child(self.page_title(Text::Playlists))
+            .child(crate::widgets::page_toolbar(theme).child(
                 accent_button("new-playlist", "plus", self.t(Text::NewPlaylist), theme).on_click(
                     cx.listener(|this, _, window, cx| {
                         this.open_playlist_dialog(Dialog::New(Vec::new()), window, cx)

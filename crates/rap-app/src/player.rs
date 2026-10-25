@@ -21,6 +21,8 @@ impl Rap {
             .gap(rems(0.25))
             .py(rems(0.5))
             .bg(theme.background)
+            .border_t_1()
+            .border_color(theme.border)
             .child(self.progress_row(cx).w_full().px(rems(0.75)))
             .child(
                 div()

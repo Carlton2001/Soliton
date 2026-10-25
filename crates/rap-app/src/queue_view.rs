@@ -51,8 +51,9 @@ impl Rap {
             .min_h_0()
             .flex()
             .flex_col()
+            .child(self.page_title(Text::Queue))
             .child(
-                crate::widgets::page_toolbar()
+                crate::widgets::page_toolbar(theme)
                     .child(
                         button("save-queue", "list-plus", self.t(Text::SaveQueue), theme)
                             .opacity(if count > 0 { 1. } else { 0.4 })
@@ -159,9 +160,6 @@ impl Rap {
                         .when_some(album, |v, id| {
                             v.child(
                                 button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
-                                    .when(self.compact_controls, |button| {
-                                        crate::widgets::compact_button(button, false)
-                                    })
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         this.focus.focus(window);
                                         this.open_album(id, cx);

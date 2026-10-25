@@ -1,7 +1,7 @@
 use crate::app::Rap;
 use gpui::{prelude::*, *};
 
-const TITLE_BAR_HEIGHT: f32 = 40.;
+pub(crate) const TITLE_BAR_HEIGHT: f32 = 40.;
 const CAPTION_BUTTON_WIDTH: f32 = 46.;
 /// Hover color of the close caption button, as in native Windows title bars.
 const CLOSE_HOVER: u32 = 0xc42b1c;
@@ -46,24 +46,6 @@ impl Rap {
             .flex_none()
             .items_center()
             .bg(theme.background)
-            .child(
-                drag("title-bar-brand")
-                    .flex_none()
-                    .gap_2()
-                    .pl_3()
-                    .pr_4()
-                    .child(
-                        img(crate::assets::Assets::logo_path(self.settings.app_icon))
-                            .size(px(18.))
-                            .flex_none(),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(13.))
-                            .font_weight(FontWeight::BOLD)
-                            .child("rap"),
-                    ),
-            )
             .child(drag("title-bar-drag").flex_1())
             // Windows handles these clicks natively through their control areas.
             .child(

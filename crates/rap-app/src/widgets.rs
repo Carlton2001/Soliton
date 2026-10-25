@@ -5,6 +5,7 @@ use gpui::{prelude::*, *};
 use std::path::PathBuf;
 use std::rc::Rc;
 mod adaptive;
+pub use adaptive::{Density, set_density};
 
 /// Type scale at the 16 px reference: body text is 13 px.
 pub const TEXT_CAPTION: Rems = Rems(0.6875);
@@ -28,19 +29,15 @@ pub const RADIUS: Rems = Rems(0.3125);
 pub const RADIUS_LARGE: Rems = Rems(0.5);
 const ICON: Rems = Rems(1.);
 
-/// Compact actions keep their hit target and tooltip, without a label-sized box.
-pub fn compact_button(control: Stateful<Div>, chevron: bool) -> Stateful<Div> {
-    let width = if chevron { rems(3.5) } else { CONTROL_HEIGHT };
-    control.w(width).min_w(width).max_w(width).px(rems(0.5))
-}
-
 /// First row of page actions, with one owner for its surrounding space.
-pub fn page_toolbar() -> Div {
+pub fn page_toolbar(theme: Theme) -> Div {
     div()
         .flex_none()
         .px(PAGE_INSET)
         .pt(PAGE_TOP_PADDING)
         .pb(PAGE_SECTION_GAP)
+        .border_b_1()
+        .border_color(theme.border)
         .flex()
         .items_center()
         .gap(CONTROL_GAP)
@@ -138,7 +135,7 @@ fn styled_button(
         .text_size(TEXT_BODY)
         .font_weight(FontWeight::MEDIUM)
         .flex()
-        .flex_shrink()
+        .flex_none()
         .min_w(rems(2.5))
         .items_center()
         .justify_center()
@@ -168,6 +165,7 @@ fn styled_button(
             icon: name,
             label: label.clone(),
             color: theme.text,
+            primary,
         });
     with_tooltip(control, label, tooltip_theme)
 }
@@ -322,7 +320,7 @@ pub fn ghost(
         .text_size(TEXT_BODY)
         .font_weight(FontWeight::MEDIUM)
         .flex()
-        .flex_shrink()
+        .flex_none()
         .min_w(rems(2.5))
         .items_center()
         .gap(rems(0.625))
@@ -335,6 +333,7 @@ pub fn ghost(
             icon: name,
             label: label.clone(),
             color: theme.muted,
+            primary: false,
         });
     with_tooltip(control, label, theme)
 }
@@ -389,7 +388,7 @@ pub fn nav_item(
         .h(rems(2.25))
         .font_weight(FontWeight::MEDIUM)
         .flex()
-        .flex_shrink()
+        .flex_none()
         .min_w(rems(2.5))
         .items_center()
         .gap(rems(0.625))
@@ -403,12 +402,11 @@ pub fn nav_item(
     } else {
         entry.hover(move |style| style.bg(theme.hover))
     };
+    // Menu entries keep their label at every density.
     with_tooltip(
-        entry.child(adaptive::Content {
-            icon: name,
-            label: label.clone(),
-            color,
-        }),
+        entry
+            .child(tinted_icon(name, color))
+            .child(div().min_w_0().truncate().child(label.clone())),
         label,
         theme,
     )
@@ -462,6 +460,7 @@ pub fn segment(
             icon: name,
             label: label.clone(),
             color,
+            primary: false,
         });
         // Icon-only steppers supply their meaningful tooltip at the call site.
         if label.is_empty() {

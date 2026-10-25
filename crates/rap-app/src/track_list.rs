@@ -258,9 +258,6 @@ impl Rap {
                         )
                         .max_w_full()
                         .child(crate::widgets::icon("chevron-down", theme))
-                        .when(compact || self.compact_controls, |button| {
-                            crate::widgets::compact_button(button, true)
-                        })
                         .when(compact, |v| {
                             v.px(rems(0.375)).text_size(crate::widgets::TEXT_CAPTION)
                         })

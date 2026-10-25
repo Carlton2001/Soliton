@@ -190,9 +190,6 @@ impl Rap {
                     self.theme(),
                 )
                 .child(tinted_icon("chevron-down", self.theme().text))
-                .when(self.compact_controls, |button| {
-                    crate::widgets::compact_button(button, true)
-                })
                 .on_click(cx.listener(move |this, _, _, cx| {
                     if open {
                         this.menu = None;
@@ -262,9 +259,6 @@ impl Rap {
                     self.theme(),
                 )
                 .child(tinted_icon("chevron-down", self.theme().text))
-                .when(self.compact_controls, |button| {
-                    crate::widgets::compact_button(button, true)
-                })
                 .on_click(cx.listener(|this, _, _, cx| this.open_menu(Menu::Sort, cx))),
             )
             .when(self.menu == Some(Menu::Sort), |anchor| {
@@ -295,9 +289,20 @@ impl Rap {
 
     fn filters_menu(&self, kind: FilterKind, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
+        // The values column follows its longest label, measured on all values so
+        // searching does not resize the menu. Check mark, paddings and scrollbar
+        // take about 4 rems; a character averages half a rem.
+        let longest = self
+            .values(kind)
+            .iter()
+            .map(|(label, _)| label.chars().count())
+            .chain([self.t(Text::All).chars().count()])
+            .max()
+            .unwrap_or(0);
+        let values_width = (longest as f32 * 0.5 + 4.).clamp(14., 24.);
         popover(theme)
             .pr_0()
-            .w(rems(36.))
+            .w(rems(12. + 0.5 + values_width))
             .h(rems(24.))
             .flex()
             .gap(rems(0.25))

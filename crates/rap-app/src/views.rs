@@ -30,6 +30,17 @@ impl Rap {
         crate::widgets::input_field(self.search.clone(), true, theme)
     }
 
+    /// Name of the current section, above its toolbar.
+    pub fn page_title(&self, label: Text) -> Div {
+        div()
+            .flex_none()
+            .px(rems(CONTENT_PADDING))
+            .pt(crate::widgets::PAGE_TOP_PADDING)
+            .text_size(crate::widgets::TEXT_DISPLAY)
+            .font_weight(FontWeight::SEMIBOLD)
+            .child(self.t(label))
+    }
+
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let albums = self.section == Section::Albums;
@@ -43,47 +54,52 @@ impl Rap {
             .px(rems(CONTENT_PADDING))
             .pt(crate::widgets::PAGE_TOP_PADDING)
             .pb(crate::widgets::PAGE_SECTION_GAP)
+            .border_b_1()
+            .border_color(theme.border)
             .flex()
             .flex_col()
             .gap(crate::widgets::PAGE_SECTION_GAP)
             .child(
+                // One row: the search narrows and the view toggle drops its labels.
                 div()
                     .flex()
-                    .flex_wrap()
                     .items_center()
                     .gap(crate::widgets::CONTROL_GAP)
                     .when(albums, |row| {
                         let playable = !self.visible.is_empty();
                         row.child(
                             accent_button("play-all", "play", self.t(Text::PlayAll), theme)
-                                .when(self.compact_controls, |button| {
-                                    crate::widgets::compact_button(button, false)
-                                })
+                                .flex_none()
                                 .opacity(if playable { 1. } else { 0.5 })
                                 .on_click(cx.listener(|this, _, _, cx| this.play_all(cx))),
                         )
                     })
-                    .child(self.search_field().w(rems(19.)).max_w_full())
+                    .child(self.search_field().w(rems(19.)).min_w(rems(8.)))
                     .when(albums, |row| row.child(self.filter_button(cx)))
                     .when(albums, |row| row.child(self.sort_button(cx)))
+                    .child(div().flex_1())
                     .when_some(grid, |row, grid| {
-                        row.child(segments(
-                            [
-                                segment(
-                                    "grid",
-                                    Some("layout-grid"),
-                                    self.t(Text::Grid),
-                                    grid,
-                                    theme,
-                                )
-                                .on_click(cx.listener(|this, _, _, cx| this.set_grid(true, cx))),
-                                segment("list", Some("list"), self.t(Text::List), !grid, theme)
+                        row.child(
+                            div().min_w_0().child(segments(
+                                [
+                                    segment(
+                                        "grid",
+                                        Some("layout-grid"),
+                                        self.t(Text::Grid),
+                                        grid,
+                                        theme,
+                                    )
                                     .on_click(
-                                        cx.listener(|this, _, _, cx| this.set_grid(false, cx)),
+                                        cx.listener(|this, _, _, cx| this.set_grid(true, cx)),
                                     ),
-                            ],
-                            theme,
-                        ))
+                                    segment("list", Some("list"), self.t(Text::List), !grid, theme)
+                                        .on_click(
+                                            cx.listener(|this, _, _, cx| this.set_grid(false, cx)),
+                                        ),
+                                ],
+                                theme,
+                            )),
+                        )
                     }),
             )
             .when(albums && self.filter.active(), |view| {

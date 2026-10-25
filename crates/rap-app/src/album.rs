@@ -167,6 +167,8 @@ impl Rap {
                         .overflow_y_scroll()
                         .px(crate::widgets::PAGE_INSET)
                         .pb(crate::widgets::PAGE_SECTION_GAP)
+                        .border_b_1()
+                        .border_color(theme.border)
                         .child(record)
                         .child(
                             self.panel_album_actions(album, edition_index, cx)
@@ -186,6 +188,9 @@ impl Rap {
                 div()
                     .px(crate::widgets::PAGE_INSET)
                     .pt(crate::widgets::PAGE_TOP_PADDING)
+                    .pb(crate::widgets::PAGE_SECTION_GAP)
+                    .border_b_1()
+                    .border_color(theme.border)
                     .flex_none()
                     .flex()
                     .items_center()

@@ -54,7 +54,6 @@ pub struct Rap {
     pub focus: FocusHandle,
     pub modal_focus: FocusHandle,
     pub keyboard_index: usize,
-    pub compact_controls: bool,
     pub album_scroll: UniformListScrollHandle,
     pub album_bar: Scrollbar,
     pub facet_scroll: UniformListScrollHandle,
@@ -197,7 +196,6 @@ impl Rap {
             focus: cx.focus_handle(),
             modal_focus: cx.focus_handle(),
             keyboard_index: 0,
-            compact_controls: false,
             album_bar: bar(&lists[0]),
             album_scroll: lists[0].clone(),
             facet_scroll: lists[1].clone(),
@@ -649,8 +647,6 @@ impl Drop for Rap {
 impl Render for Rap {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::scale::apply(self.settings.ui_rem_size, window);
-        self.compact_controls =
-            f32::from(window.viewport_size().width) / f32::from(window.rem_size()) < 52.;
         // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
@@ -666,6 +662,19 @@ impl Render for Rap {
         } else {
             0.
         };
+        // Labels go all at once, the main actions last.
+        let main_width = if split {
+            width_in_rems - crate::collection::album_panel_width(width_in_rems)
+        } else {
+            width_in_rems
+        };
+        crate::widgets::set_density(if main_width < 40. {
+            crate::widgets::Density::Tight
+        } else if main_width < 52. {
+            crate::widgets::Density::Compact
+        } else {
+            crate::widgets::Density::Full
+        });
         let content = width_in_rems * f32::from(window.rem_size());
         self.columns = ((content - panel_width - reserved + gap) / (tile + gap))
             .floor()
@@ -713,7 +722,10 @@ impl Render for Rap {
             .overflow_hidden()
             .when(
                 !self.now_playing && self.section == Section::Artists && self.selected.is_none(),
-                |v| v.child(self.header(cx)),
+                |v| {
+                    v.child(self.page_title(Text::Artists))
+                        .child(self.header(cx))
+                },
             )
             .child(body);
         let notices = self.notices_view(cx);
@@ -745,14 +757,22 @@ impl Render for Rap {
             .text_color(theme.text)
             .font_family("Inter")
             .text_size(crate::widgets::TEXT_BODY)
-            .child(self.title_bar(window))
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
                     .flex()
                     .child(self.navigation(cx))
-                    .child(main),
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .min_h_0()
+                            .flex()
+                            .flex_col()
+                            .child(self.title_bar(window))
+                            .child(main),
+                    ),
             )
             .children(notices)
             .child(self.footer(window, cx))
