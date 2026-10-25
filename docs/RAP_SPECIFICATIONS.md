@@ -90,16 +90,21 @@ Ces règles restent en vigueur pour toute évolution.
   avec l'icône RAP au-dessus des boutons ; barre de titre sans nom à sa droite.
   Icônes et libellés :
   Artistes, Albums, Playlists, File de lecture, Paramètres. Pas de bouton Retour ;
-  `Alt+←/→` parcourent l'historique. Pas de titre de page redondant.
-- Barre de titre, navigation et lecteur partagent le fond de l'application.
-  Recherche à gauche des contrôles de tri et Grille/Liste ; filtres de métadonnées
-  réservés à Albums ; genres et années par filtres.
+  `Alt+←/→` parcourent l'historique. Chaque section principale affiche son titre
+  au-dessus de ses contrôles ; les fiches (album, playlist) et « Lecture en cours »
+  gardent leur propre en-tête.
+- Barre de titre, navigation et lecteur partagent le fond de l'application. Un trait
+  sépare la navigation, le lecteur et l'en-tête de chaque page du contenu.
+  Recherche à gauche des contrôles de tri ; Grille/Liste à droite, sur la même
+  ligne ; la recherche se rétrécit si besoin. Filtres de métadonnées réservés à
+  Albums ; genres et années par filtres ; le menu s'ajuste aux valeurs affichées.
 - Albums : grille ou liste, choix mémorisé ; sur fenêtre large la fiche s'ouvre dans
   un panneau à droite, sur fenêtre étroite dans une page dédiée.
 - Fiche album : grande pochette, métadonnées, durée, pistes, formats, éditions ;
   qualité par piste si elle diffère. Numéros disque.piste toujours affichés.
-- Boutons avec icône : libellé si la place le permet, sinon icône seule avec
-  infobulle. Actions secondaires des morceaux dans un menu « Actions ».
+- Boutons avec icône : libellé complet ou icône seule avec infobulle, jamais d'état
+  intermédiaire. Tous les boutons, groupés compris, se réduisent ensemble ; les
+  boutons de lecture en dernier. Les entrées de menu gardent leur libellé. Actions secondaires des morceaux dans un menu « Actions ».
 - Lecteur : progression au-dessus ; pochette et métadonnées à gauche ; Aléatoire,
   Précédent, Lecture/Pause (centré), Suivant, Répéter, File ; volume à droite,
   dans un panneau en fenêtre étroite. « Lecture en cours » par le bouton Agrandir,
