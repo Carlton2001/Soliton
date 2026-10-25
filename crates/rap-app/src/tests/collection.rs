@@ -1,4 +1,4 @@
-use super::{Section, split_collection};
+use super::{Section, album_panel_width, split_collection};
 
 #[test]
 fn album_panel_requires_room_for_both_the_collection_and_record() {
@@ -18,4 +18,10 @@ fn other_pages_and_empty_selection_keep_their_existing_layout() {
     ] {
         assert!(!split_collection(90., section, true));
     }
+}
+
+#[test]
+fn album_panel_takes_half_of_the_window() {
+    assert_eq!(album_panel_width(72.), 36.);
+    assert_eq!(album_panel_width(120.), 60.);
 }

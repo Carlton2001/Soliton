@@ -3,7 +3,9 @@ use crate::{
     i18n::Text,
     scrollbar::Scrollbar,
     theme::Theme,
-    widgets::{RADIUS, TEXT_SMALL, TEXT_TITLE, button, cover, segment, segments, time},
+    widgets::{
+        RADIUS, TEXT_SMALL, TEXT_TITLE, accent_button, button, cover, segment, segments, time,
+    },
 };
 use gpui::{prelude::*, *};
 use rap_core::{config::CoverSize, text::fold};
@@ -47,8 +49,20 @@ impl Rap {
             .child(
                 div()
                     .flex()
+                    .flex_wrap()
                     .items_center()
                     .gap(crate::widgets::CONTROL_GAP)
+                    .when(albums, |row| {
+                        let playable = !self.visible.is_empty();
+                        row.child(
+                            accent_button("play-all", "play", self.t(Text::PlayAll), theme)
+                                .when(self.compact_controls, |button| {
+                                    crate::widgets::compact_button(button, false)
+                                })
+                                .opacity(if playable { 1. } else { 0.5 })
+                                .on_click(cx.listener(|this, _, _, cx| this.play_all(cx))),
+                        )
+                    })
                     .child(self.search_field().w(rems(19.)).max_w_full())
                     .when(albums, |row| row.child(self.filter_button(cx)))
                     .when(albums, |row| row.child(self.sort_button(cx)))

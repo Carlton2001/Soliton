@@ -32,6 +32,15 @@ impl AssetSource for Assets {
                 _ => None,
             } };
         }
+        macro_rules! window_controls {
+            ($($name:literal),*) => { match path {
+                $(concat!("window-controls/", $name, ".svg") => Some(Cow::Borrowed(include_bytes!(concat!("../../../assets/window-controls/", $name, ".svg")).as_slice())),)*
+                _ => None,
+            } };
+        }
+        if let Some(control) = window_controls!("minimize", "maximize", "restore", "close") {
+            return Ok(Some(control));
+        }
         if let Some(logo) = logos!(
             "blue",
             "teal",
@@ -85,7 +94,6 @@ impl AssetSource for Assets {
             "circle-alert",
             "triangle-alert",
             "minus",
-            "copy",
             "plus"
         ))
     }

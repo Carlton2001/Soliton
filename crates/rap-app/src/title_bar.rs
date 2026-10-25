@@ -1,8 +1,4 @@
-use crate::{
-    app::{Rap, Section},
-    i18n::Text,
-    widgets::nav_item,
-};
+use crate::app::Rap;
 use gpui::{prelude::*, *};
 
 const TITLE_BAR_HEIGHT: f32 = 40.;
@@ -15,6 +11,7 @@ impl Rap {
     pub fn title_bar(&self, window: &Window) -> impl IntoElement {
         let theme = self.theme();
         let hover = theme.card;
+        // Caption symbols come from Oxyde: a 12-unit grid with a one-unit stroke.
         let caption = |id: &'static str, area: WindowControlArea, icon: &'static str| {
             div()
                 .id(id)
@@ -25,12 +22,12 @@ impl Rap {
                 .items_center()
                 .justify_center()
                 .window_control_area(area)
-                .child(svg().path(icon).size(px(14.)).text_color(theme.text))
+                .child(svg().path(icon).size_3().text_color(theme.text))
         };
         let maximize_icon = if window.is_maximized() {
-            "icons/copy.svg"
+            "window-controls/restore.svg"
         } else {
-            "icons/square.svg"
+            "window-controls/maximize.svg"
         };
         let drag = |id: &'static str| {
             div()
@@ -70,59 +67,24 @@ impl Rap {
             .child(drag("title-bar-drag").flex_1())
             // Windows handles these clicks natively through their control areas.
             .child(
-                caption("title-minimize", WindowControlArea::Min, "icons/minus.svg")
-                    .hover(move |style| style.bg(hover)),
+                caption(
+                    "title-minimize",
+                    WindowControlArea::Min,
+                    "window-controls/minimize.svg",
+                )
+                .hover(move |style| style.bg(hover)),
             )
             .child(
                 caption("title-maximize", WindowControlArea::Max, maximize_icon)
                     .hover(move |style| style.bg(hover)),
             )
             .child(
-                caption("title-close", WindowControlArea::Close, "icons/x.svg")
-                    .hover(|style| style.bg(rgb(CLOSE_HOVER))),
-            )
-    }
-    pub fn navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme();
-        let entries = [
-            (Section::Artists, "users", Text::Artists),
-            (Section::Albums, "disc-3", Text::Albums),
-            (Section::Playlists, "list", Text::Playlists),
-            (Section::Queue, "list-end", Text::Queue),
-            (Section::Settings, "settings", Text::Settings),
-        ];
-        div()
-            .flex()
-            .flex_wrap()
-            .flex_none()
-            .items_center()
-            .gap(rems(0.25))
-            .px(crate::widgets::PAGE_INSET)
-            // The page owns the full gap below navigation; do not add to it here.
-            .pt(rems(0.5))
-            .bg(theme.background)
-            .children(
-                entries
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, (section, icon, label))| {
-                        nav_item(
-                            ("nav", index),
-                            icon,
-                            self.t(label),
-                            self.section == section,
-                            theme,
-                        )
-                        .on_click(cx.listener(
-                            move |this, _, window, cx| {
-                                this.focus.focus(window);
-                                if section == Section::Playlists {
-                                    this.playlists.selected = None;
-                                }
-                                this.navigate(section, cx);
-                            },
-                        ))
-                    }),
+                caption(
+                    "title-close",
+                    WindowControlArea::Close,
+                    "window-controls/close.svg",
+                )
+                .hover(|style| style.bg(rgb(CLOSE_HOVER))),
             )
     }
 }

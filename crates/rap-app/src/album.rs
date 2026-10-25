@@ -103,11 +103,12 @@ impl Rap {
             .min_w_0()
             .when(wide, |v| v.flex_col().w(rems(19.)).flex_none())
             .when(!wide && !panel, |v| v.items_center())
-            .when(panel, |v| v.flex_col().flex_none())
+            // The panel keeps the cover beside its summary to leave room for tracks.
+            .when(panel, |v| v.items_start().flex_none())
             .child(cover(
                 edition.cover().or(album.cover()),
                 if panel {
-                    244.
+                    128.
                 } else if wide {
                     280.
                 } else {
@@ -161,7 +162,7 @@ impl Rap {
                 .child(
                     div()
                         .id("album-panel-summary")
-                        .max_h(relative(0.65))
+                        .max_h(relative(0.5))
                         .min_h_0()
                         .overflow_y_scroll()
                         .px(crate::widgets::PAGE_INSET)

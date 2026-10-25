@@ -34,9 +34,7 @@ impl Rap {
                             .tab_index(0)
                             .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
                             .focus(move |style| style.border_color(theme.accent))
-                            .w(rems(7.25))
-                            .min_h(rems(6.))
-                            .p(rems(0.5))
+                            .p(rems(0.375))
                             .rounded(rems(0.5))
                             .border_2()
                             .border_color(if selected {

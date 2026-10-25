@@ -655,18 +655,19 @@ impl Render for Rap {
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
         let reserved = crate::scale::scaled((2. * crate::views::CONTENT_PADDING) * 16. + 12.);
+        let width_in_rems = crate::navigation::content_width(window);
         let split = crate::collection::split_collection(
-            f32::from(window.viewport_size().width) / f32::from(window.rem_size()),
+            width_in_rems,
             self.section,
             self.selected.is_some(),
         );
         let panel_width = if split {
-            crate::scale::scaled(crate::collection::ALBUM_PANEL_WIDTH * 16.)
+            crate::scale::scaled(crate::collection::album_panel_width(width_in_rems) * 16.)
         } else {
             0.
         };
-        self.columns = ((f32::from(window.viewport_size().width) - panel_width - reserved + gap)
-            / (tile + gap))
+        let content = width_in_rems * f32::from(window.rem_size());
+        self.columns = ((content - panel_width - reserved + gap) / (tile + gap))
             .floor()
             .max(1.) as usize;
         let theme = self.theme();
@@ -745,8 +746,14 @@ impl Render for Rap {
             .font_family("Inter")
             .text_size(crate::widgets::TEXT_BODY)
             .child(self.title_bar(window))
-            .child(self.navigation(cx))
-            .child(main)
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .child(self.navigation(cx))
+                    .child(main),
+            )
             .children(notices)
             .child(self.footer(window, cx))
             .children(self.menu_view(cx))

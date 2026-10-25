@@ -47,6 +47,20 @@ impl Rap {
         self.audio_command(Command::Play { tracks, start }, cx);
     }
 
+    /// Plays the displayed albums in their current order, each in its best edition.
+    pub fn play_all(&mut self, cx: &mut Context<Self>) {
+        let tracks: Vec<_> = self
+            .visible
+            .iter()
+            .flat_map(|&index| self.snapshot.albums[index].primary().tracks.iter())
+            .filter(|t| t.available)
+            .cloned()
+            .collect();
+        if !tracks.is_empty() {
+            self.audio_command(Command::Play { tracks, start: 0 }, cx);
+        }
+    }
+
     pub fn enqueue_album(&mut self, id: i64, edition: usize, next: bool, cx: &mut Context<Self>) {
         if let Some(edition) = self
             .snapshot

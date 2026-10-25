@@ -194,7 +194,7 @@ impl Rap {
             && !self.now_playing
             && (self.selected.is_none()
                 || crate::collection::split_collection(
-                    f32::from(window.viewport_size().width) / f32::from(window.rem_size()),
+                    crate::navigation::content_width(window),
                     self.section,
                     self.selected.is_some(),
                 ))

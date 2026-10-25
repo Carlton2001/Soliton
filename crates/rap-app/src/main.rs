@@ -16,6 +16,7 @@ mod icon_preferences;
 mod indexing;
 mod input;
 mod keys;
+mod navigation;
 mod notices;
 mod now_playing;
 mod output_watch;

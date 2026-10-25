@@ -12,9 +12,9 @@ impl Rap {
         let track = self.playback.track.as_ref();
         let album_id = self.current_album().map(|album| album.id);
         let rem = f32::from(window.rem_size());
-        // Leave room for navigation, the persistent player, the return action and metadata.
+        // Leave room for the title bar, the persistent player, the return action and metadata.
         let side = ((f32::from(window.viewport_size().height) / rem - 26.)
-            .min(f32::from(window.viewport_size().width) / rem - 4.))
+            .min(crate::navigation::content_width(window) - 4.))
         .clamp(4., 32.);
         div()
             .flex_1()

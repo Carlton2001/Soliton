@@ -4,6 +4,10 @@ Les icônes de `icons/` sont les SVG officiels de Lucide, téléchargés sans
 modification depuis https://github.com/lucide-icons/lucide/tree/main/icons.
 Leur licence est conservée dans `icons/LICENSE`.
 
+Les symboles de `window-controls/` (Réduire, Agrandir, Restaurer, Fermer)
+proviennent sans modification de `assets/visuals/window-controls/` du projet
+Oxyde-GPUI, Copyright (C) 2026 Carlton2001, sous GPL-3.0.
+
 Les fontes Inter fournies dans `fonts/` sont embarquées sans modification.
 Copyright The Inter Project Authors, sous SIL Open Font License 1.1 ;
 licence dans `fonts/Inter-LICENSE.txt` (https://github.com/rsms/inter).

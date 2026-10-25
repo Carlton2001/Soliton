@@ -339,6 +339,37 @@ pub fn ghost(
     with_tooltip(control, label, theme)
 }
 
+/// Icon-only navigation entry of the section rail; its label is the tooltip.
+pub fn nav_icon(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: impl Into<SharedString>,
+    selected: bool,
+    theme: Theme,
+) -> Stateful<Div> {
+    let entry = div()
+        .id(id)
+        .tab_index(0)
+        .capture_any_mouse_down(keyboard_focus_only)
+        .border_1()
+        .border_color(gpui::transparent_black())
+        .focus(move |style| style.bg(theme.selected).border_color(theme.accent))
+        .size(rems(2.5))
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .rounded(RADIUS)
+        .active(move |style| style.bg(theme.pressed));
+    let entry = if selected {
+        entry.bg(theme.selected)
+    } else {
+        entry.hover(move |style| style.bg(theme.hover))
+    };
+    let color = if selected { theme.text } else { theme.muted };
+    with_tooltip(entry.child(tinted_icon(name, color)), label.into(), theme)
+}
+
 /// Navigation entry; selection uses a tinted background and body foreground.
 pub fn nav_item(
     id: impl Into<ElementId>,
