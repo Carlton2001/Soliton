@@ -93,3 +93,5 @@ Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de l
 Voir [les spécifications](docs/RAP_SPECIFICATIONS.md), [l'architecture](docs/ARCHITECTURE.md),
 [les dépendances](docs/DEPENDENCIES.md) et [les correctifs GPUI](vendor/README.md).
 Attributions dans [assets/NOTICE.md](assets/NOTICE.md).
+Collecte et vérification des licences des crates et ressources :
+[licenses/dependencies/README.md](licenses/dependencies/README.md).

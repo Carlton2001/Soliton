@@ -1,0 +1,29 @@
+# Keep license texts and copyright holders in the generated distribution notices.
+accepted = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib", "CC0-1.0", "MPL-2.0", "OpenSSL", "BSL-1.0", "OFL-1.1", "LicenseRef-ring"]
+ignore-build-dependencies = false
+ignore-dev-dependencies = false
+
+[ar_archive_writer]
+accepted = ["Apache-2.0 WITH LLVM-exception"]
+
+[libfuzzer-sys]
+accepted = ["MIT", "NCSA"]
+
+[rap-app]
+accepted = ["GPL-3.0-only"]
+
+[rap-audio]
+accepted = ["GPL-3.0-only"]
+
+[rap-core]
+accepted = ["GPL-3.0-only"]
+
+[rap-library]
+accepted = ["GPL-3.0-only"]
+
+[rap-network]
+accepted = ["GPL-3.0-only"]
+
+[rap-platform]
+accepted = ["GPL-3.0-only"]
+
