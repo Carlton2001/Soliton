@@ -216,3 +216,20 @@ fn home_artist_and_album_round_trip() {
     settings.save(&path).unwrap();
     assert_eq!(Settings::load(&path).unwrap().last_view, settings.last_view);
 }
+
+#[test]
+fn system_accent_and_appearance_persist_independently() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    for appearance in [Appearance::System, Appearance::Light, Appearance::Dark] {
+        let settings = Settings {
+            appearance,
+            accent: Accent::System,
+            ..Settings::default()
+        };
+        settings.save(&path).unwrap();
+        let loaded = Settings::load(&path).unwrap();
+        assert_eq!(loaded.accent, Accent::System);
+        assert_eq!(loaded.appearance, appearance);
+    }
+}

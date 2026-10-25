@@ -301,7 +301,6 @@ impl Rap {
             .unwrap_or(0);
         let values_width = (longest as f32 * 0.5 + 4.).clamp(14., 24.);
         popover(theme)
-            .pr_0()
             .w(rems(12. + 0.5 + values_width))
             .h(rems(24.))
             .flex()
@@ -386,8 +385,7 @@ impl Rap {
             .when(searchable, |column| {
                 column.child(
                     crate::widgets::input_field(self.menu_search.clone(), true, theme)
-                        .mb(rems(0.25))
-                        .mr(rems(0.25)),
+                        .mb(rems(0.25)),
                 )
             })
             .child(crate::views::scroll_area(
@@ -430,7 +428,7 @@ fn dropdown(menu: AnyElement, align_right: bool) -> AnyElement {
             .mt(rems(0.25))
             .when(align_right, |anchor| anchor.right_0())
             .when(!align_right, |anchor| anchor.left_0())
-            .child(anchored().snap_to_window().child(menu)),
+            .child(anchored().snap_to_window_with_margin(px(20.)).child(menu)),
     )
     .with_priority(1)
     .into_any_element()

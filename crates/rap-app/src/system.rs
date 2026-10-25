@@ -46,6 +46,7 @@ impl Rap {
             match event {
                 DesktopEvent::Media(command) if !self.quitting => self.system_media(command, cx),
                 DesktopEvent::Media(_) => {}
+                DesktopEvent::SystemAccent(colors) => self.system_accent = Some(colors),
                 DesktopEvent::Show => {
                     if let Some(desktop) = &self.desktop {
                         desktop.show();

@@ -30,10 +30,12 @@ pub enum Accent {
     Red,
     Orange,
     Green,
+    /// Follows the operating system accent palette.
+    System,
 }
 
 impl Accent {
-    pub const ALL: [Accent; 8] = [
+    pub const ALL: [Accent; 9] = [
         Accent::Teal,
         Accent::Blue,
         Accent::Indigo,
@@ -42,6 +44,7 @@ impl Accent {
         Accent::Red,
         Accent::Orange,
         Accent::Green,
+        Accent::System,
     ];
 }
 

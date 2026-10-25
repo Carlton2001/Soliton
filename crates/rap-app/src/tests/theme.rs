@@ -21,6 +21,10 @@ fn every_accent_is_readable_on_every_surface() {
     for dark in [true, false] {
         for accent in Accent::ALL {
             let theme = Theme::new(dark, accent);
+            assert!(
+                contrast(theme.accent, theme.on_accent) >= 4.5,
+                "{accent:?} dark={dark}: text on accent fill"
+            );
             for (name, surface) in [
                 ("background", theme.background),
                 ("panel", theme.panel),
@@ -41,5 +45,28 @@ fn text_stays_readable() {
             assert!(contrast(theme.text, surface) >= 7.0);
             assert!(contrast(theme.muted, surface) >= 4.5);
         }
+    }
+}
+
+#[test]
+fn system_accent_follows_palette_and_theme_without_affecting_fixed_accents() {
+    let first = [0x003e92, 0x99caff];
+    let changed = [0x5c2d91, 0xd8b9ff];
+    for dark in [false, true] {
+        let theme = Theme::with_system_accent(dark, Accent::System, Some(first));
+        assert_eq!(theme.accent, rgb(first[usize::from(dark)]));
+        let updated = Theme::with_system_accent(dark, Accent::System, Some(changed));
+        assert_eq!(updated.accent, rgb(changed[usize::from(dark)]));
+        assert_eq!(updated.selected.r, updated.accent.r);
+        assert_eq!(updated.selected.g, updated.accent.g);
+        assert_eq!(updated.selected.b, updated.accent.b);
+        assert_eq!(
+            Theme::with_system_accent(dark, Accent::Teal, Some(changed)).accent,
+            Theme::new(dark, Accent::Teal).accent,
+        );
+        assert_eq!(
+            Theme::new(dark, Accent::System).accent,
+            Theme::new(dark, Accent::Blue).accent
+        );
     }
 }

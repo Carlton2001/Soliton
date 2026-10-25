@@ -105,6 +105,7 @@ impl Rap {
             Accent::Red => Text::Red,
             Accent::Orange => Text::Orange,
             Accent::Green => Text::Green,
+            Accent::System => Text::System,
         })
     }
 
@@ -253,12 +254,23 @@ impl Rap {
             }),
             theme,
         );
-        let accents = div()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .gap(rems(0.25))
-            .children(Accent::ALL.map(|accent| self.swatch(accent, s.accent == accent, cx)));
+        let system_accent = segment(
+            "accent-system",
+            None,
+            self.t(Text::System),
+            s.accent == Accent::System,
+            theme,
+        )
+        .on_click(cx.listener(|this, _, _, cx| this.set_accent(Accent::System, cx)));
+        let accents = segments(
+            std::iter::once(system_accent).chain(
+                Accent::ALL
+                    .into_iter()
+                    .filter(|accent| *accent != Accent::System)
+                    .map(|accent| self.swatch(accent, s.accent == accent, cx)),
+            ),
+            theme,
+        );
         let cover_size = segments(
             sizes.map(|(size, label)| {
                 segment(
@@ -301,28 +313,13 @@ impl Rap {
 
     fn swatch(&self, accent: Accent, selected: bool, cx: &mut Context<Self>) -> Stateful<Div> {
         let theme = self.theme();
-        let color = Theme::new(self.dark(), accent).accent;
+        let color = crate::theme::accent_swatch(accent);
         with_tooltip(
-            div()
-                .id(("accent", accent as usize))
-                .tab_index(0)
-                .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
-                .focus(move |s| s.border_2().border_color(theme.accent))
-                .size(rems(1.75))
-                .rounded_full()
-                .flex()
-                .items_center()
+            segment(("accent", accent as usize), None, "", selected, theme)
+                .px(rems(0.375))
+                .gap_0()
                 .justify_center()
-                .border_2()
-                .border_color(if selected {
-                    theme.text
-                } else {
-                    gpui::transparent_black().into()
-                })
-                .when(!selected, |swatch| {
-                    swatch.hover(move |style| style.border_color(theme.control_border))
-                })
-                .child(div().size(rems(1.25)).rounded_full().bg(color))
+                .child(div().size(rems(1.)).rounded_full().bg(color))
                 .on_click(cx.listener(move |this, _, _, cx| this.set_accent(accent, cx))),
             self.accent_name(accent).into(),
             theme,

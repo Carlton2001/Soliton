@@ -67,6 +67,7 @@ pub struct Rap {
     pub settings: Settings,
     /// Operating system preference, used when the appearance follows the system.
     pub system_dark: bool,
+    pub system_accent: Option<[u32; 2]>,
     pub snapshot: Arc<LibrarySnapshot>,
     pub visible: Vec<usize>,
     pub filter: Filter,
@@ -208,6 +209,7 @@ impl Rap {
             pending_removal: None,
             settings,
             system_dark: is_dark(window.appearance()),
+            system_accent: None,
             snapshot: Arc::new(LibrarySnapshot::default()),
             visible: Vec::new(),
             filter,
@@ -439,7 +441,7 @@ impl Rap {
         }
     }
     pub fn theme(&self) -> Theme {
-        Theme::new(self.dark(), self.settings.accent)
+        Theme::with_system_accent(self.dark(), self.settings.accent, self.system_accent)
     }
     /// Queries the catalogue again with the current filter and display settings.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {

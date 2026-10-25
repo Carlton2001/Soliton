@@ -1,5 +1,6 @@
 //! Native ownership lives on one worker; callbacks only enqueue commands.
 mod app_icons;
+mod appearance;
 mod autostart;
 pub(crate) mod bluetooth;
 pub(crate) mod device_watch;
@@ -242,8 +243,12 @@ fn run(
         taskbar::detach(HWND(window as *mut _), binding);
     }
     let _ = events.try_send(DesktopEvent::Autostart(autostart::enabled()));
+    let mut appearance = initialized.then(appearance::AccentWatcher::new).flatten();
     let mut wanted_icon = icon;
     while !shutdown.load(Ordering::Acquire) {
+        if let Some(appearance) = &mut appearance {
+            appearance.poll(events);
+        }
         if restore.swap(false, Ordering::AcqRel) {
             unsafe {
                 let window = HWND(window as *mut _);
@@ -306,6 +311,7 @@ fn run(
             }
         }
     }
+    drop(appearance);
     drop(media);
     drop(taskbar);
     if let Some(binding) = taskbar_binding {

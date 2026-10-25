@@ -29,8 +29,19 @@ pub struct Theme {
 }
 
 impl Theme {
+    #[cfg(test)]
     pub fn new(dark: bool, accent: Accent) -> Self {
-        let accent = rgb(accent_color(accent, dark));
+        Self::with_system_accent(dark, accent, None)
+    }
+
+    pub fn with_system_accent(dark: bool, accent: Accent, system: Option<[u32; 2]>) -> Self {
+        let accent = rgb(if accent == Accent::System {
+            system
+                .map(|colors| colors[usize::from(dark)])
+                .unwrap_or_else(|| accent_color(Accent::Blue, dark))
+        } else {
+            accent_color(accent, dark)
+        });
         let selected = Rgba {
             a: if dark { 0.18 } else { 0.14 },
             ..accent
@@ -41,64 +52,85 @@ impl Theme {
             b: value,
             a,
         };
-        // Palettes of Oxyde Windows Dark and Windows Light.
+        // Windows 11 / WinUI neutral resources, adapted to RAP's surface roles.
+        // Source: microsoft/microsoft-ui-xaml, Common_themeresources_any.xaml.
+        // Keep control fills translucent so they adapt to each containing surface;
+        // native previews receive opaque RGB surface and text colors.
         if dark {
             Self {
-                background: rgb(0x181818),
-                panel: rgb(0x1e1e1e),
-                card: rgb(0x2a2a2a),
-                text: rgb(0xd0d0d0),
-                muted: rgb(0x999999),
-                border: rgb(0x2e2e2e),
+                background: rgb(0x202020), // SolidBackgroundFillColorBase
+                panel: rgb(0x282828),      // SolidBackgroundFillColorTertiary
+                card: rgb(0x323232),       // CardBackgroundFillColorDefault over panel
+                text: rgb(0xffffff),
+                muted: rgb(0xc5c5c5),
+                border: layer(1., 21. / 255.), // DividerStrokeColorDefault
                 accent,
-                on_accent: rgb(0x111111),
+                on_accent: rgb(0x000000),
                 selected,
-                control: rgb(0x2b2b2b),
-                control_border: rgb(0x3d3d3d),
-                control_hover: rgb(0x333333),
-                control_pressed: rgb(0x262626),
-                hover: layer(1., 0.07),
-                pressed: layer(1., 0.11),
-                danger: rgb(0xc42b1c),
-                scrim: layer(0.094, 0.82),
+                control: layer(1., 15. / 255.),
+                control_border: layer(1., 18. / 255.),
+                control_hover: layer(1., 21. / 255.),
+                control_pressed: layer(1., 8. / 255.),
+                hover: layer(1., 15. / 255.),
+                pressed: layer(1., 10. / 255.),
+                danger: rgb(0xff99a4),
+                scrim: layer(0., 77. / 255.),
             }
         } else {
             Self {
-                background: rgb(0xeeeeee),
-                panel: rgb(0xffffff),
-                card: rgb(0xededed),
-                text: rgb(0x2e2e2e),
-                muted: rgb(0x666666),
-                border: rgb(0xe0e0e0),
+                background: rgb(0xf3f3f3), // SolidBackgroundFillColorBase
+                panel: rgb(0xf9f9f9),      // SolidBackgroundFillColorTertiary
+                card: rgb(0xffffff),       // CardBackgroundFillColorTertiary
+                text: rgb(0x1b1b1b),
+                muted: rgb(0x606060),
+                border: layer(0., 15. / 255.),
                 accent,
                 on_accent: rgb(0xffffff),
                 selected,
-                control: rgb(0xfdfdfd),
-                control_border: rgb(0xcfcfcf),
-                control_hover: rgb(0xf3f3f3),
-                control_pressed: rgb(0xe8e8e8),
-                hover: layer(0., 0.05),
-                pressed: layer(0., 0.09),
+                control: layer(1., 179. / 255.),
+                control_border: layer(0., 15. / 255.),
+                control_hover: Rgba {
+                    a: 128. / 255.,
+                    ..rgb(0xf9f9f9)
+                },
+                control_pressed: Rgba {
+                    a: 77. / 255.,
+                    ..rgb(0xf9f9f9)
+                },
+                hover: layer(0., 9. / 255.),
+                pressed: layer(0., 6. / 255.),
                 danger: rgb(0xc42b1c),
-                scrim: layer(0.933, 0.88),
+                scrim: layer(0., 77. / 255.),
             }
         }
     }
 }
 
-/// One readable variant per theme: accents color text, icons and progress on
-/// every surface of the palette.
+/// Stable swatch colors from the Windows personalization palette.
+/// Reference: Microsoft's Universal color palette (Microsoft-Design-Language-1603.pdf).
+/// These identify the chosen hue independently of the current light/dark theme.
+pub fn accent_swatch(accent: Accent) -> Rgba {
+    rgb(accent_palette(accent).0)
+}
+
+/// Reference swatch, dark-theme variant, light-theme variant.
+/// Variants retain the reference hue while meeting 4.5:1 text contrast on
+/// every RAP surface, including text drawn on accent-filled controls.
+fn accent_palette(accent: Accent) -> (u32, u32, u32) {
+    match accent {
+        Accent::Teal => (0x038387, 0x51a9ac, 0x037a7e),
+        Accent::Blue | Accent::System => (0x0078d4, 0x4fa2e1, 0x006ec3),
+        Accent::Indigo => (0x6b69d6, 0x9694e2, 0x6462c7),
+        Accent::Violet => (0x8764b8, 0xaa91cd, 0x7f5ead),
+        Accent::Pink => (0xe3008c, 0xef6ebd, 0xd30082),
+        Accent::Red => (0xe81123, 0xf2757f, 0xda1021),
+        Accent::Orange => (0xca5010, 0xda865a, 0xba4a0f),
+        Accent::Green => (0x10893e, 0x58ac78, 0x0f7e39),
+    }
+}
+
 fn accent_color(accent: Accent, dark: bool) -> u32 {
-    let (dark_variant, light_variant) = match accent {
-        Accent::Teal => (0x68d4b3, 0x0f6e5a),
-        Accent::Blue => (0x74b6ff, 0x1d5fb4),
-        Accent::Indigo => (0xa3acff, 0x4249c2),
-        Accent::Violet => (0xc6a2ff, 0x6c3dbf),
-        Accent::Pink => (0xff94c8, 0xa82a66),
-        Accent::Red => (0xff8f86, 0xb02a26),
-        Accent::Orange => (0xffb36e, 0x9a4a08),
-        Accent::Green => (0x93d97f, 0x2c6e1e),
-    };
+    let (_, dark_variant, light_variant) = accent_palette(accent);
     if dark { dark_variant } else { light_variant }
 }
 
