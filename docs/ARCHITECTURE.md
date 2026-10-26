@@ -136,7 +136,8 @@ Listes, grilles et sélecteurs virtualisés (`uniform_list`). Textes centralisé
 dans `i18n.rs`, y compris les erreurs : moteur et bibliothèque produisent des
 `soliton_core::failure::Failure` (nature sans texte, détail système conservé) que
 l'interface traduit sous le libellé de leur origine. Inter embarquée, chiffres tabulaires (`tnum`). Champ de texte issu
-de l'exemple GPUI (Apache-2.0). SVG Lucide officiels non modifiés. Accents vérifiés
+de l'exemple GPUI (Apache-2.0). SVG Lucide officiels non modifiés,
+chargés avec un trait de 1,5 au lieu de 2 (seul cet attribut change). Accents vérifiés
 à un contraste d'au moins 4,5:1. Erreurs conservées (50 au plus) dans un bandeau.
 
 ## Intégration Windows

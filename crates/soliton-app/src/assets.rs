@@ -2,6 +2,19 @@ use gpui::{AssetSource, SharedString};
 use soliton_core::config::AppIcon;
 use std::borrow::Cow;
 
+/// Lucide draws its icons with a 2-unit stroke; the interface uses a lighter one.
+/// Only this attribute is rewritten at load time: the bundled files and their
+/// paths stay exactly as downloaded.
+const ICON_STROKE_WIDTH: &str = r#"stroke-width="1.5""#;
+
+fn lighter_stroke(svg: &'static [u8]) -> Cow<'static, [u8]> {
+    let svg = std::str::from_utf8(svg).expect("Lucide icons are UTF-8");
+    Cow::Owned(
+        svg.replace(r#"stroke-width="2""#, ICON_STROKE_WIDTH)
+            .into_bytes(),
+    )
+}
+
 pub struct Assets;
 #[cfg(test)]
 #[path = "tests/assets.rs"]
@@ -22,7 +35,7 @@ impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
         macro_rules! icons {
             ($($name:literal),*) => { match path {
-                $(concat!("icons/", $name, ".svg") => Some(Cow::Borrowed(include_bytes!(concat!("../../../assets/icons/", $name, ".svg")).as_slice())),)*
+                $(concat!("icons/", $name, ".svg") => Some(lighter_stroke(include_bytes!(concat!("../../../assets/icons/", $name, ".svg")).as_slice())),)*
                 _ => None,
             } };
         }
