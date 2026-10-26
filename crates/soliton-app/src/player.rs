@@ -331,14 +331,15 @@ impl Soliton {
     pub fn progress_row(&self, cx: &mut Context<Self>) -> Div {
         let theme = self.theme();
         let p = &self.playback;
+        let position = self.shown_position();
         let fraction = self.seek_preview.unwrap_or(if p.duration_ms > 0 {
-            p.position_ms as f32 / p.duration_ms as f32
+            position as f32 / p.duration_ms as f32
         } else {
             0.
         });
         let shown = match self.seek_preview {
             Some(preview) => (p.duration_ms as f32 * preview) as u64,
-            None => p.position_ms,
+            None => position,
         };
         let entity = cx.weak_entity();
         let on_change: OnChange = Rc::new(move |fraction, released, _, cx| {

@@ -3,6 +3,17 @@ use crate::{app::Soliton, i18n::Text, notices::Level};
 use gpui::*;
 use soliton_audio::{Command, PlaybackState};
 use soliton_core::{failure::Failure, model::Album};
+use std::time::{Duration, Instant};
+
+/// A reported position this close to a sent seek shows that the engine applied it.
+const SEEK_SETTLED_MS: u64 = 1_000;
+/// A seek the engine never confirms, such as one past the end, stops being shown.
+const SEEK_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Whether a sent seek no longer needs to stand in for the reported position.
+fn seek_settled(position_ms: u64, target_ms: u64, elapsed: Duration, track_changed: bool) -> bool {
+    track_changed || elapsed >= SEEK_TIMEOUT || position_ms.abs_diff(target_ms) < SEEK_SETTLED_MS
+}
 
 impl Soliton {
     pub fn audio_command(&mut self, command: Command, cx: &mut Context<Self>) {
@@ -149,10 +160,34 @@ impl Soliton {
         if released {
             self.seek_preview = None;
             let target = (self.playback.duration_ms as f64 * f64::from(fraction)) as u64;
+            self.seek_target = Some((target, Instant::now()));
             self.audio_command(Command::Seek(target), cx);
         } else {
             self.seek_preview = Some(fraction);
             cx.notify();
+        }
+    }
+
+    /// Position to display: a sent seek, until the engine reports it, rather
+    /// than the earlier position still in flight.
+    pub fn shown_position(&self) -> u64 {
+        self.seek_target
+            .filter(|(_, sent)| sent.elapsed() < SEEK_TIMEOUT)
+            .map_or(self.playback.position_ms, |(target, _)| target)
+    }
+
+    /// Called with each engine state, after it replaced `previous_track`'s.
+    pub fn settle_seek(&mut self, previous_track: Option<i64>) {
+        let track = self.playback.track.as_ref().map(|t| t.id);
+        if let Some((target, sent)) = self.seek_target
+            && seek_settled(
+                self.playback.position_ms,
+                target,
+                sent.elapsed(),
+                track != previous_track,
+            )
+        {
+            self.seek_target = None;
         }
     }
 
@@ -165,3 +200,7 @@ impl Soliton {
             .find(|album| album.tracks().any(|t| t.id == id))
     }
 }
+
+#[cfg(test)]
+#[path = "tests/playback.rs"]
+mod tests;

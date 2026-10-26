@@ -96,7 +96,7 @@ pub struct Soliton {
     pub seek_preview: Option<f32>,
     /// Volume restored when sound is turned back on.
     pub muted_volume: Option<f32>,
-    /// Last keyboard seek target and when it was sent.
+    /// Last seek sent and when, shown until the engine reports it.
     pub seek_target: Option<(u64, Instant)>,
     query_pending: bool,
     _subscriptions: Vec<Subscription>,
@@ -353,7 +353,9 @@ impl Soliton {
             if playback.network_output.is_some() {
                 self.settings.volume = playback.volume;
             }
+            let previous_track = self.playback.track.as_ref().map(|t| t.id);
             self.playback = playback;
+            self.settle_seek(previous_track);
             self.remember_queue();
         }
         for event in self.services.events.try_iter().collect::<Vec<_>>() {
