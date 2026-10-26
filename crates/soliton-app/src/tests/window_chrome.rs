@@ -13,7 +13,7 @@ fn resize_border_distinguishes_edges_corners_and_content() {
         (400., 599., Some(ResizeEdge::Bottom)),
         (0., 300., Some(ResizeEdge::Left)),
         (799., 300., Some(ResizeEdge::Right)),
-        (4., 4., None),
+        (10., 10., None),
         (400., 300., None),
         (-1., 0., None),
         (0., -1., None),

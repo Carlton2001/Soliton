@@ -474,8 +474,7 @@ fn slider_bubble(
     bottom: Rems,
     theme: crate::theme::Theme,
 ) -> Deferred {
-    let mut background = theme.control;
-    background.a = 1.;
+    // Opaque like tooltips: the translucent control fill has no surface behind it here.
     deferred(
         div()
             .absolute()
@@ -486,8 +485,8 @@ fn slider_bubble(
             .py(rems(0.125))
             .rounded(rems(0.3125))
             .border_1()
-            .border_color(theme.border)
-            .bg(background)
+            .border_color(theme.control_border)
+            .bg(theme.panel)
             .occlude()
             .shadow_sm()
             .text_center()

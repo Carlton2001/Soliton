@@ -2,7 +2,8 @@
 use crate::{placement, theme::Theme};
 use gpui::{prelude::*, *};
 
-const RESIZE_BORDER: Pixels = px(4.);
+/// Transparent margin holding the shadow and the resize zones.
+const RESIZE_BORDER: Pixels = px(10.);
 
 pub fn options(bounds: WindowBounds) -> WindowOptions {
     WindowOptions {
@@ -60,8 +61,8 @@ pub fn drag_region(id: &'static str, window: &mut Window, cx: &mut App) -> State
         })
 }
 
-/// No wrapper or new handlers on Windows. Linux resizes through the compositor;
-/// the border deliberately leaves the cursor unchanged.
+/// No wrapper or new handlers on Windows. On Linux, a transparent margin carries
+/// the window shadow and the compositor-driven resize zones with their cursors.
 pub fn frame(content: Div, window: &mut Window, theme: Theme) -> Div {
     if !cfg!(target_os = "linux") {
         return content;
@@ -81,11 +82,30 @@ pub fn frame(content: Div, window: &mut Window, theme: Theme) -> Div {
     div()
         .relative()
         .size_full()
-        .bg(theme.border)
         .pt(if tiling.top { px(0.) } else { RESIZE_BORDER })
         .pr(if tiling.right { px(0.) } else { RESIZE_BORDER })
         .pb(if tiling.bottom { px(0.) } else { RESIZE_BORDER })
         .pl(if tiling.left { px(0.) } else { RESIZE_BORDER })
+        .child(
+            canvas(
+                move |_, window, _| {
+                    resize_zones(window.viewport_size(), tiling)
+                        .map(|(edge, zone)| {
+                            (edge, window.insert_hitbox(zone, HitboxBehavior::Normal))
+                        })
+                        .collect::<Vec<_>>()
+                },
+                |_, zones, window, _| {
+                    for (edge, hitbox) in zones {
+                        window.set_cursor_style(resize_cursor(edge), &hitbox);
+                    }
+                },
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full(),
+        )
         .on_mouse_down(MouseButton::Left, move |event, window, cx| {
             if !window.is_maximized()
                 && !window.is_fullscreen()
@@ -95,31 +115,85 @@ pub fn frame(content: Div, window: &mut Window, theme: Theme) -> Div {
                 cx.stop_propagation();
             }
         })
-        .child(content)
+        .child(
+            content
+                .border_color(theme.border)
+                .when(!tiling.top, |content| content.border_t_1())
+                .when(!tiling.right, |content| content.border_r_1())
+                .when(!tiling.bottom, |content| content.border_b_1())
+                .when(!tiling.left, |content| content.border_l_1())
+                .when(!tiling.is_tiled(), |content| {
+                    content.shadow(vec![BoxShadow {
+                        color: hsla(0., 0., 0., 0.4),
+                        offset: point(px(0.), px(0.)),
+                        blur_radius: RESIZE_BORDER / 2.,
+                        spread_radius: px(0.),
+                    }])
+                }),
+        )
+}
+
+/// Non-overlapping zones of the margin, corners first; tiled sides have none.
+fn resize_zones(
+    size: Size<Pixels>,
+    tiling: Tiling,
+) -> impl Iterator<Item = (ResizeEdge, Bounds<Pixels>)> {
+    let side = |tiled: bool| if tiled { px(0.) } else { RESIZE_BORDER };
+    let (top, right, bottom, left) = (
+        side(tiling.top),
+        side(tiling.right),
+        side(tiling.bottom),
+        side(tiling.left),
+    );
+    let (width, height) = (size.width, size.height);
+    let (inner_width, inner_height) = (width - left - right, height - top - bottom);
+    let zone = |x, y, w, h| Bounds::new(point(x, y), gpui::size(w, h));
+    [
+        (ResizeEdge::TopLeft, zone(px(0.), px(0.), left, top)),
+        (
+            ResizeEdge::TopRight,
+            zone(width - right, px(0.), right, top),
+        ),
+        (
+            ResizeEdge::BottomLeft,
+            zone(px(0.), height - bottom, left, bottom),
+        ),
+        (
+            ResizeEdge::BottomRight,
+            zone(width - right, height - bottom, right, bottom),
+        ),
+        (ResizeEdge::Top, zone(left, px(0.), inner_width, top)),
+        (
+            ResizeEdge::Bottom,
+            zone(left, height - bottom, inner_width, bottom),
+        ),
+        (ResizeEdge::Left, zone(px(0.), top, left, inner_height)),
+        (
+            ResizeEdge::Right,
+            zone(width - right, top, right, inner_height),
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, zone)| !zone.is_empty())
 }
 
 fn resize_edge(position: Point<Pixels>, size: Size<Pixels>, tiling: Tiling) -> Option<ResizeEdge> {
-    if position.x < px(0.)
-        || position.y < px(0.)
-        || position.x >= size.width
-        || position.y >= size.height
-    {
-        return None;
-    }
-    let top = !tiling.top && position.y < RESIZE_BORDER;
-    let bottom = !tiling.bottom && position.y >= size.height - RESIZE_BORDER;
-    let left = !tiling.left && position.x < RESIZE_BORDER;
-    let right = !tiling.right && position.x >= size.width - RESIZE_BORDER;
-    match (top, bottom, left, right) {
-        (true, _, true, _) => Some(ResizeEdge::TopLeft),
-        (true, _, _, true) => Some(ResizeEdge::TopRight),
-        (_, true, true, _) => Some(ResizeEdge::BottomLeft),
-        (_, true, _, true) => Some(ResizeEdge::BottomRight),
-        (true, _, _, _) => Some(ResizeEdge::Top),
-        (_, true, _, _) => Some(ResizeEdge::Bottom),
-        (_, _, true, _) => Some(ResizeEdge::Left),
-        (_, _, _, true) => Some(ResizeEdge::Right),
-        _ => None,
+    // Half-open, unlike `Bounds::contains`, so adjacent zones never share a pixel.
+    resize_zones(size, tiling)
+        .find(|(_, zone)| {
+            let end = zone.bottom_right();
+            (zone.origin.x..end.x).contains(&position.x)
+                && (zone.origin.y..end.y).contains(&position.y)
+        })
+        .map(|(edge, _)| edge)
+}
+
+fn resize_cursor(edge: ResizeEdge) -> CursorStyle {
+    match edge {
+        ResizeEdge::Top | ResizeEdge::Bottom => CursorStyle::ResizeUpDown,
+        ResizeEdge::Left | ResizeEdge::Right => CursorStyle::ResizeLeftRight,
+        ResizeEdge::TopLeft | ResizeEdge::BottomRight => CursorStyle::ResizeUpLeftDownRight,
+        ResizeEdge::TopRight | ResizeEdge::BottomLeft => CursorStyle::ResizeUpRightDownLeft,
     }
 }
 
