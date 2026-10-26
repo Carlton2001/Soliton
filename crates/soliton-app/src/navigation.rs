@@ -15,7 +15,7 @@ pub fn content_width(window: &Window) -> f32 {
 }
 
 impl Soliton {
-    pub fn navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn navigation(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let entry = |index: usize,
                      section: Section,
@@ -49,21 +49,18 @@ impl Soliton {
             .border_r_1()
             .border_color(theme.border)
             .child(
-                crate::window_chrome::drag_region(
-                    div()
-                        .id("navigation-brand")
-                        .w_full()
-                        .h(px(crate::title_bar::TITLE_BAR_HEIGHT))
-                        .flex_none()
-                        .flex()
-                        .items_center()
-                        .justify_center(),
-                )
-                .child(
-                    img(crate::assets::Assets::logo_path(self.settings.app_icon))
-                        .size(px(24.))
-                        .flex_none(),
-                ),
+                crate::window_chrome::drag_region("navigation-brand", window, cx)
+                    .w_full()
+                    .h(px(crate::title_bar::TITLE_BAR_HEIGHT))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        img(crate::assets::Assets::logo_path(self.settings.app_icon))
+                            .size(px(24.))
+                            .flex_none(),
+                    ),
             )
             .child(
                 div()

@@ -8,9 +8,14 @@ const CLOSE_HOVER: u32 = 0xc42b1c;
 
 impl Soliton {
     /// Title bar drawn in the application theme; the native one is transparent.
-    pub fn title_bar(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn title_bar(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let hover = theme.card;
+        let drag = crate::window_chrome::drag_region("title-bar-drag", window, cx)
+            .h_full()
+            .flex()
+            .items_center()
+            .flex_1();
         // Caption symbols come from Oxyde: a 12-unit grid with a one-unit stroke.
         let caption = |id: &'static str, area: WindowControlArea, icon: &'static str| {
             div()
@@ -23,18 +28,18 @@ impl Soliton {
                 .justify_center()
                 .window_control_area(area)
                 .when(cfg!(target_os = "linux"), |button| {
-                    button.on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _, window, cx| {
-                            match area {
-                                WindowControlArea::Min => window.minimize_window(),
-                                WindowControlArea::Max => window.zoom_window(),
-                                WindowControlArea::Close => this.request_close(window, cx),
-                                WindowControlArea::Drag => window.start_window_move(),
-                            }
-                            cx.stop_propagation();
-                        }),
-                    )
+                    // Acts on release inside the button, like native caption buttons.
+                    button.on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                        if !event.standard_click() {
+                            return;
+                        }
+                        match area {
+                            WindowControlArea::Min => window.minimize_window(),
+                            WindowControlArea::Max => window.zoom_window(),
+                            WindowControlArea::Close => this.request_close(window, cx),
+                            WindowControlArea::Drag => {}
+                        }
+                    }))
                 })
                 .child(svg().path(icon).size(px(12.)).text_color(theme.text))
         };
@@ -42,9 +47,6 @@ impl Soliton {
             "window-controls/restore.svg"
         } else {
             "window-controls/maximize.svg"
-        };
-        let drag = |id: &'static str| {
-            crate::window_chrome::drag_region(div().id(id).h_full().flex().items_center())
         };
         div()
             .id("title-bar")
@@ -54,7 +56,7 @@ impl Soliton {
             .flex_none()
             .items_center()
             .bg(theme.background)
-            .child(drag("title-bar-drag").flex_1())
+            .child(drag)
             // Windows handles these clicks natively through their control areas.
             .child(
                 caption(

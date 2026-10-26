@@ -769,7 +769,7 @@ impl Render for Soliton {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .child(self.navigation(cx))
+                    .child(self.navigation(window, cx))
                     .child(
                         div()
                             .flex_1()

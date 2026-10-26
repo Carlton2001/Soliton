@@ -21,19 +21,32 @@ pub fn options(bounds: WindowBounds) -> WindowOptions {
 }
 
 /// Reused by the title bar and brand, preserving their native Windows hitboxes.
-pub fn drag_region<E: InteractiveElement + FluentBuilder>(region: E) -> E {
-    region
+pub fn drag_region(id: &'static str, window: &mut Window, cx: &mut App) -> Stateful<Div> {
+    let region = div()
+        .id(id)
         .window_control_area(WindowControlArea::Drag)
-        .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window())
-        .when(cfg!(target_os = "linux"), |region| {
-            region.on_mouse_down(MouseButton::Left, |event, window, cx| {
-                if event.click_count == 2 {
-                    window.zoom_window();
-                } else {
-                    window.start_window_move();
-                }
-                cx.stop_propagation();
-            })
+        .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window());
+    if !cfg!(target_os = "linux") {
+        return region;
+    }
+    // Moving on press hands the pointer to the compositor and loses double-clicks.
+    let pressed = window.use_keyed_state(id, cx, |_, _| false);
+    region
+        .on_mouse_down(MouseButton::Left, {
+            let pressed = pressed.clone();
+            move |_, _, cx| pressed.update(cx, |pressed, _| *pressed = true)
+        })
+        .on_mouse_move(move |event, window, cx| {
+            if pressed.update(cx, |pressed, _| std::mem::take(pressed))
+                && event.pressed_button == Some(MouseButton::Left)
+            {
+                window.start_window_move();
+            }
+        })
+        .on_click(|event, window, _| {
+            if event.standard_click() && event.click_count() == 2 {
+                window.zoom_window();
+            }
         })
 }
 
