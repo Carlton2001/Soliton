@@ -22,7 +22,7 @@ try {
     ./scripts/check-third-party-licenses.ps1
     if (-not $SkipBuild) {
         $env:RUSTFLAGS = "$previousFlags -C target-feature=+crt-static".Trim()
-        cargo build --locked --release --target $target -p soliton-app --bin soliton
+        cargo build --locked --release --target $target -p soliton-app --bin Soliton
         if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     }
     $metadata = cargo metadata --locked --offline --no-deps --format-version 1

@@ -93,17 +93,18 @@ Fermeture :
 - [ ] « Demander » affiche la boîte de confirmation avec l'option Masquer.
 - [ ] « Quitter », depuis la fenêtre ou depuis la notification, ferme proprement.
 
-## 4. Point à vérifier, antérieur à ce commit
+## 4. Distribution Windows
 
-`scripts/build-distribution.ps1` construit `--bin soliton`, alors que la cible
-Cargo s'appelle `Soliton`. Cargo distingue la casse : la construction de la
-distribution Windows échoue probablement. À contrôler avec :
+`scripts/build-distribution.ps1` construisait `--bin soliton` depuis le renommage
+RAP → Soliton, alors que la cible Cargo s'appelle `Soliton`. Le workflow
+« Windows distribution » échouait pour cette raison ; le nom est corrigé.
 
 ```powershell
 ./scripts/build-distribution.ps1 -PortableOnly
 ```
 
-- [ ] La distribution portable se construit, ou le nom de cible est corrigé.
+- [ ] La distribution portable se construit (ou le workflow « Windows
+  distribution » réussit).
 
 ## Résultat
 
