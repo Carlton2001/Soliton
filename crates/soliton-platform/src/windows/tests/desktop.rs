@@ -1,7 +1,7 @@
 //! Exercises the real Windows services, without touching music or startup settings.
 use super::*;
 use crate::{Desktop, MediaCommand, MediaTrack, TransportState};
-use raw_window_handle::Win32WindowHandle;
+use raw_window_handle::{HandleError, HasWindowHandle, Win32WindowHandle, WindowHandle};
 use std::{num::NonZeroIsize, time::Instant};
 use windows::{
     Media::Control::{
@@ -11,6 +11,14 @@ use windows::{
 };
 
 struct TestWindow(HWND);
+impl HasWindowHandle for TestWindow {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+        let handle = NonZeroIsize::new(self.0.0 as isize).ok_or(HandleError::Unavailable)?;
+        let raw = RawWindowHandle::Win32(Win32WindowHandle::new(handle));
+        // SAFETY: the test window outlives every borrow of its handle.
+        Ok(unsafe { WindowHandle::borrow_raw(raw) })
+    }
+}
 impl Drop for TestWindow {
     fn drop(&mut self) {
         unsafe {
@@ -131,10 +139,7 @@ fn native_tray_smtc_artwork_commands_and_cleanup() {
         )
         .unwrap()
     });
-    let raw = RawWindowHandle::Win32(Win32WindowHandle::new(
-        NonZeroIsize::new(window.0.0 as isize).unwrap(),
-    ));
-    let desktop = Desktop::start(raw, Language::English, Default::default()).unwrap();
+    let desktop = Desktop::start(&window, Language::English, Default::default()).unwrap();
     wait_event(&desktop, |event| {
         matches!(event, DesktopEvent::Autostart(Ok(_)))
     });

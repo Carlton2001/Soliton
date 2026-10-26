@@ -1,7 +1,7 @@
 //! Portable contracts for native integration. No native types leave this crate.
 use anyhow::Result;
 use crossbeam_channel::Receiver;
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 use soliton_core::config::{AppIcon, Language};
 use std::path::PathBuf;
 
@@ -80,29 +80,48 @@ pub struct Desktop {
     pub events: Receiver<DesktopEvent>,
     #[cfg(target_os = "windows")]
     native: crate::windows::Integration,
+    #[cfg(target_os = "linux")]
+    native: crate::linux::Integration,
 }
 
 impl Desktop {
-    pub const SUPPORTED: bool = cfg!(target_os = "windows");
+    /// Some native integration exists; each capability is reported separately.
+    pub const SUPPORTED: bool = cfg!(any(target_os = "windows", target_os = "linux"));
+    /// A notification area icon can restore a hidden window, so closing may hide.
+    pub const HIDES: bool = cfg!(target_os = "windows");
+    /// Sign-in launch can be registered by the user.
+    pub const AUTOSTART: bool = cfg!(any(target_os = "windows", target_os = "linux"));
 
     /// The caller must drop the integration before destroying the borrowed window.
-    pub fn start(handle: RawWindowHandle, language: Language, icon: AppIcon) -> Result<Self> {
+    pub fn start(window: &impl HasWindowHandle, language: Language, icon: AppIcon) -> Result<Self> {
         #[cfg(target_os = "windows")]
         {
+            let handle = window
+                .window_handle()
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                .as_raw();
             let (native, events) = crate::windows::Integration::start(handle, language, icon)?;
             Ok(Self { native, events })
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
         {
-            let _ = (handle, language, icon);
+            // The session bus and XDG files need no window handle, which GPUI's
+            // X11 backend does not provide.
+            let _ = (window, language);
+            let (native, events) = crate::linux::Integration::start(icon)?;
+            Ok(Self { native, events })
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        {
+            let _ = (window, language, icon);
             anyhow::bail!("Desktop integration is not implemented on this platform")
         }
     }
 
     pub fn publish(&self, state: MediaState, language: Language, icon: AppIcon) {
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         self.native.publish(state, language, icon);
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         let _ = (state, language, icon);
     }
 
@@ -121,15 +140,17 @@ impl Desktop {
         false
     }
 
+    /// Restores a hidden window. Without [`Self::HIDES`], the caller activates
+    /// its own window through the toolkit instead.
     pub fn show(&self) {
         #[cfg(target_os = "windows")]
         self.native.show();
     }
 
     pub fn set_autostart(&self, enabled: bool) -> Result<()> {
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         return self.native.set_autostart(enabled);
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         {
             let _ = enabled;
             anyhow::bail!("Autostart is not implemented on this platform")
@@ -138,7 +159,7 @@ impl Desktop {
 
     /// Waits for native cleanup. Call on a background executor during app quit.
     pub fn shutdown(self) {
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         {
             let mut native = self.native;
             native.join();

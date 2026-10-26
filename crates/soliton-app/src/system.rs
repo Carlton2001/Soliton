@@ -6,7 +6,6 @@ use crate::{
     widgets::{RADIUS_LARGE, TEXT_SUBTITLE, button, checkbox, list_box, segment, segments},
 };
 use gpui::{prelude::*, *};
-use raw_window_handle::HasWindowHandle;
 use soliton_audio::{Command, PlaybackState};
 use soliton_core::config::CloseBehavior;
 use soliton_platform::{
@@ -19,16 +18,7 @@ impl Soliton {
         if !Desktop::SUPPORTED {
             return;
         }
-        let result = HasWindowHandle::window_handle(window)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))
-            .and_then(|handle| {
-                Desktop::start(
-                    handle.as_raw(),
-                    self.settings.language,
-                    self.settings.app_icon,
-                )
-            });
-        match result {
+        match Desktop::start(window, self.settings.language, self.settings.app_icon) {
             Ok(desktop) => self.desktop = Some(desktop),
             Err(error) => {
                 self.report_warning(self.labelled(self.t(Text::DesktopError), &error.to_string()))
@@ -36,7 +26,7 @@ impl Soliton {
         }
     }
 
-    pub fn poll_desktop(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn poll_desktop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let events: Vec<_> = self
             .desktop
             .as_ref()
@@ -47,11 +37,13 @@ impl Soliton {
                 DesktopEvent::Media(command) if !self.quitting => self.system_media(command, cx),
                 DesktopEvent::Media(_) => {}
                 DesktopEvent::SystemAccent(colors) => self.system_accent = Some(colors),
-                DesktopEvent::Show => {
+                DesktopEvent::Show if Desktop::HIDES => {
                     if let Some(desktop) = &self.desktop {
                         desktop.show();
                     }
                 }
+                // The window is never hidden; the compositor decides on focus.
+                DesktopEvent::Show => window.activate_window(),
                 DesktopEvent::Quit => self.quit_app(cx),
                 DesktopEvent::Autostart(result) => {
                     self.startup_pending = false;
@@ -127,7 +119,7 @@ impl Soliton {
         if self.quitting {
             return;
         }
-        if !Desktop::SUPPORTED {
+        if !Desktop::HIDES {
             self.quit_app(cx);
             return;
         }
@@ -232,6 +224,13 @@ impl Soliton {
             }),
             theme,
         );
+        let title = if cfg!(target_os = "windows") {
+            Text::WindowsIntegration
+        } else {
+            Text::DesktopIntegration
+        };
+        let on_close =
+            Desktop::HIDES.then(|| setting_row(self.t(Text::OnClose), None, on_close, theme));
         let autostart = div().px(rems(0.75)).py(rems(0.625)).child(
             checkbox(
                 "autostart",
@@ -248,16 +247,11 @@ impl Soliton {
                 }
             })),
         );
+        let autostart = Desktop::AUTOSTART.then(|| autostart.into_any_element());
         Some(section(
-            self.t(Text::WindowsIntegration),
+            self.t(title),
             None,
-            list_box(
-                [
-                    setting_row(self.t(Text::OnClose), None, on_close, theme),
-                    autostart.into_any_element(),
-                ],
-                theme,
-            ),
+            list_box(on_close.into_iter().chain(autostart), theme),
         ))
     }
 

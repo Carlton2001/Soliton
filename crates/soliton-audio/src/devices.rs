@@ -19,7 +19,15 @@ pub struct OutputInfo {
     pub sample_format: String,
 }
 
+/// Linux plays through the sound server behind ALSA's `default` PCM. CPAL's
+/// other entries are aliases of it or raw cards that would bypass PipeWire, and
+/// listing them opens every device, so only the system default is offered.
+pub const OUTPUTS_LISTED: bool = !cfg!(target_os = "linux");
+
 pub(crate) fn list() -> Result<Vec<OutputDevice>> {
+    if !OUTPUTS_LISTED {
+        return Ok(Vec::new());
+    }
     let names = cpal::default_host()
         .output_devices()?
         .map(|device| device.name())

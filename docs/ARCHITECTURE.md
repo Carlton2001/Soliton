@@ -8,7 +8,7 @@
 | `soliton-library` | Parcours, tags, SQLite, regroupement, cache des pochettes, surveillance, recherche. |
 | `soliton-audio` | Décodage, sortie CPAL, file de lecture, arbitrage entre sortie locale et réseau. |
 | `soliton-network` | Découverte SSDP/mDNS, contrôle DLNA et Cast, serveur HTTP des médias. Sans GPUI ni décodage. |
-| `soliton-platform` | Intégrations système derrière `Desktop` ; types Windows confinés à `windows/`. |
+| `soliton-platform` | Intégrations système derrière `Desktop` ; code natif confiné à `windows/` et `linux/`. |
 | `soliton-app` | Assemblage des services et interface GPUI. |
 
 SQLite reste un module de `soliton-library`. Paramètres, base et pochettes sont dans
@@ -97,7 +97,8 @@ chemin, provenance de playlist conservée, instantanés immuables partagés par 
 Modifier la suite ne rouvre pas le flux courant.
 
 **Sorties locales.** Identifiées par leur nom (seul identifiant portable de CPAL
-0.16) ; noms ambigus non sélectionnables. `None` = périphérique par défaut, résolu
+0.16) ; noms ambigus non sélectionnables. Sous Linux, aucune énumération
+(`OUTPUTS_LISTED`) : seule la sortie ALSA `default` du serveur de son est utilisée. `None` = périphérique par défaut, résolu
 à chaque ouverture. Découverte toutes les 5 s sur un worker borné. Un changement
 prépare la nouvelle session avant de remplacer l'ancienne ; un échec la conserve.
 Pas de reprise automatique après déconnexion.
@@ -159,3 +160,22 @@ commandes système dans une file de 64. Les touches multimédias passent par SMT
   une action de l'utilisateur.
 - **Fermeture** : annulation des travaux, arrêt du moteur, retrait des abonnements
   et de l'icône, sauvegarde finale, puis `cx.quit()`.
+
+## Intégration Linux
+
+`Desktop` expose des capacités distinctes : `HIDES` (zone de notification, Windows
+seulement), `AUTOSTART`. Sous Linux, un worker possède la connexion D-Bus de
+session (`zbus` bloquant, déjà présent via GPUI) ; l'interface lui envoie l'état
+coalescé dans une file d'une entrée, les commandes reviennent dans une file de 64.
+Le handle de fenêtre n'est pas demandé : GPUI ne le fournit pas sous X11.
+
+- **MPRIS** : `org.mpris.MediaPlayer2` et `.Player` ; seuls état, métadonnées et
+  capacités émettent `PropertiesChanged`, la position est lue à la demande et un
+  écart de plus de 1,5 s par rapport à la lecture attendue émet `Seeked`. Un
+  identifiant de piste par occurrence protège `SetPosition` des requêtes périmées.
+- **Démarrage** : entrée XDG remplacée atomiquement, `Exec` cité selon la
+  spécification Desktop Entry, sans shell.
+- **Icône du lanceur** : réécrite seulement si l'entrée de bureau porte le marqueur
+  d'`install.sh` ; la date du thème `hicolor` est mise à jour pour les caches.
+- **Fenêtre** : `Raise` active la fenêtre par GPUI ; l'état agrandi enregistré est
+  réappliqué après ouverture.

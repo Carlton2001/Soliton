@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Soliton
+GenericName=Music Player
+GenericName[fr]=Lecteur de musique
+Comment=Play your local music library
+Comment[fr]=Écouter votre bibliothèque musicale locale
+Exec=@EXEC@
+Icon=io.github.Carlton2001.Soliton
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;audio;player;album;flac;mp3;
+Keywords[fr]=musique;audio;lecteur;album;flac;mp3;
+StartupNotify=true
+StartupWMClass=io.github.Carlton2001.Soliton
+SingleMainWindow=true
+X-Soliton-Install=user

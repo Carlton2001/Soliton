@@ -10,7 +10,7 @@ mod resample;
 #[path = "tests/support.rs"]
 mod test_support;
 
-pub use devices::{OutputDevice, OutputInfo};
+pub use devices::{OUTPUTS_LISTED, OutputDevice, OutputInfo};
 pub use engine::Engine;
 pub use soliton_core::config::Repeat;
 use soliton_core::{failure::Failure, model::Track};

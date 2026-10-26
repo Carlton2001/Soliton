@@ -30,6 +30,11 @@ jobs:
         run: |
           rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt --no-modify-path
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: License inventory
+        run: sh scripts/check-third-party-licenses.sh
+      - name: Shell scripts syntax
+        run: |
+          for script in scripts/*.sh installer/linux/*.sh; do sh -n "$script"; done
       - name: Format
         run: cargo +1.98.1 fmt --check
       - name: Check all targets
@@ -38,4 +43,4 @@ jobs:
         run: cargo +1.98.1 test --workspace --locked
       - name: Build the application
         run: cargo +1.98.1 build -p soliton-app --bin Soliton --locked
-      # No desktop, GPU, or audio device is exercised by this job.
+      # No desktop, session bus, GPU, or audio device is exercised by this job.

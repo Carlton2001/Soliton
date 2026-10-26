@@ -41,7 +41,7 @@ impl Engine {
             .spawn(move || {
                 loop {
                     let result = crate::devices::list();
-                    if discovered.send(result).is_err() {
+                    if discovered.send(result).is_err() || !crate::devices::OUTPUTS_LISTED {
                         break;
                     }
                     let interval = if watched.load(Ordering::Relaxed) {

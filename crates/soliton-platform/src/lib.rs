@@ -14,6 +14,12 @@ pub use desktop::{
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[cfg(target_os = "linux")]
+mod linux;
+
+/// Desktop entry, icon and D-Bus identity shared with the Linux package files.
+pub const APP_ID: &str = "io.github.Carlton2001.Soliton";
+
 #[cfg(target_os = "windows")]
 mod windows_download;
 

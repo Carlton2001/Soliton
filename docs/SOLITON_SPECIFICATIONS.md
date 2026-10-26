@@ -2,7 +2,7 @@
 ## Spécifications
 
 **Licence :** GPL-3.0-only · **Langage :** Rust · **Interface :** GPUI ·
-**Plateformes :** Windows (cible V1), Linux ensuite
+**Plateformes :** Windows (cible V1), Linux (Fedora Workstation)
 
 Ce document fixe le périmètre, les règles produit et les phases restantes.
 L'état fonctionnel actuel est décrit dans le [README](../README.md), les choix
@@ -35,6 +35,10 @@ compilations, cache des pochettes, surveillance des sources, interface finalisé
 playlists et file, intégration Windows (SMTC, barre des tâches, notification,
 fermeture, démarrage automatique), sorties audio locales et Bluetooth, sorties
 DLNA / UPnP et Google Cast.
+
+Linux : version fonctionnelle sous Fedora Workstation (bibliothèque, lecture
+locale par la sortie système, interface Wayland/X11, MPRIS, démarrage
+automatique, archive installable par utilisateur) ; voir [LINUX.md](LINUX.md).
 
 Reste à faire : distribution (phase 10), validations matérielles (phase 11).
 
@@ -136,6 +140,8 @@ Ces règles restent en vigueur pour toute évolution.
 
 - Sortie partagée locale (`cpal`), sélection persistée, changement sans perte de
   piste ni de position, aucun repli silencieux vers une autre sortie.
+- Linux : sortie système par défaut uniquement (PipeWire ou PulseAudio via ALSA),
+  périphérique choisi dans les paramètres Son ; jamais de carte ALSA brute.
 - Bluetooth via les paramètres Windows et les sorties exposées par le système.
   Soliton ne prétend pas établir la connexion, n'annonce ni lossless ni bit-perfect et
   ne change pas la sortie par défaut de Windows.
@@ -151,7 +157,10 @@ Ces règles restent en vigueur pour toute évolution.
   Suivant, Quitter), fermeture configurable (quitter, masquer, demander) avec
   commande Quitter explicite, démarrage automatique optionnel.
 - La notification ne doit pas être le seul moyen de retrouver une fenêtre masquée.
-- Linux ultérieurement : MPRIS / D-Bus, notification, démarrage automatique.
+- Linux : MPRIS (panneau média et touches multimédias du bureau, sans ouverture
+  d'URI), démarrage automatique XDG optionnel, icône du lanceur suivant la palette
+  pour une installation par `install.sh`. Sans zone de notification sous GNOME,
+  la fermeture quitte toujours. Notification reportée.
 
 ---
 
@@ -163,7 +172,8 @@ Ces règles restent en vigueur pour toute évolution.
 - Mode exclusif, bit-perfect, égaliseur.
 - Opus, WMA, APE et autres formats demandant des décodeurs complémentaires.
 - Transcodage réseau, multiroom, Alexa Wi-Fi.
-- Linux.
+- Linux : Flatpak, paquet RPM, sélection native des sinks PipeWire, mises à jour
+  intégrées.
 
 ---
 
@@ -238,4 +248,7 @@ Ne pas trancher ces points sans les présenter.
 - **NAS** : notifications et performances variables ; l'analyse périodique sert
   de repli.
 - **Linux** : intégrations différentes ; aucune API Windows dans le code commun.
+  Backends GPUI Linux incomplets (handle de fenêtre X11, état agrandi à
+  l'ouverture, activation Wayland) : contourner dans Soliton plutôt que modifier
+  GPUI.
 - **Distribution** : antivirus et SmartScreen sans signature de l'exécutable.

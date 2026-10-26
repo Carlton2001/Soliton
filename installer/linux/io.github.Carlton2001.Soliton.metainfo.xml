@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.Carlton2001.Soliton</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Soliton</name>
+  <summary>Play your local music library</summary>
+  <summary xml:lang="fr">Écouter votre bibliothèque musicale locale</summary>
+  <developer id="io.github.carlton2001">
+    <name>Carlton2001</name>
+  </developer>
+  <description>
+    <p>
+      Soliton is a fast music player for large local collections. It indexes
+      your folders in the background, groups albums and their editions, and
+      shows embedded cover art. Your music files are only ever read.
+    </p>
+    <p xml:lang="fr">
+      Soliton est un lecteur rapide pour les grandes collections locales. Il
+      indexe vos dossiers en arrière-plan, regroupe albums et éditions, et
+      affiche les pochettes intégrées. Vos fichiers musicaux sont seulement lus.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.Carlton2001.Soliton.desktop</launchable>
+  <provides>
+    <binary>soliton</binary>
+  </provides>
+  <url type="homepage">https://github.com/Carlton2001/Soliton</url>
+  <url type="bugtracker">https://github.com/Carlton2001/Soliton/issues</url>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+    <category>Player</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-26"/>
+  </releases>
+</component>
