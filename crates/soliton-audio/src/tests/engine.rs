@@ -252,7 +252,7 @@ fn native_output_play_pause_seek_next_and_stop() {
     assert_eq!(paused.position_ms, still.position_ms);
     engine.send(Command::Seek(2000)).unwrap();
     wait(&|p| p.state == PlaybackState::Paused && p.position_ms == 2000);
-    let named = wait(&|p| !p.outputs.is_empty());
+    let named = wait(&|p| !crate::OUTPUTS_LISTED || !p.outputs.is_empty());
     let output = named.output.unwrap();
     assert!(output.sample_rate > 0);
     assert!(output.channels > 0);

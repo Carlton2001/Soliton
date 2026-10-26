@@ -7,8 +7,8 @@ La phase 8 (API locale de contrôle) est reportée.
 
 Les commandes ci-dessous sont à exécuter depuis la racine du dépôt.
 
-Le prototype Linux est en préparation sans changement des backends Windows.
-Pour Fedora Workstation, WSL et Silverblue, voir [LINUX.md](LINUX.md).
+Soliton fonctionne aussi sous Linux (Fedora Workstation), sans changement des
+backends Windows ; voir [LINUX.md](LINUX.md).
 
 ## Lancer
 
@@ -94,7 +94,8 @@ Sous le bac à sable, `$env:CARGO_INCREMENTAL = '0'` évite l'avertissement de l
 - Éditions fusionnées seulement si artiste, titre et année sont identiques ; le
   choix d'édition n'est pas mémorisé.
 - Distribution Windows et vérification des mises à jour : voir le
-  [guide de distribution](DISTRIBUTION.md). Linux non validé.
+  [guide de distribution](DISTRIBUTION.md). Linux : validé dans une VM Fedora
+  Workstation, essais sur matériel réel en attente ([LINUX.md](LINUX.md)).
 - Validations matérielles en attente : voir la phase 11 des spécifications.
 
 Voir [les spécifications](SOLITON_SPECIFICATIONS.md), [l'architecture](ARCHITECTURE.md),

@@ -7,6 +7,6 @@ Le [README du projet](../README.md) présente Soliton et ses fonctionnalités po
 - [Architecture](ARCHITECTURE.md) : responsabilités des crates, threads et contrats des services.
 - [Dépendances](DEPENDENCIES.md) : choix techniques, licences et points de validation.
 - [Distribution et mises à jour](DISTRIBUTION.md) : construction, paquets Windows et mécanisme de mise à jour.
-- [Prototype Linux](LINUX.md) : préparation Fedora, compilation, limites et essais à réaliser ; [audit initial de portabilité](PORTABILITE_LINUX.md).
+- [Linux](LINUX.md) : fonctionnement, installation, compilation sous Fedora, archive et validation ; [audit initial de portabilité](PORTABILITE_LINUX.md).
 - [Correctifs GPUI](../vendor/README.md) : dépendances conservées localement et modifications ciblées.
 - [Attributions des ressources](../assets/NOTICE.md) et [licences des dépendances](../licenses/dependencies/README.md).

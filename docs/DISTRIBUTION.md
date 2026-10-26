@@ -65,6 +65,22 @@ dans `%LOCALAPPDATA%/Soliton`. La désinstallation conserve ces données. `SOLIT
 reste prioritaire pour le développement. Les fichiers musicaux restent en lecture
 seule dans les deux modes.
 
+## Construire sous Linux x86_64
+
+Sur Fedora avec Rust 1.98.1 et les paquets de [LINUX.md](LINUX.md) :
+
+```sh
+RUSTUP_TOOLCHAIN=1.98.1 scripts/build-linux.sh
+```
+
+Le résultat `target/distribution/output/Soliton-<version>-x86_64-linux.tar.gz`
+contient le binaire `soliton`, l'entrée de bureau, les métadonnées AppStream,
+l'icône, `LICENSE`, `licenses/dependencies`, `install.sh` et `uninstall.sh`
+(installation par utilisateur dans `~/.local`, sans root), avec son empreinte
+SHA-256. Les mises à jour intégrées ne sont pas proposées sous Linux : installer
+la nouvelle archive par-dessus. Les sources sont dans `installer/linux/` ;
+ajouter la nouvelle version aux métadonnées AppStream avant de construire.
+
 ## GitHub
 
 - `tests.yml` : formatage, check de toutes les cibles Rust et tests Windows,

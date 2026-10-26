@@ -63,7 +63,7 @@ impl Soliton {
                     .into_any_element()
                 }),
         );
-        if self.playback.outputs.is_empty() {
+        if soliton_audio::OUTPUTS_LISTED && self.playback.outputs.is_empty() {
             rows.push(
                 list_row()
                     .text_color(theme.muted)
@@ -100,6 +100,9 @@ impl Soliton {
             ))
             .when(local, |view| {
                 view.child(hint(self.t(Text::OutputStreamHint), theme))
+            })
+            .when(!soliton_audio::OUTPUTS_LISTED, |view| {
+                view.child(hint(self.t(Text::SystemSoundSettingsHint), theme))
             });
         section(self.t(Text::AudioOutput), None, body)
     }

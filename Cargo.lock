@@ -5701,7 +5701,6 @@ dependencies = [
  "crossbeam-channel",
  "embed-resource",
  "gpui",
- "raw-window-handle",
  "resvg",
  "soliton-audio",
  "soliton-core",
@@ -5800,6 +5799,7 @@ dependencies = [
  "windows-collections",
  "windows-future",
  "windows-registry 0.5.3",
+ "zbus",
 ]
 
 [[package]]

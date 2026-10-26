@@ -1,34 +1,74 @@
-# Prototype Linux — développement et validation
+# Soliton sous Linux
 
-Le support Linux est en préparation. Windows conserve son backend GPUI, WASAPI
-et ses intégrations natives. Les essais graphiques et matériels Fedora Workstation
-et Silverblue restent nécessaires avant d'annoncer Linux comme validé.
+Soliton fonctionne sous Linux : bibliothèque, lecture locale, interface GPUI
+Wayland/X11, contrôles média du bureau (MPRIS), démarrage automatique et
+installation par utilisateur. Windows conserve son backend GPUI, WASAPI et ses
+intégrations natives. L'[audit initial](PORTABILITE_LINUX.md) décrit les
+obstacles et le périmètre du portage.
 
-L'[audit initial](PORTABILITE_LINUX.md) décrit les obstacles et le périmètre du
-portage. Ce guide concerne la version du code après les premières adaptations.
+Fedora Workstation (GNOME, Wayland, PipeWire) est l'environnement de
+développement et de validation. Silverblue reste à vérifier sur un hôte réel.
 
-## Ce qui est préparé
+## Fonctionnement
 
-- Build de l'application sans référence aux ressources Windows sur un hôte Linux.
-- GPUI 0.2.2 avec Wayland et X11, sans changement des versions des dépendances.
-- Correctif local de la dépendance Unix `xattr` 0.2.3 pour `libc` récent sous
-  Linux, sans changement de version ; voir [vendor/README.md](../vendor/README.md).
-- Négociation `xdg-shell` compatible avec la version 1 exposée par WSLg, dans le
-  backend Wayland uniquement.
-- Décorations clientes Linux : déplacement au clic gauche depuis la barre de
-  titre et le logo, double-clic pour agrandir/restaurer, réduction, fermeture et
-  redimensionnement par les bords libres. Aucun changement de curseur ajouté.
-- Identifiant de fenêtre `io.github.Carlton2001.Soliton`.
-- Fermeture via le nettoyage normal de Soliton ; absence de masquage sans moyen
-  de restauration.
-- Mises à jour Windows indisponibles dans l'interface Linux, sans requête au
-  démarrage ni modification du choix enregistré dans les paramètres.
-- Découverte audio périodique conservée sans tentative de surveillance Windows.
-- Bibliothèque, paramètres et caches indépendants des dossiers musicaux.
+- **Fenêtre** : décorations clientes ; déplacement au clic gauche depuis la barre
+  de titre et le logo, double-clic pour agrandir/restaurer, réduction, fermeture
+  et redimensionnement par les bords libres, sans changement de curseur. État
+  agrandi restauré au démarrage (GPUI ne l'applique pas à l'ouverture sous Linux).
+  Identifiant `io.github.Carlton2001.Soliton`, partagé par la fenêtre, l'entrée de
+  bureau, l'icône et MPRIS.
+- **Audio** : Symphonia → Rubato → CPAL 0.16/ALSA `default` → PipeWire
+  (`pipewire-alsa`) ou PulseAudio (`alsa-plugins-pulseaudio`). Seule la sortie
+  système par défaut est proposée : le périphérique, Bluetooth compris, se choisit
+  dans les paramètres Son. Les autres entrées CPAL étaient des alias de cette
+  sortie ou des cartes ALSA brutes (`plughw`) contournant PipeWire, et leur
+  énumération ouvrait chaque périphérique toutes les 5 s. La sélection native des
+  sinks PipeWire est reportée.
+- **MPRIS** (`org.mpris.MediaPlayer2.soliton`, suffixe `.instance<pid>` pour une
+  seconde instance) : titre, artiste, album, durée, pochette du cache Soliton,
+  état, position et `Seeked` ; lecture, pause, bascule, arrêt, précédent,
+  suivant, `Seek`, `SetPosition`, `Raise` et `Quit`. Les touches multimédias de
+  GNOME et son panneau média passent par ce service. Aucune URI ni fichier hors
+  bibliothèque n'est accepté. Sans bus de session, la lecture continue et un
+  avertissement est affiché.
+- **Démarrage automatique** : entrée XDG
+  `~/.config/autostart/io.github.Carlton2001.Soliton.desktop`, écrite ou retirée
+  seulement par la case des paramètres. Elle désigne l'exécutable courant.
+- **Fermeture** : GNOME n'a pas de zone de notification ; la fermeture quitte
+  toujours Soliton par le nettoyage normal, sans masquage.
+- **Icône** : quand Soliton a été installé par `install.sh` (marqueur
+  `X-Soliton-Install=user` dans son entrée de bureau), la palette choisie remplace
+  l'icône `~/.local/share/icons/hicolor/scalable/apps/io.github.Carlton2001.Soliton.svg`.
+  Une entrée ou une icône installée autrement n'est jamais modifiée.
+- **Indisponible sous Linux** : mises à jour intégrées (téléchargement et
+  installateur Windows), Bluetooth dédié, notifications natives de sorties audio,
+  accent système. Audio exclusif et Flatpak restent hors périmètre ; DLNA/Cast
+  sont compilés mais non validés sous Linux.
+- Bibliothèque, paramètres et caches dans `~/.local/share/Soliton`
+  (`SOLITON_DATA_DIR` pour isoler un essai), jamais dans les sources musicales.
 
-## Préparer Fedora Workstation ou Fedora WSL
+## Installer depuis l'archive
 
-Depuis la racine du dépôt, avec une session utilisateur normale :
+```sh
+tar -xzf Soliton-0.1.0-x86_64-linux.tar.gz
+cd Soliton-0.1.0-x86_64-linux
+./install.sh
+```
+
+Installation pour l'utilisateur courant, sans root : `~/.local/bin/soliton`,
+entrée de bureau, métadonnées AppStream, icône et licences dans
+`~/.local/share`. Relancer `install.sh` d'une archive plus récente met à jour.
+`./uninstall.sh` retire ces fichiers et l'entrée de démarrage automatique, et
+conserve `~/.local/share/Soliton`. Il refuse d'agir sur une entrée de bureau
+qu'il n'a pas installée.
+
+Prérequis d'exécution : Vulkan, session Wayland ou X11, D-Bus et portail XDG
+(choix des dossiers), PipeWire avec `pipewire-alsa` ou PulseAudio avec sa
+passerelle ALSA. Le binaire est lié à `libasound`, `libxcb` et `libxkbcommon`
+(Vulkan, Wayland et Fontconfig sont chargés à l'exécution) ; construit sur
+Fedora 44, il requiert la glibc de cette version ou plus récente.
+
+## Préparer Fedora pour le développement
 
 ```sh
 sudo dnf install gcc gcc-c++ make cmake pkgconf-pkg-config \
@@ -38,160 +78,84 @@ rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt
 . "$HOME/.cargo/env"
 ```
 
-La version Rust correspond à celle de la validation Windows. Si Rust est déjà
-installé par rustup, utiliser plutôt :
-
-```sh
-rustup toolchain install 1.98.1 --profile minimal --component rustfmt
-```
-
-Références Fedora : [Rust](https://developer.fedoraproject.org/tech/languages/rust/rust-installation.html),
+Avec rustup déjà présent : `rustup toolchain install 1.98.1 --profile minimal
+--component rustfmt`. Références Fedora :
+[Rust](https://developer.fedoraproject.org/tech/languages/rust/rust-installation.html),
 [ALSA](https://packages.fedoraproject.org/pkgs/alsa-lib/alsa-lib-devel/),
 [xkbcommon](https://packages.fedoraproject.org/pkgs/libxkbcommon/libxkbcommon-devel/),
-[xkbcommon X11](https://packages.fedoraproject.org/pkgs/libxkbcommon/libxkbcommon-x11-devel/),
-[FreeType](https://packages.fedoraproject.org/pkgs/freetype/freetype-devel/),
-[Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/).
+[Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/),
+[pipewire-alsa](https://packages.fedoraproject.org/pkgs/pipewire/pipewire-alsa/).
 
-Dans WSL, garder les artefacts sur le système de fichiers Linux pour éviter de
-mélanger les builds avec Windows et réduire les accès au volume Windows :
-
-```sh
-export CARGO_TARGET_DIR="$HOME/.cache/soliton/target"
-export CARGO_INCREMENTAL=0
-```
-
-Cette configuration est locale au shell. Les sources peuvent rester dans le
-checkout Windows monté sous `/mnt/c/`. Une compilation et des tests WSL ne
-remplacent pas les essais d'une session GNOME Workstation.
-
-## Compiler et tester
+## Compiler, tester, lancer
 
 ```sh
 cargo +1.98.1 fmt --check
 cargo +1.98.1 check --workspace --all-targets --locked
 cargo +1.98.1 test --workspace --locked
-cargo +1.98.1 build -p soliton-app --bin Soliton --locked
-```
-
-Les tests audio demandant une sortie et les fixtures multicodecs sont ignorés
-par défaut. Les tests ordinaires n'ont pas besoin d'une fenêtre ou d'un GPU.
-Le workflow GitHub Linux vérifie compilation et tests sans valider le bureau.
-
-## Lancer avec des données isolées
-
-Vérifier Vulkan, une session graphique Wayland ou X11, D-Bus et le portail de
-choix de fichiers. Sous GNOME, le service de portail approprié doit être actif.
-Un environnement WSL minimal ne fournit pas nécessairement ces services.
-
-```sh
-export SOLITON_DATA_DIR="$HOME/.local/share/Soliton-linux-prototype"
+export SOLITON_DATA_DIR="$HOME/.local/share/Soliton-dev"
 RUST_LOG=info cargo +1.98.1 run -p soliton-app --bin Soliton --locked
 ```
 
-Ce dossier doit rester hors des sources musicales. Ne pas réutiliser la base
-Windows pour les premiers essais : ses chemins absolus et ses noms de sorties
-ne correspondent pas à ceux de Linux.
-
-Le binaire `Soliton-index` permet aussi une vérification de l'indexation sans
-ouvrir de fenêtre :
+`WAYLAND_DISPLAY= cargo run …` force X11 (XWayland). `Soliton-index` vérifie
+l'indexation sans fenêtre :
 
 ```sh
 cargo +1.98.1 run -p soliton-app --bin Soliton-index --locked -- \
   "$SOLITON_DATA_DIR" /chemin/vers/une/collection-de-test
 ```
 
-## Audio standard
-
-La chaîne reste Symphonia → Rubato → CPAL 0.16/ALSA → greffon PipeWire.
-Sur une session Fedora PipeWire, vérifier la présence de `pipewire-alsa` et le
-routage du périphérique ALSA `default` vers PipeWire. Sélectionner d'abord la
-sortie système par défaut dans Soliton. La liste CPAL peut également contenir des
-sorties matérielles ALSA ; elle n'est pas une liste native des sinks PipeWire.
-
-Le paquet [pipewire-alsa](https://packages.fedoraproject.org/pkgs/pipewire/pipewire-alsa/)
-fournit la passerelle. Pour un serveur PulseAudio, la passerelle correspondante est
-[alsa-plugins-pulseaudio](https://packages.fedoraproject.org/pkgs/alsa-plugins/alsa-plugins-pulseaudio/).
-
-Les tests natifs existants peuvent être lancés explicitement sur la machine de
-validation ; ils utilisent un volume nul :
+Tests explicites sur une session de bureau (volume nul pour l'audio) :
 
 ```sh
-cargo +1.98.1 test -p soliton-audio native_output_play_pause_seek_next_and_stop -- --ignored
-cargo +1.98.1 test -p soliton-audio unavailable_preference_never_falls_back_and_output_failure_can_be_recovered -- --ignored
+cargo +1.98.1 test -p soliton-audio native_output -- --ignored
+cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
+cargo +1.98.1 test -p soliton-platform session_bus -- --ignored
 ```
 
-## Essais restant à réaliser sur Workstation
-
-1. Barre de titre : clics gauche, déplacement, réduction, agrandissement,
-   restauration, redimensionnement, placement sur plusieurs écrans et fermeture.
-2. Mise à l'échelle GNOME, thèmes clair/sombre et saisie avec accents.
-3. Ajout de dossiers par le portail, indexation, tags, pochettes, éditions,
-   annulation et reprise incrémentale.
-4. Surveillance : ajouts, modifications, suppressions, quotas inotify et
-   retrait/remontage d'une source sans perte du catalogue hors ligne.
-5. Lecture WAV/FLAC/MP3, pause, seek, suivant, volume, fréquences 44,1/48 kHz,
-   changement et déconnexion de sortie.
-6. Redémarrage et persistance des paramètres, playlists et file.
-
-Sous Silverblue, Toolbx convient à la préparation et aux premiers essais.
-Vérifier ensuite le binaire depuis l'hôte, ses bibliothèques avec `ldd`, le GPU,
-le portail et le son. Une réussite dans Toolbx n'est pas une validation de l'hôte.
-Voir la [documentation Toolbx](https://containertoolbx.org/).
-
-## Fonctions différées
-
-MPRIS/D-Bus, touches multimédias globales, notification, démarrage automatique,
-gestion Bluetooth dédiée, sélection native de sinks PipeWire et distribution Linux
-ne font pas partie de cette première étape. Audio exclusif, DLNA/Cast et Flatpak
-restent hors du périmètre de validation Linux actuel. Les dépendances réseau
-restent compilées, sans changement de l'architecture du moteur.
-
-## Résultats de validation sur cette machine
-
-Le 26 octobre 2026, avec Rust 1.98.1 :
-
-| Environnement | Vérification | Résultat |
-| --- | --- | --- |
-| Windows MSVC | Format et `cargo check --workspace --all-targets --locked` | Réussis, sans avertissement du projet |
-| Windows MSVC | Suite de tests du workspace | 141 tests réussis, 9 tests ignorés par défaut |
-| Windows MSVC | Test audio natif lecture/pause/seek/suivant/arrêt, volume nul | Réussi |
-| Windows MSVC | Démarrage/fermeture précoce, masquage/restauration, confirmation, fermeture minimisée et barre des tâches | Réussis |
-| Windows MSVC | Six icônes, persistance, icônes natives fenêtre/proxy et zone de notification | Réussis |
-| Windows MSVC | Inventaire des licences et tests des scripts de distribution/mises à jour | Réussis |
-| Fedora 44 WSL | `cargo check --workspace --all-targets --locked` et construction des deux exécutables | Réussis |
-| Fedora 44 WSL | Suite de tests du workspace, dont surveillance inotify réelle | 127 tests réussis, 4 tests ignorés par défaut |
-| Fedora 44 WSL | Tests amont de la copie xattr corrigée | 4 tests et 1 doctest réussis |
-| Fedora 44 WSL | Indexation des 7 fixtures audio synthétiques | Réussie, sans erreur |
-| Fedora 44 WSLg | Test audio natif à volume nul, CPAL/ALSA vers PulseAudio WSLg | Réussi avec configuration ALSA locale au processus |
-| Fedora 44 WSLg | Lancement de la fenêtre, Wayland puis X11 | Réussis pendant 12 secondes chacun, sans panic ; arrêt imposé par le test |
-
-Ces résultats ne valident pas les interactions d'une session GNOME Workstation,
-le routage PipeWire natif, les montages amovibles/NAS ni Silverblue. Le workflow
-GitHub est ajouté mais n'a pas encore été exécuté à distance.
-
-Le rendu WSLg observé utilise llvmpipe : les adaptateurs D3D12 exposés par WSL
-ne proposent pas l'extension Vulkan `VK_EXT_inline_uniform_block` demandée par
-Blade. Ce lancement ne valide donc pas l'accélération matérielle Linux.
-Le portail de paramètres n'est pas disponible dans cette distribution WSL
-minimale ; le choix de dossiers par portail reste à vérifier sur Workstation.
-Les essais de lancement temporisés ne vérifient pas la fermeture depuis les
-contrôles Linux, ni l'ensemble des interactions de fenêtre.
-
-Pour reproduire le contrôle audio WSLg sans remplacer la configuration ALSA du
-compte, créer un fichier dédié hors des sources musicales :
+## Construire l'archive
 
 ```sh
-mkdir -p "$HOME/.cache/soliton"
-cat > "$HOME/.cache/soliton/wsl-pulse.conf" <<'EOF'
-</usr/share/alsa/alsa.conf>
-pcm.!default { type pulse }
-ctl.!default { type pulse }
-EOF
-ALSA_CONFIG_PATH="$HOME/.cache/soliton/wsl-pulse.conf" \
-  cargo +1.98.1 test --workspace --locked \
-  native_output_play_pause_seek_next_and_stop -- --ignored
+RUSTUP_TOOLCHAIN=1.98.1 scripts/build-linux.sh
 ```
 
-Ce contrôle nécessite `alsa-plugins-pulseaudio` et le `PULSE_SERVER` fourni par
-WSLg. L'énumération CPAL essaie aussi les interfaces optionnelles JACK et OSS :
-leurs diagnostics « Unknown PCM » n'ont pas empêché le test de lecture.
+Le script vérifie l'inventaire des licences (`scripts/check-third-party-licenses.sh`,
+mêmes empreintes que la version PowerShell), exige une entrée `<release>` de la
+version courante dans les métadonnées AppStream, construit en release, assemble
+`target/distribution/output/Soliton-<version>-x86_64-linux.tar.gz`, contrôle son
+contenu et écrit son empreinte SHA-256. `--skip-build` réutilise le binaire release
+existant. Les sources de l'entrée de bureau, des métadonnées et des scripts sont
+dans `installer/linux/`. La régénération des notices reste faite par
+`scripts/update-third-party-licenses.ps1` ; elle couvre toutes les cibles, dont
+Linux.
+
+## Validation
+
+Le 26 octobre 2026, Fedora 44 Workstation, GNOME 50 Wayland, PipeWire 1.6, Rust
+1.98.1, dans une machine virtuelle VMware (rendu Vulkan logiciel llvmpipe) :
+
+| Vérification | Résultat |
+| --- | --- |
+| Format, `cargo check --workspace --all-targets --locked` sans avertissement | Réussis |
+| Suite de tests du workspace | 135 réussis, 5 ignorés par défaut |
+| Tests natifs explicites : deux tests audio, MPRIS sur le bus de session | Réussis |
+| `soliton-platform` pour `x86_64-pc-windows-msvc` (`cargo check`, tests compris) | Réussi |
+| Lecture/pause/seek/suivant/arrêt CPAL → ALSA → PipeWire, volume nul | Réussie |
+| MPRIS sur le bus de session : propriétés, `PlayPause`, `SetPosition` (test) | Réussi |
+| MPRIS depuis `gdbus` sur l'application : métadonnées et pochette, lecture, suivant, seek relatif, pause | Réussi |
+| Fenêtre Wayland et X11 : rendu, échelle 2×, polices, contrôles Linux | Réussis |
+| Restauration de l'état agrandi (X11) | Réussie après correctif |
+| Indexation : FLAC 16/44,1 et 24/96 regroupés en deux éditions, MP3 multidisque, compilation WAV, pochettes | Réussie |
+| Absence de flux PipeWire éphémères et de messages ALSA après la politique de sortie | Vérifiée |
+| Archive release : installation dans un `HOME` isolé, entrée de bureau validée, lancement, icône suivant la palette, désinstallation conservant les données, refus d'une entrée étrangère | Réussis |
+| AppStream (`appstreamcli validate`) et entrée de bureau (`desktop-file-validate`) | Valides ; remarque pédante sur les majuscules de l'identifiant |
+
+Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
+lancements temporisés) restent valables pour Windows.
+
+À vérifier encore sur matériel réel : accélération GPU, interactions manuelles de
+la barre de titre et du redimensionnement sous Wayland, panneau média et touches
+multimédias GNOME, case de démarrage automatique et ouverture de session,
+rafraîchissement de l'icône du lanceur, portail de choix de dossiers, surveillance
+lors du retrait/remontage d'une source et des quotas inotify, changement de sortie
+dans GNOME pendant la lecture, Silverblue (binaire de l'archive sur l'hôte,
+`ldd`).

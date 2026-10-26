@@ -3,7 +3,6 @@ use crate::{placement, theme::Theme};
 use gpui::{prelude::*, *};
 
 const RESIZE_BORDER: Pixels = px(4.);
-pub const APP_ID: &str = "io.github.Carlton2001.Soliton";
 
 pub fn options(bounds: WindowBounds) -> WindowOptions {
     WindowOptions {
@@ -14,9 +13,20 @@ pub fn options(bounds: WindowBounds) -> WindowOptions {
             title: Some("Soliton".into()),
             ..Default::default()
         }),
-        app_id: cfg!(target_os = "linux").then(|| APP_ID.into()),
+        app_id: cfg!(target_os = "linux").then(|| soliton_platform::APP_ID.into()),
         window_decorations: cfg!(target_os = "linux").then_some(WindowDecorations::Client),
         ..Default::default()
+    }
+}
+
+/// GPUI's Linux backends open `WindowBounds::Maximized` windows unmaximized;
+/// Windows restores the state natively.
+pub fn restore_maximized(bounds: WindowBounds, window: &mut Window) {
+    if cfg!(target_os = "linux")
+        && matches!(bounds, WindowBounds::Maximized(_))
+        && !window.is_maximized()
+    {
+        window.zoom_window();
     }
 }
 
