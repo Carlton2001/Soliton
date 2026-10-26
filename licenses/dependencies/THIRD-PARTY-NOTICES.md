@@ -4897,8 +4897,8 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- tempfile 3.27.0
 - xattr 0.2.3
+- tempfile 3.27.0
 
 ```text
 Copyright (c) 2015 Steven Allen

@@ -69,3 +69,40 @@ fn maps_paths_to_the_owning_source_folders() {
         vec![(1, vec![album]), (2, vec![dir.path().join("other/Gone")])]
     );
 }
+
+#[test]
+fn native_watcher_observes_files_before_and_after_source_reactivation() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut source = Source {
+        id: 1,
+        path: directory.path().canonicalize().unwrap(),
+        available: true,
+    };
+    let (sender, events) = crossbeam_channel::bounded(256);
+    let mut watcher = SourceWatcher::new(sender).unwrap();
+    assert!(watcher.sync(std::slice::from_ref(&source)).is_empty());
+    let await_path = |path: &Path| {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match events
+                .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                .expect("Native watcher did not report the new audio file")
+            {
+                WatchEvent::Paths(paths) if paths.iter().any(|changed| changed == path) => break,
+                WatchEvent::Paths(_) => {}
+                WatchEvent::Overflow => panic!("Unexpected overflow for one synthetic file"),
+            }
+        }
+    };
+    let first = source.path.join("first.wav");
+    std::fs::write(&first, b"synthetic watcher fixture").unwrap();
+    await_path(&first);
+
+    source.available = false;
+    assert!(watcher.sync(std::slice::from_ref(&source)).is_empty());
+    source.available = true;
+    assert!(watcher.sync(std::slice::from_ref(&source)).is_empty());
+    let second = source.path.join("after-reactivation.wav");
+    std::fs::write(&second, b"synthetic watcher fixture").unwrap();
+    await_path(&second);
+}

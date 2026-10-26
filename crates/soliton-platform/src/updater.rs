@@ -5,6 +5,9 @@ use std::{io, path::PathBuf};
 
 const SETUP_LIMIT: usize = 512 * 1024 * 1024;
 
+/// The signed installer and release manifest currently target Windows only.
+pub const SUPPORTED: bool = cfg!(target_os = "windows");
+
 pub struct PreparedUpdate {
     directory: tempfile::TempDir,
     setup: PathBuf,

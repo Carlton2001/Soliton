@@ -20,7 +20,7 @@ pub struct OutputWatch {
 
 impl Soliton {
     pub fn poll_outputs(&mut self, cx: &mut Context<Self>) {
-        if self.audio.is_none() || self.quitting {
+        if !AudioOutputs::SUPPORTED || self.audio.is_none() || self.quitting {
             return;
         }
         let state = &mut self.output_watch;

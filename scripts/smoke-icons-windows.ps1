@@ -10,7 +10,7 @@ $data=Join-Path $project 'target\icon-qa-data'
 $output=Join-Path $project ('target\icon-qa-' + $Language + $(if($Light){'-light'}else{'-dark'}))
 New-Item -ItemType Directory -Force -Path $data,$output | Out-Null
 $settings=Join-Path $data 'settings.json'
-@{language=$Language;appearance=$(if($Light){'Light'}else{'Dark'});volume=0;close_behavior='Hide';last_view=@{view='Settings'};window=@{x=100;y=100;width=1180;height=880;maximized=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
+@{language=$Language;appearance=$(if($Light){'Light'}else{'Dark'});volume=0;close_behavior='Hide';check_updates=$false;last_view=@{view='Settings'};window=@{x=100;y=100;width=1180;height=880;maximized=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
 $previousData=$env:SOLITON_DATA_DIR
 $previousLog=$env:RUST_LOG
 $env:SOLITON_DATA_DIR=$data
@@ -82,8 +82,8 @@ function Click-Icon([int]$index) {
         $origin=New-Object SolitonIconsSmoke+Point
         [SolitonIconsSmoke]::GetWindowRect($handle,[ref]$rect) | Out-Null
         [SolitonIconsSmoke]::ClientToScreen($handle,[ref]$origin) | Out-Null
-        $x=[int]((90+$index*124)*$scale)-($origin.X-$rect.Left)
-        $y=[int](520*$scale)-($origin.Y-$rect.Top)
+        $x=[int]((116+$index*64)*$scale)-($origin.X-$rect.Left)
+        $y=[int](475*$scale)-($origin.Y-$rect.Top)
         $point=($y -shl 16) -bor ($x -band 0xffff)
         [SolitonIconsSmoke]::PostMessage($handle,0x200,[IntPtr]0,[IntPtr]$point) | Out-Null
         [SolitonIconsSmoke]::PostMessage($handle,0x201,[IntPtr]1,[IntPtr]$point) | Out-Null

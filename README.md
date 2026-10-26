@@ -8,6 +8,8 @@ Soliton is a native music player built in **Rust** with **GPUI**. It brings your
 
 Windows is the current build and validation target. Windows distribution is prepared, with package and hardware validation still pending. Linux is not currently validated.
 
+A Linux prototype is being prepared with Fedora as the development and validation environment. See the [Linux guide](docs/LINUX.md) for setup, checks, and remaining desktop tests.
+
 ## Your Music, Kept Local
 
 Browse music from multiple folders, external drives, or mounted network shares in one library. Soliton reads metadata and artwork from your files and stores its database and caches separately. **Your music files, tags, and embedded artwork remain untouched.**

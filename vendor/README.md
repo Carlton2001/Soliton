@@ -28,6 +28,10 @@ Source : https://crates.io/crates/gpui/0.2.2
   texte tronqué utilise ses propres runs. Une première mesure étroite ne doit pas
   laisser des longueurs périmées lors d'une seconde mesure plus large, au risque
   de découper un caractère UTF-8 et de provoquer un panic DirectWrite.
+- `src/platform/linux/wayland/client.rs` : accepter `xdg_wm_base` à partir de la
+  version 1 annoncée par WSLg, tout en négociant jusqu'à la version 5. Les requêtes
+  utilisées existent en version 1 ; les états de tuilage ajoutés en version 2
+  restent facultatifs. Aucun changement dans le backend Windows.
 
 Ces changements corrigent les diagnostics au démarrage et la double destruction
 observés sous Windows. Aucun filtre global des journaux, aucun désarmement des
@@ -43,3 +47,17 @@ des macros. Les autres sources du package sont inchangées.
 
 Lors d'une mise à jour upstream, réexaminer ces modifications et les retirer une
 fois les mêmes comportements corrigés et validés dans la version retenue.
+
+## xattr 0.2.3 — MIT OR Apache-2.0
+
+Source : https://crates.io/crates/xattr/0.2.3
+
+Dépendance Unix indirecte de GPUI via `gpui_http_client` et `zed-async-tar`.
+`src/sys/mod.rs` : utiliser `libc::ENODATA` pour l'attribut absent sous Linux ;
+`libc` 0.2.191 n'expose plus l'ancien alias `ENOATTR` pour cette cible.
+Le nom interne `ENOATTR` et l'API de la crate sont conservés. Les autres cibles
+gardent leur comportement. Référence :
+[getxattr(2)](https://man7.org/linux/man-pages/man2/getxattr.2.html).
+
+Copie des sources et tests publiés avec leurs licences. Aucun appel d'écriture
+d'attributs n'est ajouté au parcours de la bibliothèque musicale Soliton.

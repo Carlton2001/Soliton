@@ -25,6 +25,9 @@ pub(crate) fn start(
 pub struct AudioOutputs;
 
 impl AudioOutputs {
+    /// Other platforms keep the audio engine's periodic enumeration.
+    pub const SUPPORTED: bool = cfg!(target_os = "windows");
+
     /// Signals added, removed, enabled or disabled audio outputs.
     pub fn watch() -> Result<DeviceWatch> {
         #[cfg(target_os = "windows")]

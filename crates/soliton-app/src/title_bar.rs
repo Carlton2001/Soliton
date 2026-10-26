@@ -8,7 +8,7 @@ const CLOSE_HOVER: u32 = 0xc42b1c;
 
 impl Soliton {
     /// Title bar drawn in the application theme; the native one is transparent.
-    pub fn title_bar(&self, window: &Window) -> impl IntoElement {
+    pub fn title_bar(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let hover = theme.card;
         // Caption symbols come from Oxyde: a 12-unit grid with a one-unit stroke.
@@ -22,6 +22,20 @@ impl Soliton {
                 .items_center()
                 .justify_center()
                 .window_control_area(area)
+                .when(cfg!(target_os = "linux"), |button| {
+                    button.on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, window, cx| {
+                            match area {
+                                WindowControlArea::Min => window.minimize_window(),
+                                WindowControlArea::Max => window.zoom_window(),
+                                WindowControlArea::Close => this.request_close(window, cx),
+                                WindowControlArea::Drag => window.start_window_move(),
+                            }
+                            cx.stop_propagation();
+                        }),
+                    )
+                })
                 .child(svg().path(icon).size(px(12.)).text_color(theme.text))
         };
         let maximize_icon = if window.is_maximized() {
@@ -30,13 +44,7 @@ impl Soliton {
             "window-controls/maximize.svg"
         };
         let drag = |id: &'static str| {
-            div()
-                .id(id)
-                .h_full()
-                .flex()
-                .items_center()
-                .window_control_area(WindowControlArea::Drag)
-                .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window())
+            crate::window_chrome::drag_region(div().id(id).h_full().flex().items_center())
         };
         div()
             .id("title-bar")

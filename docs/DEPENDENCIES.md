@@ -29,8 +29,9 @@ les documentations officielles. Pas de dépendance directe à Oxyde.
 | Capacités HTTP | uuid 1.28, futures-util 0.3 | MIT / Apache-2.0 | UUID aléatoires par média, révocation au remplacement/arrêt, huit corps HTTP simultanés maximum |
 | Interfaces SSDP | if-addrs 0.15, socket2 0.6 | MIT / Apache-2.0 | Huit interfaces IPv4 au maximum, quatre lectures de descriptions simultanées ; aucun type système dans les contrats communs |
 
-GPUI 0.2.2 et proc-macro-error2 2.0.1 sont conservés localement avec des correctifs
-ciblés via `[patch.crates-io]` : [vendor/README.md](../vendor/README.md).
+GPUI 0.2.2, proc-macro-error2 2.0.1 et la dépendance Unix xattr 0.2.3 sont
+conservés localement avec des correctifs ciblés via `[patch.crates-io]` :
+[vendor/README.md](../vendor/README.md).
 
 La compilation Windows nécessite Rust MSVC, les Build Tools C++ et le SDK Windows.
 Cast utilise rustls avec ring et AWS-LC, liés statiquement (aucune DLL à installer).

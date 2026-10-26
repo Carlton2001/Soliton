@@ -1,4 +1,7 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
 // aws-lc-sys (TLS for Google Cast) exports a few entropy functions, so the MSVC
 // linker reports creating an import library next to the executable. Harmless.
 #![allow(linker_messages)]
@@ -40,6 +43,7 @@ mod track_list;
 mod updates;
 mod views;
 mod widgets;
+mod window_chrome;
 
 use gpui::*;
 use soliton_core::config::Settings;
@@ -72,28 +76,16 @@ fn main() -> anyhow::Result<()> {
             })
             .detach();
             let window_bounds = placement::restore(settings.window, cx);
-            cx.open_window(
-                WindowOptions {
-                    window_bounds: Some(window_bounds),
-                    window_min_size: Some(placement::MIN_SIZE),
-                    titlebar: Some(TitlebarOptions {
-                        appears_transparent: true,
-                        title: Some("Soliton".into()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                |window, cx| {
-                    let app = cx.new(|cx| app::Soliton::new(settings, paths, window, cx));
-                    let owner = app.downgrade();
-                    window.on_window_should_close(cx, move |window, cx| {
-                        let _ = owner.update(cx, |app, cx| app.request_close(window, cx));
-                        false
-                    });
-                    app.read(cx).focus.focus(window);
-                    app
-                },
-            )
+            cx.open_window(window_chrome::options(window_bounds), |window, cx| {
+                let app = cx.new(|cx| app::Soliton::new(settings, paths, window, cx));
+                let owner = app.downgrade();
+                window.on_window_should_close(cx, move |window, cx| {
+                    let _ = owner.update(cx, |app, cx| app.request_close(window, cx));
+                    false
+                });
+                app.read(cx).focus.focus(window);
+                app
+            })
             .expect("Cannot open Soliton window");
             cx.activate(true);
         });

@@ -3,7 +3,9 @@
 //! All six palettes are rasterized from assets/logos at build time.
 //! Resource 1 is the default Graphite/Mint icon; resources 2..7 follow PALETTES.
 
-use std::{env, fs, path::PathBuf};
+use std::env;
+#[cfg(windows)]
+use std::{fs, path::PathBuf};
 
 const PALETTES: [&str; 6] = [
     "blue",
@@ -13,6 +15,7 @@ const PALETTES: [&str; 6] = [
     "graphite-mint",
     "ivory-ink",
 ];
+#[cfg(windows)]
 const SIZES: [u32; 7] = [16, 20, 24, 32, 48, 64, 256];
 
 fn main() {
@@ -24,6 +27,14 @@ fn main() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
+    #[cfg(windows)]
+    windows_resources();
+    #[cfg(not(windows))]
+    panic!("Windows resources can only be built on a Windows host");
+}
+
+#[cfg(windows)]
+fn windows_resources() {
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
     let mut resources = String::new();
     for (index, palette) in PALETTES.iter().enumerate() {
@@ -91,11 +102,6 @@ fn ico_bytes(palette: &str) -> Vec<u8> {
         ico.extend_from_slice(&image);
     }
     ico
-}
-
-#[cfg(not(windows))]
-fn ico_bytes(_: &str) -> Vec<u8> {
-    panic!("Windows icons can only be built on a Windows host");
 }
 
 /// Renders the logo centered on a transparent square, as a 32-bit icon DIB.

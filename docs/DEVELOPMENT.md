@@ -7,6 +7,9 @@ La phase 8 (API locale de contrôle) est reportée.
 
 Les commandes ci-dessous sont à exécuter depuis la racine du dépôt.
 
+Le prototype Linux est en préparation sans changement des backends Windows.
+Pour Fedora Workstation, WSL et Silverblue, voir [LINUX.md](LINUX.md).
+
 ## Lancer
 
 Installer Rust MSVC, les Build Tools C++ et le SDK Windows, puis :

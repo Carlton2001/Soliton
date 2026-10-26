@@ -49,21 +49,21 @@ impl Soliton {
             .border_r_1()
             .border_color(theme.border)
             .child(
-                div()
-                    .id("navigation-brand")
-                    .w_full()
-                    .h(px(crate::title_bar::TITLE_BAR_HEIGHT))
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .window_control_area(WindowControlArea::Drag)
-                    .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window())
-                    .child(
-                        img(crate::assets::Assets::logo_path(self.settings.app_icon))
-                            .size(px(24.))
-                            .flex_none(),
-                    ),
+                crate::window_chrome::drag_region(
+                    div()
+                        .id("navigation-brand")
+                        .w_full()
+                        .h(px(crate::title_bar::TITLE_BAR_HEIGHT))
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .justify_center(),
+                )
+                .child(
+                    img(crate::assets::Assets::logo_path(self.settings.app_icon))
+                        .size(px(24.))
+                        .flex_none(),
+                ),
             )
             .child(
                 div()

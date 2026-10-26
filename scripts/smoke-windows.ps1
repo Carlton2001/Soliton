@@ -24,7 +24,7 @@ New-Item -ItemType Directory -Force $data | Out-Null
 & cargo run -p soliton-app --bin Soliton-index --offline -- $data $fixtures
 if ($LASTEXITCODE -ne 0) { throw 'Library smoke test failed' }
 $closeBehavior = switch ($CloseScenario) { 'Hidden' { 'Hide' } 'Ask' { 'Ask' } default { 'Quit' } }
-$initialSettings = @{language=$Language;dark=(-not $Light);album_grid=(-not $List);volume=0.0;close_behavior=$closeBehavior}
+$initialSettings = @{language=$Language;dark=(-not $Light);album_grid=(-not $List);volume=0.0;close_behavior=$closeBehavior;check_updates=$false}
 if ($Updates) { $initialSettings.last_view = @{view='Settings'}; $initialSettings.check_updates = $false }
 $initialSettings | ConvertTo-Json | Set-Content -Encoding utf8NoBOM (Join-Path $data 'settings.json')
 $previousData = $env:SOLITON_DATA_DIR

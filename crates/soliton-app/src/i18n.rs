@@ -21,6 +21,7 @@ pub enum Text {
     UpToDate,
     UpdateFailed,
     UpdateNotConfigured,
+    UpdatesUnsupported,
     Actions,
     Playlists,
     NewPlaylist,
@@ -234,6 +235,10 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::UpdateNotConfigured => (
             "Le dépôt des mises à jour n’est pas encore configuré.",
             "The update repository is not configured yet.",
+        ),
+        Text::UpdatesUnsupported => (
+            "Les mises à jour intégrées ne sont pas disponibles sur cette plateforme.",
+            "Built-in updates are not available on this platform.",
         ),
         Text::Actions => ("Actions", "Actions"),
         Text::Playlists => ("Playlists", "Playlists"),

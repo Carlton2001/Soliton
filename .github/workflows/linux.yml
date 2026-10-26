@@ -1,0 +1,41 @@
+name: Linux build and tests (Fedora)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  fedora:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Install Fedora build dependencies
+        run: >-
+          dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config
+          alsa-lib-devel libxkbcommon-devel libxkbcommon-x11-devel
+          freetype-devel fontconfig-devel libxcb-devel wayland-devel
+          git rustup
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Format
+        run: cargo +1.98.1 fmt --check
+      - name: Check all targets
+        run: cargo +1.98.1 check --workspace --all-targets --locked
+      - name: Unit and integration tests
+        run: cargo +1.98.1 test --workspace --locked
+      - name: Build the application
+        run: cargo +1.98.1 build -p soliton-app --bin Soliton --locked
+      # No desktop, GPU, or audio device is exercised by this job.

@@ -40,7 +40,7 @@ impl Soliton {
     }
 
     pub fn install_update(&mut self, cx: &mut Context<Self>) {
-        if self.updates.installing || self.quitting {
+        if !soliton_platform::updater::SUPPORTED || self.updates.installing || self.quitting {
             return;
         }
         let Some(release) = self.updates.available.clone() else {
@@ -111,6 +111,9 @@ impl Soliton {
     }
 
     pub fn check_for_updates(&mut self, cx: &mut Context<Self>) {
+        if !soliton_platform::updater::SUPPORTED {
+            return;
+        }
         let Some(repository) = repository() else {
             return;
         };
@@ -147,6 +150,24 @@ impl Soliton {
 
     pub fn update_preferences(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
+        let version = setting_row(
+            self.t(Text::Version),
+            None,
+            format!("Soliton {}", env!("CARGO_PKG_VERSION")),
+            theme,
+        );
+        if !soliton_platform::updater::SUPPORTED {
+            return section(
+                self.t(Text::About),
+                None,
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(rems(0.625))
+                    .child(list_box([version], theme))
+                    .child(hint(self.t(Text::UpdatesUnsupported), theme)),
+            );
+        }
         let check = button(
             "check-updates",
             "refresh-cw",
@@ -181,12 +202,7 @@ impl Soliton {
             .gap(rems(0.625))
             .child(list_box(
                 [
-                    setting_row(
-                        self.t(Text::Version),
-                        None,
-                        format!("Soliton {}", env!("CARGO_PKG_VERSION")),
-                        theme,
-                    ),
+                    version,
                     setting_row(
                         self.t(Text::CheckUpdates),
                         Some(self.t(Text::UpdateHint)),

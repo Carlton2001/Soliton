@@ -736,7 +736,7 @@ impl Render for Soliton {
             )
             .child(body);
         let notices = self.notices_view(cx);
-        div()
+        let content = div()
             .relative()
             .track_focus(&self.focus)
             .on_mouse_down(
@@ -777,7 +777,7 @@ impl Render for Soliton {
                             .min_h_0()
                             .flex()
                             .flex_col()
-                            .child(self.title_bar(window))
+                            .child(self.title_bar(window, cx))
                             .child(main),
                     ),
             )
@@ -785,7 +785,8 @@ impl Render for Soliton {
             .child(self.footer(window, cx))
             .children(self.menu_view(cx))
             .children(self.close_dialog(cx))
-            .children(self.playlist_dialog(cx))
+            .children(self.playlist_dialog(cx));
+        crate::window_chrome::frame(content, window, theme)
     }
 }
 
