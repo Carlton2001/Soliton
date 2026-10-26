@@ -13,7 +13,8 @@ développement et de validation. Silverblue reste à vérifier sur un hôte rée
 
 - **Fenêtre** : décorations clientes ; déplacement au clic gauche depuis la barre
   de titre et le logo, double-clic pour agrandir/restaurer, réduction, fermeture
-  et redimensionnement par les bords libres, sans changement de curseur. État
+  et redimensionnement par une marge transparente autour de la fenêtre, qui porte
+  l'ombre portée et le curseur de redimensionnement des bords libres. État
   agrandi restauré au démarrage (GPUI ne l'applique pas à l'ouverture sous Linux).
   Identifiant `io.github.Carlton2001.Soliton`, partagé par la fenêtre, l'entrée de
   bureau, l'icône et MPRIS.
