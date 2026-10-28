@@ -170,6 +170,15 @@ impl Soliton {
             last.view = soliton_core::config::View::Artists;
             last.album = None;
         }
+        // Settings are not a place to come back to: reopen on the queue when
+        // one is waiting, otherwise on the artists.
+        if last.view == soliton_core::config::View::Settings {
+            last.view = if settings.last_queue.tracks.is_empty() {
+                soliton_core::config::View::Artists
+            } else {
+                soliton_core::config::View::Queue
+            };
+        }
         let filter = Filter {
             sort: settings.album_sort,
             hide_unavailable: settings.hide_unavailable,
