@@ -185,6 +185,10 @@ par défaut. Les données restent dans `~/.local/share/Soliton`, partagées avec
 l'archive et conservées par `dnf remove`. Si l'archive est aussi installée,
 son entrée dans `~/.local/share/applications` masque celle du paquet.
 
+Les deux entrées déclarent `StartupNotify=false` : GPUI ne consomme pas le jeton
+de démarrage (`XDG_ACTIVATION_TOKEN`, `DESKTOP_STARTUP_ID`), et GNOME garderait
+le curseur d'attente jusqu'à son délai d'expiration.
+
 Le paquet déclare `vulkan-loader`, `mesa-vulkan-drivers` et
 `libwayland-client`, chargés à l'exécution ; les autres bibliothèques sont
 détectées par `rpmbuild`. Le champ `License` est calculé par
@@ -264,6 +268,7 @@ Le 28 octobre 2026, paquet RPM dans un conteneur `fedora:44` minimal :
 | `rpmlint` 2.8.0 | Aucune erreur ; absence de page de manuel et de documentation signalée |
 | `dnf remove` : fichiers retirés, `~/.local/share/Soliton` conservé | Réussi |
 | Paquet installé sur la machine de développement (Fedora 44, GNOME Wayland) : lanceur, icône, fenêtre associée au dock, panneau média, bibliothèque existante retrouvée | Réussi (essai manuel) ; avertissement attendu de `dnf` pour un paquet local non signé |
+| Lancement depuis la vue des applications avec `StartupNotify=false` : plus de curseur d'attente, fenêtre au premier plan | Réussi (essai manuel) |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
