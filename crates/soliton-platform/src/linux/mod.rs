@@ -1,5 +1,5 @@
 //! Session bus and XDG files are owned by one worker; the UI only enqueues.
-mod autostart;
+//! Soliton does not register a sign-in launch on Linux.
 mod launcher_icon;
 mod mpris;
 
@@ -21,7 +21,6 @@ type Update = (MediaState, Language, AppIcon);
 pub(super) struct Integration {
     updates: Sender<Update>,
     stale: Receiver<Update>,
-    startup: Sender<bool>,
     shutdown: Arc<AtomicBool>,
     worker: Option<JoinHandle<()>>,
 }
@@ -30,18 +29,16 @@ impl Integration {
     pub fn start(icon: AppIcon) -> Result<(Self, Receiver<DesktopEvent>)> {
         let (events, receiver) = bounded(64);
         let (updates, latest) = bounded(1);
-        let (startup, requests) = bounded(4);
         let shutdown = Arc::new(AtomicBool::new(false));
         let worker_shutdown = shutdown.clone();
         let stale = latest.clone();
         let worker = std::thread::Builder::new()
             .name("soliton-desktop".into())
-            .spawn(move || run(icon, &events, latest, requests, &worker_shutdown))?;
+            .spawn(move || run(icon, &events, latest, &worker_shutdown))?;
         Ok((
             Self {
                 updates,
                 stale,
-                startup,
                 shutdown,
                 worker: Some(worker),
             },
@@ -56,12 +53,6 @@ impl Integration {
             let _ = self.stale.try_recv();
             let _ = self.updates.try_send(update);
         }
-    }
-
-    pub fn set_autostart(&self, enabled: bool) -> Result<()> {
-        self.startup
-            .try_send(enabled)
-            .map_err(|_| anyhow::anyhow!("Desktop command queue unavailable"))
     }
 
     pub fn join(&mut self) {
@@ -82,13 +73,11 @@ fn run(
     icon: AppIcon,
     events: &Sender<DesktopEvent>,
     updates: Receiver<Update>,
-    startup: Receiver<bool>,
     shutdown: &AtomicBool,
 ) {
     let warn = |error: String| {
         let _ = events.try_send(DesktopEvent::Warning(error));
     };
-    let _ = events.try_send(DesktopEvent::Autostart(autostart::enabled()));
     let mut launcher = launcher_icon::LauncherIcon::default();
     if let Err(error) = launcher.apply(icon) {
         warn(format!("Launcher icon: {error:#}"));
@@ -112,10 +101,6 @@ fn run(
                 // A broken bus must not flood the UI on every position tick.
                 media = None;
             }
-        }
-        for enabled in startup.try_iter() {
-            let result = autostart::set(enabled).and_then(|()| autostart::enabled());
-            let _ = events.try_send(DesktopEvent::Autostart(result));
         }
     }
 }

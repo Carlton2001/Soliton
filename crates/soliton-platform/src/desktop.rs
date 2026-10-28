@@ -89,8 +89,9 @@ impl Desktop {
     pub const SUPPORTED: bool = cfg!(any(target_os = "windows", target_os = "linux"));
     /// A notification area icon can restore a hidden window, so closing may hide.
     pub const HIDES: bool = cfg!(target_os = "windows");
-    /// Sign-in launch can be registered by the user.
-    pub const AUTOSTART: bool = cfg!(any(target_os = "windows", target_os = "linux"));
+    /// Sign-in launch can be registered by the user; not offered on Linux,
+    /// where GNOME has no tray and the window would open at every sign-in.
+    pub const AUTOSTART: bool = cfg!(target_os = "windows");
 
     /// The caller must drop the integration before destroying the borrowed window.
     pub fn start(window: &impl HasWindowHandle, language: Language, icon: AppIcon) -> Result<Self> {
@@ -148,9 +149,9 @@ impl Desktop {
     }
 
     pub fn set_autostart(&self, enabled: bool) -> Result<()> {
-        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        #[cfg(target_os = "windows")]
         return self.native.set_autostart(enabled);
-        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        #[cfg(not(target_os = "windows"))]
         {
             let _ = enabled;
             anyhow::bail!("Autostart is not implemented on this platform")

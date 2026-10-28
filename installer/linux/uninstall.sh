@@ -5,7 +5,6 @@ set -eu
 
 APP_ID=io.github.Carlton2001.Soliton
 data=${XDG_DATA_HOME:-$HOME/.local/share}
-config=${XDG_CONFIG_HOME:-$HOME/.config}
 entry=$data/applications/$APP_ID.desktop
 
 if [ -f "$entry" ] && ! grep -qx 'X-Soliton-Install=user' "$entry"; then
@@ -14,8 +13,7 @@ if [ -f "$entry" ] && ! grep -qx 'X-Soliton-Install=user' "$entry"; then
 fi
 rm -f "$HOME/.local/bin/soliton" "$entry" \
     "$data/metainfo/$APP_ID.metainfo.xml" \
-    "$data/icons/hicolor/scalable/apps/$APP_ID.svg" \
-    "$config/autostart/$APP_ID.desktop"
+    "$data/icons/hicolor/scalable/apps/$APP_ID.svg"
 rm -rf "$data/doc/soliton"
 if [ -d "$data/icons/hicolor" ]; then
     touch "$data/icons/hicolor"

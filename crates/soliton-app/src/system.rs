@@ -202,7 +202,8 @@ impl Soliton {
     }
 
     pub fn system_preferences(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !Desktop::SUPPORTED {
+        // Linux has neither option: the section would be empty.
+        if !Desktop::HIDES && !Desktop::AUTOSTART {
             return None;
         }
         let theme = self.theme();
