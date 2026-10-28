@@ -183,7 +183,8 @@ Ces règles restent en vigueur pour toute évolution.
 - Mode exclusif, bit-perfect, égaliseur.
 - Opus, WMA, APE et autres formats demandant des décodeurs complémentaires.
 - Transcodage réseau, multiroom, Alexa Wi-Fi.
-- Linux : Flatpak, paquet RPM, sélection native des sinks PipeWire, mises à jour
+- Linux : distribution au-delà de l'archive pour Fedora Workstation (autres
+  distributions et Silverblue, paquets .deb et RPM, Flatpak), mises à jour
   intégrées.
 
 ---

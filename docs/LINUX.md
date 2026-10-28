@@ -6,7 +6,8 @@ intégrations natives. L'[audit initial](PORTABILITE_LINUX.md) décrit les
 obstacles et le périmètre du portage.
 
 Fedora Workstation (GNOME, Wayland, PipeWire) est l'environnement de
-développement et de validation. Silverblue reste à vérifier sur un hôte réel.
+développement et de validation. Les autres distributions, Silverblue compris,
+relèvent de la distribution Linux hors V1 (paquets .deb et RPM, Flatpak).
 
 ## Fonctionnement
 
@@ -228,6 +229,3 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
-
-À vérifier encore : Silverblue (binaire de l'archive sur l'hôte,
-`ldd`).
