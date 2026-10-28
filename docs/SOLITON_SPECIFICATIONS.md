@@ -145,7 +145,8 @@ Ces règles restent en vigueur pour toute évolution.
   autre sortie.
 - Avec « Périphérique système par défaut », une sortie perdue (casque éteint)
   laisse la lecture continuer sur la nouvelle sortie par défaut du système ;
-  pause seulement si aucune ne s'ouvre.
+  pause seulement si aucune ne s'ouvre. Une pause demandée par le système
+  (WirePlumber sous Linux) est respectée.
 - Sortie choisie perdue ou absente : pause à la même position et avertissement
   affiché jusqu'à la reprise. La reprise se fait sur la sortie système par
   défaut ; Soliton revient sur la sortie choisie dès qu'elle réapparaît, sans

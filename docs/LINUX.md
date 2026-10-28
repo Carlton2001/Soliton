@@ -28,7 +28,11 @@ développement et de validation. Silverblue reste à vérifier sur un hôte rée
   appairé apparaît aussitôt, sans sondage. « Périphérique système par défaut »
   suit immédiatement la sortie choisie dans les paramètres Son ; si cette sortie
   disparaît en erreur (casque Bluetooth éteint), le flux est rouvert sur la
-  nouvelle sortie par défaut sans pause. Une sortie
+  nouvelle sortie par défaut sans pause. WirePlumber met toutefois en pause, par
+  MPRIS, les lecteurs dont la sortie disparaît (`linking.pause-playback`, actif
+  par défaut, Firefox compris) ; Soliton respecte ce réglage du système.
+  `wpctl settings --save linking.pause-playback false` le désactive pour toutes
+  les applications. Une sortie
   choisie est ciblée par `target.object` avec `node.dont-reconnect` et
   `node.dont-fallback` : PipeWire ne la remplace jamais. Sa disparition met la
   lecture en pause, avec un avertissement jusqu'à la reprise ; la reprise joue
@@ -218,13 +222,12 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 | Panneau média et touches multimédias GNOME | Réussis (essais manuels) |
 | Portail de choix de dossiers à l'ajout d'une source | Réussi (essai manuel) |
 | Icône du lanceur suivant la palette (copie installée) | Réussie (essai manuel) |
-| Sortie par défaut : casque Bluetooth allumé, la lecture le suit ; casque éteint, elle se mettait en pause | Défaut corrigé (reprise sur la nouvelle sortie par défaut), à confirmer |
+| Sortie par défaut : casque Bluetooth allumé, la lecture le suit ; casque éteint, session rouverte sur la nouvelle sortie par défaut (« Format envoyé » mis à jour), puis pause demandée par WirePlumber (`linking.pause-playback`, observé par `dbus-monitor`) | Réussi (essai manuel) ; pause du système respectée |
 | Test natif du moteur : perte de la sortie par défaut, session rouverte sur la nouvelle sans pause ni avertissement, position gardée | Réussi |
 | Collection réelle de 7 206 pistes sur NTFS (`ntfs-3g`, 99 dossiers) : 372 surveillances inotify utilisées sur tout le système pour une limite de 557 977 | Vérifié |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
 
-À vérifier encore : extinction du casque Bluetooth avec « Périphérique système
-par défaut » après correctif, Silverblue (binaire de l'archive sur l'hôte,
+À vérifier encore : Silverblue (binaire de l'archive sur l'hôte,
 `ldd`).
