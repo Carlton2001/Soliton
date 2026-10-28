@@ -179,7 +179,8 @@ pub struct Settings {
     pub album_sort: AlbumSort,
     pub hide_unavailable: bool,
     pub volume: f32,
-    /// Local CPAL device name; None uses the system default.
+    /// Local output: CPAL device name, or PipeWire node name on Linux; None
+    /// uses the system default.
     pub output_device: Option<String>,
     pub shuffle: bool,
     pub repeat: Repeat,
@@ -213,7 +214,7 @@ impl Default for Settings {
             artist_grid: true,
             cover_size: CoverSize::Medium,
             album_sort: AlbumSort::Artist,
-            hide_unavailable: false,
+            hide_unavailable: true,
             volume: 0.7,
             output_device: None,
             shuffle: false,

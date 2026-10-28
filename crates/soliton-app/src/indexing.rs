@@ -17,6 +17,10 @@ use std::{
 const PERIODIC_SCAN: Duration = Duration::from_secs(30 * 60);
 const PROBE_INTERVAL: Duration = Duration::from_secs(60);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Offline sources are probed more often, so that a remounted volume returns
+/// quickly; a share still slow to answer is simply tried again later.
+const RETURN_PROBE_INTERVAL: Duration = Duration::from_secs(5);
+const RETURN_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
 /// A burst of notifications is handled once quiet, or after the longest delay.
 const QUIET: Duration = Duration::from_secs(2);
 const LONGEST: Duration = Duration::from_secs(15);
@@ -33,6 +37,7 @@ struct Worker {
     /// Background work stops when the application closes.
     background: Cancellation,
     next_probe: Instant,
+    next_return_probe: Instant,
     next_periodic: Instant,
 }
 
@@ -73,6 +78,7 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
         prober: Prober::default(),
         background,
         next_probe: now + PROBE_INTERVAL,
+        next_return_probe: now + RETURN_PROBE_INTERVAL,
         next_periodic: now + PERIODIC_SCAN,
     };
     loop {
@@ -84,11 +90,15 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
             worker.timers();
             continue;
         }
-        let deadline = [worker.next_probe, worker.next_periodic]
-            .into_iter()
-            .chain(worker.changes.deadline())
-            .min()
-            .unwrap_or_else(Instant::now);
+        let deadline = [
+            worker.next_probe,
+            worker.next_return_probe,
+            worker.next_periodic,
+        ]
+        .into_iter()
+        .chain(worker.changes.deadline())
+        .min()
+        .unwrap_or_else(Instant::now);
         let timeout = deadline.saturating_duration_since(Instant::now());
         crossbeam_channel::select! {
             recv(worker.work) -> message => match message {
@@ -212,12 +222,18 @@ impl Worker {
         let was_available = self.sources().iter().any(|s| s.id == id && s.available);
         let mut last = Instant::now();
         let mut shown = 0;
+        let mut announced = was_available;
         let events = self.events.clone();
         let result = self.library.scan_scope(
             id,
             dirs,
             &self.background,
             |progress: &ScanProgress| {
+                // A returning source is shown available before its scan ends.
+                if !announced {
+                    announced = true;
+                    let _ = events.try_send(Event::Changed);
+                }
                 if progress.indexed > shown && last.elapsed() > Duration::from_secs(1) {
                     shown = progress.indexed;
                     last = Instant::now();
@@ -271,8 +287,13 @@ impl Worker {
             self.periodic();
         }
         if Instant::now() >= self.next_probe {
-            self.probe();
+            self.probe(false);
             self.next_probe = Instant::now() + PROBE_INTERVAL;
+        } else if Instant::now() >= self.next_return_probe {
+            self.probe(true);
+        }
+        if Instant::now() >= self.next_return_probe {
+            self.next_return_probe = Instant::now() + RETURN_PROBE_INTERVAL;
         }
     }
 
@@ -291,14 +312,23 @@ impl Worker {
         self.next_periodic = Instant::now() + PERIODIC_SCAN;
     }
 
-    /// Detects sources going offline, and rescans those coming back.
-    fn probe(&mut self) {
+    /// Detects sources going offline, and rescans those coming back; only the
+    /// offline ones with `returning`.
+    fn probe(&mut self, returning: bool) {
         let mut changed = false;
         for source in self.sources() {
             if self.background.is_cancelled() {
                 return;
             }
-            let reachable = self.prober.reachable(&source.path, PROBE_TIMEOUT) == Some(true);
+            if returning && source.available {
+                continue;
+            }
+            let timeout = if returning {
+                RETURN_PROBE_TIMEOUT
+            } else {
+                PROBE_TIMEOUT
+            };
+            let reachable = self.prober.reachable(&source.path, timeout) == Some(true);
             if source.available && !reachable {
                 match self.library.set_source_available(source.id, false) {
                     Ok(true) => {
@@ -375,3 +405,7 @@ impl Interlude for Passage<'_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/indexing.rs"]
+mod tests;
