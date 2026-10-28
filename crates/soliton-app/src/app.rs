@@ -669,8 +669,17 @@ impl Render for Soliton {
         crate::scale::apply(self.settings.ui_rem_size, window);
         // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
-        let tile = crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.);
-        let reserved = crate::scale::scaled((2. * crate::views::CONTENT_PADDING) * 16. + 12.);
+        // Cover, padding, then the 2 px focus border on each side.
+        let tile =
+            crate::scale::scaled(crate::views::cover_side(self.settings.cover_size) + 16.) + 4.;
+        // The artist page also keeps a lane for its letter index.
+        let lane = if self.section == Section::Artists {
+            crate::alphabet::LANE
+        } else {
+            0.
+        };
+        let reserved =
+            crate::scale::scaled((2. * crate::views::CONTENT_PADDING + lane) * 16. + 12.);
         let width_in_rems = crate::navigation::content_width(window);
         let split = crate::collection::split_collection(
             width_in_rems,
@@ -696,9 +705,20 @@ impl Render for Soliton {
             crate::widgets::Density::Full
         });
         let content = width_in_rems * f32::from(window.rem_size());
-        self.columns = ((content - panel_width - reserved + gap) / (tile + gap))
-            .floor()
-            .max(1.) as usize;
+        // The list measured on the last frame is exact: the estimate from the window
+        // misses decorations such as the resize border drawn by the client on Linux.
+        let measured = match self.section {
+            Section::Albums => Some(&self.album_bar),
+            Section::Artists => Some(&self.facet_bar),
+            _ => None,
+        }
+        .map(|bar| f32::from(bar.handle.bounds().size.width))
+        .filter(|width| *width > 0.);
+        let available = match measured {
+            Some(list) => list - crate::scale::scaled(2. * crate::views::CONTENT_PADDING * 16.),
+            None => content - panel_width - reserved,
+        };
+        self.columns = ((available + gap) / (tile + gap)).floor().max(1.) as usize;
         let theme = self.theme();
         // Each page has its own search: the text does not follow to another one.
         let section = self.section;

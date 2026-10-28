@@ -271,7 +271,8 @@ impl Soliton {
             }));
         if self.settings.album_grid {
             return frame
-                .w(rems(side / 16. + 1.))
+                // Sized by its cover, so padding and the focus border add around it.
+                .flex_none()
                 .flex()
                 .flex_col()
                 .gap(rems(0.25))
@@ -279,7 +280,7 @@ impl Soliton {
                 .child(
                     div()
                         .mt(rems(0.25))
-                        .w_full()
+                        .w(rems(side / 16.))
                         .truncate()
                         .whitespace_normal()
                         .line_clamp(1)
@@ -288,7 +289,7 @@ impl Soliton {
                 )
                 .child(
                     div()
-                        .w_full()
+                        .w(rems(side / 16.))
                         .truncate()
                         .whitespace_normal()
                         .line_clamp(1)
@@ -413,6 +414,7 @@ impl Soliton {
             return self.facet_empty(&query);
         }
         let theme = self.theme();
+        let names: Vec<String> = cards.iter().map(|card| card.name.clone()).collect();
         let grid = self.settings.artist_grid;
         let columns = if grid { self.columns.max(1) } else { 1 };
         let side = cover_side(self.settings.cover_size);
@@ -492,8 +494,7 @@ impl Soliton {
                                                 .border_2()
                                                 .border_color(theme.accent)
                                         })
-                                        .w(rems(side / 16. + 1.))
-                                        .min_w_0()
+                                        .flex_none()
                                         .p(rems(0.5))
                                         .rounded(RADIUS)
                                         .flex()
@@ -505,7 +506,7 @@ impl Soliton {
                                         .child(
                                             div()
                                                 .mt(rems(0.25))
-                                                .w_full()
+                                                .w(rems(side / 16.))
                                                 .truncate()
                                                 .whitespace_normal()
                                                 .line_clamp(1)
@@ -531,7 +532,20 @@ impl Soliton {
         .track_scroll(self.facet_scroll.clone())
         .flex_1()
         .min_h_0();
-        collection_scroll_area(list, &self.facet_bar, theme, grid)
+        // The letter index only helps when the list scrolls.
+        let scrolls = self.facet_bar.handle.max_offset().height > px(0.);
+        let content = div()
+            .relative()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(list)
+            .when(scrolls, |content| content.pr(rems(crate::alphabet::LANE)))
+            .when(scrolls, |content| {
+                content.child(self.alphabet_index(names, columns, cx))
+            });
+        collection_scroll_area(content, &self.facet_bar, theme, grid)
     }
 
     /// Search text narrowing the artist, genre or year list.

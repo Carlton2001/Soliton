@@ -6,6 +6,7 @@
 // linker reports creating an import library next to the executable. Harmless.
 #![allow(linker_messages)]
 mod album;
+mod alphabet;
 mod app;
 mod assets;
 mod audio_preferences;
