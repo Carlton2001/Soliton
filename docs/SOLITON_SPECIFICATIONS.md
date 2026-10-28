@@ -37,8 +37,8 @@ fermeture, démarrage automatique), sorties audio locales et Bluetooth, sorties
 DLNA / UPnP et Google Cast.
 
 Linux : version fonctionnelle sous Fedora Workstation (bibliothèque, lecture
-locale par la sortie système, interface Wayland/X11, MPRIS, démarrage
-automatique, archive installable par utilisateur) ; voir [LINUX.md](LINUX.md).
+locale par la sortie système, interface Wayland/X11, MPRIS, archive installable
+par utilisateur ; démarrage automatique réservé à Windows) ; voir [LINUX.md](LINUX.md).
 
 Reste à faire : distribution (phase 10), validations matérielles (phase 11).
 

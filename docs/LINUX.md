@@ -58,8 +58,8 @@ relèvent de la distribution Linux hors V1 (paquets .deb et RPM, Flatpak).
   Une entrée ou une icône installée autrement n'est jamais modifiée.
 - **Indisponible sous Linux** : démarrage automatique, mises à jour intégrées
   (téléchargement et installateur Windows), Bluetooth dédié, notifications
-  natives de sorties audio, accent système. Audio exclusif et Flatpak restent hors périmètre ; DLNA/Cast
-  sont compilés mais non validés sous Linux.
+  natives de sorties audio, accent système. Audio exclusif et Flatpak restent hors périmètre ; Google Cast
+  est validé, DLNA est compilé mais non validé sous Linux.
 - **Surveillance** : inotify sur chaque dossier des sources. Si la limite du
   système (`fs.inotify.max_user_watches`) empêche de surveiller toute une
   source, ses surveillances partielles sont retirées : elle n'est couverte que
@@ -226,6 +226,8 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 | Sortie par défaut : casque Bluetooth allumé, la lecture le suit ; casque éteint, session rouverte sur la nouvelle sortie par défaut (« Format envoyé » mis à jour), puis pause demandée par WirePlumber (`linking.pause-playback`, observé par `dbus-monitor`) | Réussi (essai manuel) ; pause du système respectée |
 | Test natif du moteur : perte de la sortie par défaut, session rouverte sur la nouvelle sans pause ni avertissement, position gardée | Réussi |
 | Collection réelle de 7 206 pistes sur NTFS (`ntfs-3g`, 99 dossiers) : 372 surveillances inotify utilisées sur tout le système pour une limite de 557 977 | Vérifié |
+| Google Cast : découverte et lecture sur un appareil Cast | Réussi (essai manuel) |
+| Colonnes de la grille ajustées au redimensionnement, marge de redimensionnement comprise | Réussi (essai manuel) |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
