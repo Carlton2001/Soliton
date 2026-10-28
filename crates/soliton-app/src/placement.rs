@@ -33,24 +33,38 @@ pub fn capture(window: &Window) -> Option<WindowPlacement> {
 /// Saved bounds when their title bar is still on a connected screen; centered
 /// default bounds otherwise.
 pub fn restore(saved: Option<WindowPlacement>, cx: &App) -> WindowBounds {
-    let restored = saved.and_then(|p| {
-        let bounds = Bounds::new(
-            point(px(p.x), px(p.y)),
-            size(
-                px(p.width).max(MIN_SIZE.width),
-                px(p.height).max(MIN_SIZE.height),
-            ),
-        );
-        let grip = Bounds::new(bounds.origin, size(bounds.size.width, px(VISIBLE)));
-        let visible = cx
-            .displays()
-            .iter()
-            .any(|display| display.bounds().intersects(&grip));
-        visible.then_some((bounds, p.maximized))
-    });
-    match restored {
+    let screens: Vec<_> = cx
+        .displays()
+        .iter()
+        .map(|display| display.bounds())
+        .collect();
+    match restored(saved, &screens) {
         Some((bounds, true)) => WindowBounds::Maximized(bounds),
         Some((bounds, false)) => WindowBounds::Windowed(bounds),
         None => WindowBounds::Windowed(Bounds::centered(None, DEFAULT_SIZE, cx)),
     }
 }
+
+/// GPUI's Wayland backend lists no screen before the first window opens, and
+/// the compositor places windows itself: without screens, the saved bounds
+/// cannot be checked and are kept.
+fn restored(
+    saved: Option<WindowPlacement>,
+    screens: &[Bounds<Pixels>],
+) -> Option<(Bounds<Pixels>, bool)> {
+    let p = saved?;
+    let bounds = Bounds::new(
+        point(px(p.x), px(p.y)),
+        size(
+            px(p.width).max(MIN_SIZE.width),
+            px(p.height).max(MIN_SIZE.height),
+        ),
+    );
+    let grip = Bounds::new(bounds.origin, size(bounds.size.width, px(VISIBLE)));
+    let visible = screens.is_empty() || screens.iter().any(|screen| screen.intersects(&grip));
+    visible.then_some((bounds, p.maximized))
+}
+
+#[cfg(test)]
+#[path = "tests/placement.rs"]
+mod tests;
