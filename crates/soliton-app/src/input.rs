@@ -1,5 +1,8 @@
 // Adapted from GPUI 0.2.2 examples/input.rs, Copyright Zed Industries, Apache-2.0.
-use std::ops::Range;
+use std::{
+    ops::Range,
+    time::{Duration, Instant},
+};
 
 use gpui::{prelude::*, *};
 use unicode_segmentation::*;
@@ -34,6 +37,10 @@ pub struct TextInput {
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
     is_selecting: bool,
+    /// Caret state at the last paint; any change restarts the blink visible.
+    blink_state: Option<(SharedString, Range<usize>)>,
+    blink_start: Instant,
+    blink_timer: Option<Task<()>>,
 }
 
 impl TextInput {
@@ -48,6 +55,9 @@ impl TextInput {
             last_layout: None,
             last_bounds: None,
             is_selecting: false,
+            blink_state: None,
+            blink_start: Instant::now(),
+            blink_timer: None,
         }
     }
 }
@@ -422,6 +432,26 @@ impl EntityInputHandler for TextInput {
     }
 }
 
+const CARET_HOLD: Duration = Duration::from_millis(450);
+const CARET_FADE: Duration = Duration::from_millis(80);
+
+/// Caret opacity like the system caret: held, quickly faded out, held hidden,
+/// faded back in. Returns the delay before the next change, or `None` while fading.
+fn caret_blink(elapsed: Duration) -> (f32, Option<Duration>) {
+    let period = (CARET_HOLD + CARET_FADE) * 2;
+    let phase = Duration::from_nanos((elapsed.as_nanos() % period.as_nanos()) as u64);
+    let fade = |t: Duration| t.as_secs_f32() / CARET_FADE.as_secs_f32();
+    if phase < CARET_HOLD {
+        (1., Some(CARET_HOLD - phase))
+    } else if phase < CARET_HOLD + CARET_FADE {
+        (1. - fade(phase - CARET_HOLD), None)
+    } else if phase < CARET_HOLD * 2 + CARET_FADE {
+        (0., Some(CARET_HOLD * 2 + CARET_FADE - phase))
+    } else {
+        (fade(phase - CARET_HOLD * 2 - CARET_FADE), None)
+    }
+}
+
 struct TextElement {
     input: Entity<TextInput>,
 }
@@ -535,16 +565,32 @@ impl Element for TextElement {
             .text_system()
             .shape_line(display_text, font_size, &runs, None);
 
+        // A caret just moved or typed shows at once, before paint restarts the blink.
+        let unchanged = input
+            .blink_state
+            .as_ref()
+            .is_some_and(|(text, range)| *text == input.content && *range == selected_range);
+        let caret_elapsed = if unchanged {
+            input.blink_start.elapsed()
+        } else {
+            Duration::ZERO
+        };
+        let caret_height = (font_size * 1.2).min(bounds.size.height);
         let cursor_pos = line.x_for_index(cursor);
         let (selection, cursor) = if selected_range.is_empty() {
             (
                 None,
                 Some(fill(
+                    // Glyph height rather than the full line, centered like system carets.
                     Bounds::new(
-                        point(bounds.left() + cursor_pos, bounds.top()),
-                        size(px(2.), bounds.bottom() - bounds.top()),
+                        point(
+                            bounds.left() + cursor_pos,
+                            bounds.top() + (bounds.size.height - caret_height) / 2.,
+                        ),
+                        size(px(2.), caret_height),
                     ),
-                    gpui::blue(),
+                    // The caret and selection follow the text color of the theme.
+                    style.color.opacity(caret_blink(caret_elapsed).0),
                 )),
             )
         } else {
@@ -560,7 +606,7 @@ impl Element for TextElement {
                             bounds.bottom(),
                         ),
                     ),
-                    rgba(0x3311ff30),
+                    style.color.opacity(0.25),
                 )),
                 None,
             )
@@ -595,16 +641,39 @@ impl Element for TextElement {
         line.paint(bounds.origin, window.line_height(), window, cx)
             .unwrap();
 
-        if focus_handle.is_focused(window)
-            && let Some(cursor) = prepaint.cursor.take()
-        {
+        let focused = focus_handle.is_focused(window);
+        let caret = prepaint.cursor.take().filter(|_| focused);
+        let blinking = caret.is_some();
+        if let Some(cursor) = caret {
             window.paint_quad(cursor);
         }
 
-        self.input.update(cx, |input, _cx| {
+        let next = self.input.update(cx, |input, cx| {
             input.last_layout = Some(line);
             input.last_bounds = Some(bounds);
+            if !blinking {
+                input.blink_state = None;
+                input.blink_timer = None;
+                return None;
+            }
+            let state = (input.content.clone(), input.selected_range.clone());
+            if input.blink_state.as_ref() != Some(&state) {
+                input.blink_state = Some(state);
+                input.blink_start = Instant::now();
+            }
+            let (_, wait) = caret_blink(input.blink_start.elapsed());
+            // Held phases wait on a timer; fades redraw every frame.
+            input.blink_timer = wait.map(|wait| {
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(wait).await;
+                    this.update(cx, |_, cx| cx.notify()).ok();
+                })
+            });
+            Some(wait.is_none())
         });
+        if next == Some(true) {
+            window.request_animation_frame();
+        }
     }
 }
 
