@@ -188,7 +188,10 @@ Ces règles restent en vigueur pour toute évolution.
 - Transcodage réseau, multiroom, Alexa Wi-Fi.
 - Linux : distribution au-delà de l'archive pour Fedora Workstation (autres
   distributions et Silverblue, paquets .deb et RPM, Flatpak), mises à jour
-  intégrées.
+  intégrées. Le rendu GPUI exige Vulkan (repli logiciel lavapipe accepté sur
+  matériel ancien) : déclarer `vulkan-loader`/`libvulkan1` et
+  `mesa-vulkan-drivers` dans les paquets, et faire avertir `install.sh` en
+  l'absence de `libvulkan.so.1`.
 
 ---
 
