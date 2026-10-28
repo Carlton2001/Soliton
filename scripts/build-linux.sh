@@ -33,7 +33,7 @@ output=$root/target/distribution/output
 stage=$root/target/distribution/linux/$name
 rm -rf "$root/target/distribution/linux"
 mkdir -p "$stage" "$output"
-install -Dm755 target/release/Soliton "$stage/bin/soliton"
+install -Dm755 -s target/release/Soliton "$stage/bin/soliton"
 install -Dm644 "installer/linux/$APP_ID.desktop" "$stage/share/applications/$APP_ID.desktop"
 install -Dm644 "installer/linux/$APP_ID.metainfo.xml" "$stage/share/metainfo/$APP_ID.metainfo.xml"
 install -Dm644 assets/logos/graphite-mint.svg "$stage/share/icons/hicolor/scalable/apps/$APP_ID.svg"

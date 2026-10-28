@@ -2,7 +2,7 @@
 ## Spécifications
 
 **Licence :** GPL-3.0-only · **Langage :** Rust · **Interface :** GPUI ·
-**Plateformes :** Windows (cible V1), Linux (Fedora Workstation)
+**Plateformes :** Windows (cible de validation initiale), Linux (Fedora Workstation)
 
 Ce document fixe le périmètre, les règles produit et les phases restantes.
 L'état fonctionnel actuel est décrit dans le [README](../README.md), les choix
@@ -40,7 +40,9 @@ Linux : version fonctionnelle sous Fedora Workstation (bibliothèque, lecture
 locale par la sortie système, interface Wayland/X11, MPRIS, archive installable
 par utilisateur ; démarrage automatique réservé à Windows) ; voir [LINUX.md](LINUX.md).
 
-Reste à faire : distribution (phase 10), validations matérielles (phase 11).
+Reste à faire : distribution Windows (phase 10) et Linux (phase 10 bis),
+validations matérielles (phase 11). Les livrables sont préparés sans être
+publiés : la publication d'une release fait l'objet d'une demande distincte.
 
 ---
 
@@ -178,7 +180,7 @@ Ces règles restent en vigueur pour toute évolution.
 
 ---
 
-# 4. Hors V1
+# 4. Non planifié
 
 - API locale de contrôle (ancienne phase 8) : HTTP sur `127.0.0.1` uniquement,
   service distinct du serveur de diffusion, authentification obligatoire en cas
@@ -186,12 +188,8 @@ Ces règles restent en vigueur pour toute évolution.
 - Mode exclusif, bit-perfect, égaliseur.
 - Opus, WMA, APE et autres formats demandant des décodeurs complémentaires.
 - Transcodage réseau, multiroom, Alexa Wi-Fi.
-- Linux : distribution au-delà de l'archive pour Fedora Workstation (autres
-  distributions et Silverblue, paquets .deb et RPM, Flatpak), mises à jour
-  intégrées. Le rendu GPUI exige Vulkan (repli logiciel lavapipe accepté sur
-  matériel ancien) : déclarer `vulkan-loader`/`libvulkan1` et
-  `mesa-vulkan-drivers` dans les paquets, et faire avertir `install.sh` en
-  l'absence de `libvulkan.so.1`.
+- Linux : mises à jour intégrées, paquets pour d'autres familles que celles
+  de la phase 10 bis (Arch, openSUSE…).
 
 ---
 
@@ -231,6 +229,30 @@ d'architecture avant implémentation.
 
 **Livrable :** archive portable et installateur Windows publiables.
 
+## Phase 10 bis — Distribution Linux
+
+Dans l'ordre : RPM, puis .deb, puis Flatpak. Identifiant
+`io.github.Carlton2001.Soliton`, installation système sous `/usr`, données
+utilisateur dans `~/.local/share/Soliton` conservées à la désinstallation. Le mode
+portable reste propre à Windows ; l'icône du lanceur suit la palette seulement
+pour une installation par `install.sh`.
+
+Le rendu GPUI exige Vulkan (repli logiciel lavapipe accepté sur matériel
+ancien) : déclarer `vulkan-loader`/`libvulkan1` et `mesa-vulkan-drivers` dans
+les paquets, et faire avertir `install.sh` en l'absence de `libvulkan.so.1`.
+
+**10 bis.1 RPM** — Fedora Workstation 44 et suivantes (binaire construit sur
+Fedora 44, glibc 2.43) : `.spec` et `rpmbuild` à partir du
+binaire release de l'archive, validé par `rpmlint`, installation et
+désinstallation.
+
+**10 bis.2 .deb** — Debian et Ubuntu.
+
+**10 bis.3 Flatpak** — Flathub, Silverblue compris : permissions limitées à la
+bibliothèque, PipeWire, MPRIS et au réseau local.
+
+**Livrable :** paquets construits et vérifiés, prêts à publier.
+
 ## Phase 11 — Validation matérielle
 
 - Collection réelle de plusieurs milliers de pistes : indexation initiale,
@@ -251,7 +273,7 @@ défauts trouvés.
 
 1. Format de l'installateur Windows.
 2. Fournisseur des mises à jour (GitHub Releases envisagé) et format de version.
-3. Signature de l'exécutable.
+3. Signature de l'exécutable Windows et des paquets Linux (clé GPG du RPM).
 4. Périmètre multi-appareils réseau au-delà d'une sortie active.
 
 Ne pas trancher ces points sans les présenter.

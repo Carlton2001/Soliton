@@ -6,8 +6,8 @@ intégrations natives. L'[audit initial](PORTABILITE_LINUX.md) décrit les
 obstacles et le périmètre du portage.
 
 Fedora Workstation (GNOME, Wayland, PipeWire) est l'environnement de
-développement et de validation. Les autres distributions, Silverblue compris,
-relèvent de la distribution Linux hors V1 (paquets .deb et RPM, Flatpak).
+développement et de validation. Les paquets RPM, .deb et Flatpak
+(Silverblue compris) sont planifiés en phase 10 bis des spécifications.
 
 ## Fonctionnement
 
@@ -162,9 +162,36 @@ Le script vérifie l'inventaire des licences (`scripts/check-third-party-license
 mêmes empreintes que la version PowerShell), exige une entrée `<release>` de la
 version courante dans les métadonnées AppStream, construit en release, assemble
 `target/distribution/output/Soliton-<version>-x86_64-linux.tar.gz`, contrôle son
-contenu et écrit son empreinte SHA-256. `--skip-build` réutilise le binaire release
+contenu (binaire sans symboles) et écrit son empreinte SHA-256. `--skip-build` réutilise le binaire release
 existant. Les sources de l'entrée de bureau, des métadonnées et des scripts sont
 dans `installer/linux/`.
+
+## Construire le RPM
+
+```sh
+RUSTUP_TOOLCHAIN=1.98.1 scripts/build-rpm.sh
+```
+
+Prérequis : `sudo dnf install rpm-build desktop-file-utils appstream`. Le script
+construit d'abord l'archive (`--skip-build` est transmis), puis le paquet
+`target/distribution/output/soliton-<version>-1.fc44.x86_64.rpm` et son empreinte
+SHA-256 à partir de `installer/linux/rpm/soliton.spec`. Le binaire est celui de
+l'archive, construit sur Fedora 44 : le paquet vise Fedora 44 et suivantes.
+
+Le paquet installe le binaire, l'entrée de bureau, les métadonnées AppStream et
+l'icône sous `/usr`, les licences sous `/usr/share/licenses/soliton`. L'entrée
+système ne porte pas le marqueur de `install.sh` : son icône garde la palette
+par défaut. Les données restent dans `~/.local/share/Soliton`, partagées avec
+l'archive et conservées par `dnf remove`. Si l'archive est aussi installée,
+son entrée dans `~/.local/share/applications` masque celle du paquet.
+
+Le paquet déclare `vulkan-loader`, `mesa-vulkan-drivers` et
+`libwayland-client`, chargés à l'exécution ; les autres bibliothèques sont
+détectées par `rpmbuild`. Le champ `License` est calculé par
+`scripts/rpm-license.py` à partir des crates liées sous Linux (`cargo metadata`,
+dépendances de construction et de développement exclues) et des ressources
+embarquées (Inter, Lucide). La date de `%changelog` est celle du dernier commit et
+les notes de version restent dans les métadonnées AppStream.
 
 Après un changement de dépendances, régénérer les notices avant de construire
 (cargo-about 0.9.2 compilé une fois depuis crates.io ; Python 3 est présent sur
@@ -228,6 +255,15 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 | Collection réelle de 7 206 pistes sur NTFS (`ntfs-3g`, 99 dossiers) : 372 surveillances inotify utilisées sur tout le système pour une limite de 557 977 | Vérifié |
 | Google Cast : découverte et lecture sur un appareil Cast | Réussi (essai manuel) |
 | Colonnes de la grille ajustées au redimensionnement, marge de redimensionnement comprise | Réussi (essai manuel) |
+
+Le 28 octobre 2026, paquet RPM dans un conteneur `fedora:44` minimal :
+
+| Vérification | Résultat |
+| --- | --- |
+| `dnf install` du paquet : dépendances résolues, aucune bibliothèque manquante (`ldd`) | Réussi |
+| `rpmlint` 2.8.0 | Aucune erreur ; absence de page de manuel et de documentation signalée |
+| `dnf remove` : fichiers retirés, `~/.local/share/Soliton` conservé | Réussi |
+| Paquet installé sur la machine de développement (Fedora 44, GNOME Wayland) : lanceur, icône, fenêtre associée au dock, panneau média, bibliothèque existante retrouvée | Réussi (essai manuel) ; avertissement attendu de `dnf` pour un paquet local non signé |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.

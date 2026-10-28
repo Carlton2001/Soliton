@@ -15,6 +15,9 @@ pub struct PreparedUpdate {
 
 /// A portable ZIP is updated manually: never install a second copy silently.
 pub fn is_portable() -> io::Result<bool> {
+    if !cfg!(target_os = "windows") {
+        return Ok(false);
+    }
     let exe = std::env::current_exe()?;
     Ok(exe
         .parent()

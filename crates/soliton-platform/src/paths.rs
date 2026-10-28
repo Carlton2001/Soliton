@@ -13,7 +13,10 @@ pub struct AppPaths {
 impl AppPaths {
     pub fn discover() -> Result<Self> {
         let executable = std::env::current_exe()?;
-        if let Some(portable) = portable_directory(&executable) {
+        // Portable mode is a Windows archive feature; Linux installs use XDG paths.
+        if cfg!(target_os = "windows")
+            && let Some(portable) = portable_directory(&executable)
+        {
             return Ok(Self::at(portable));
         }
         let root = dirs::data_local_dir()
