@@ -20,7 +20,7 @@ jobs:
       - name: Install Fedora build dependencies
         run: >-
           dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config
-          alsa-lib-devel libxkbcommon-devel libxkbcommon-x11-devel
+          pipewire-devel clang-devel libxkbcommon-devel libxkbcommon-x11-devel
           freetype-devel fontconfig-devel libxcb-devel wayland-devel
           git rustup
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
