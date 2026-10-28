@@ -705,19 +705,7 @@ impl Render for Soliton {
             crate::widgets::Density::Full
         });
         let content = width_in_rems * f32::from(window.rem_size());
-        // The list measured on the last frame is exact: the estimate from the window
-        // misses decorations such as the resize border drawn by the client on Linux.
-        let measured = match self.section {
-            Section::Albums => Some(&self.album_bar),
-            Section::Artists => Some(&self.facet_bar),
-            _ => None,
-        }
-        .map(|bar| f32::from(bar.handle.bounds().size.width))
-        .filter(|width| *width > 0.);
-        let available = match measured {
-            Some(list) => list - crate::scale::scaled(2. * crate::views::CONTENT_PADDING * 16.),
-            None => content - panel_width - reserved,
-        };
+        let available = content - panel_width - reserved;
         self.columns = ((available + gap) / (tile + gap)).floor().max(1.) as usize;
         let theme = self.theme();
         // Each page has its own search: the text does not follow to another one.

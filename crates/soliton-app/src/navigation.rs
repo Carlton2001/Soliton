@@ -11,7 +11,8 @@ pub const RAIL_WIDTH: f32 = 3.5;
 
 /// Width left to pages beside the rail, in rems.
 pub fn content_width(window: &Window) -> f32 {
-    f32::from(window.viewport_size().width) / f32::from(window.rem_size()) - RAIL_WIDTH
+    let width = window.viewport_size().width - crate::window_chrome::horizontal_inset(window);
+    f32::from(width) / f32::from(window.rem_size()) - RAIL_WIDTH
 }
 
 impl Soliton {

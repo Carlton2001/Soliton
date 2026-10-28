@@ -61,6 +61,18 @@ pub fn drag_region(id: &'static str, window: &mut Window, cx: &mut App) -> State
         })
 }
 
+/// Width taken by the resize margins of `frame` on the left and right.
+pub fn horizontal_inset(window: &Window) -> Pixels {
+    if !cfg!(target_os = "linux") || window.is_fullscreen() || window.is_maximized() {
+        return px(0.);
+    }
+    let Decorations::Client { tiling } = window.window_decorations() else {
+        return px(0.);
+    };
+    let side = |tiled: bool| if tiled { px(0.) } else { RESIZE_BORDER };
+    side(tiling.left) + side(tiling.right)
+}
+
 /// No wrapper or new handlers on Windows. On Linux, a transparent margin carries
 /// the window shadow and the compositor-driven resize zones with their cursors.
 pub fn frame(content: Div, window: &mut Window, theme: Theme) -> Div {
