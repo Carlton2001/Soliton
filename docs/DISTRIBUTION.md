@@ -70,6 +70,7 @@ seule dans les deux modes.
 Sur Fedora avec Rust 1.98.1 et les paquets de [LINUX.md](LINUX.md) :
 
 ```sh
+RUSTUP_TOOLCHAIN=1.98.1 scripts/update-third-party-licenses.sh  # après un changement de dépendances
 RUSTUP_TOOLCHAIN=1.98.1 scripts/build-linux.sh
 ```
 

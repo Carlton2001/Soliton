@@ -6,7 +6,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 inventory=$root/licenses/dependencies/inputs.json
 if [ ! -f "$inventory" ]; then
-    echo "Run scripts/update-third-party-licenses.ps1 first." >&2
+    echo "Run scripts/update-third-party-licenses.sh first." >&2
     exit 1
 fi
 hash() {
@@ -19,7 +19,7 @@ if [ -z "$tracked" ]; then
 fi
 printf '%s\n' "$tracked" | while read -r path expected; do
     if [ ! -f "$root/$path" ] || [ "$(hash "$root/$path")" != "$expected" ]; then
-        echo "Third-party notices are stale: $path. Run scripts/update-third-party-licenses.ps1." >&2
+        echo "Third-party notices are stale: $path. Run scripts/update-third-party-licenses.sh." >&2
         exit 1
     fi
 done

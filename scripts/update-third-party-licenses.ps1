@@ -41,7 +41,7 @@ try {
     [IO.File]::AppendAllText($temporary, $supplement.ToString(), [Text.UTF8Encoding]::new($false))
     Move-Item -LiteralPath $temporary -Destination (Join-Path $destination 'THIRD-PARTY-NOTICES.md') -Force
     $inputs = @('Cargo.lock', 'Cargo.toml', 'about.toml', 'scripts/third-party-notices.hbs', 'scripts/update-third-party-licenses.ps1')
-    $inputs += 'scripts/license-hash.ps1'
+    $inputs += @('scripts/license-hash.ps1', 'scripts/update-third-party-licenses.sh')
     $inputs += @(Get-ChildItem -Path 'crates/*/Cargo.toml', 'vendor/*/Cargo.toml' -File | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
     $inputs += @(Get-ChildItem -LiteralPath 'vendor' -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|LICENCE|NOTICE|NOTICES|COPYRIGHT|AUTHORS)([-_.].*)?$' } | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
     $inputs += @('assets/NOTICE.md', 'assets/icons/LICENSE', 'assets/fonts/Inter-LICENSE.txt', 'assets/fonts/JetBrainsMono-LICENSE.txt', 'assets/GPUI-APACHE-2.0')

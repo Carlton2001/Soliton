@@ -9,8 +9,17 @@ Carlton2001, sous GPL-3.0 (voir le fichier LICENSE à la racine).
 ./scripts/check-third-party-licenses.ps1
 ```
 
+```sh
+cargo install cargo-about --version 0.9.2 --locked --features cli
+scripts/update-third-party-licenses.sh
+scripts/check-third-party-licenses.sh
+```
+
 Le générateur Windows x64 officiel cargo-about 0.9.2 est épinglé et vérifié par
 SHA-256. S'il est déjà installé, seule la commande de mise à jour est nécessaire.
+Sous Linux, cargo-about 0.9.2 est compilé depuis crates.io avec son verrou ;
+`update-third-party-licenses.sh` (sh et Python 3) produit les mêmes notices et le
+même inventaire que la version PowerShell : chaque système peut régénérer.
 La génération utilise Cargo.lock sans le modifier et échoue si une licence ne
 peut pas être résolue. `about.toml` définit les licences admises pour cet inventaire.
 
@@ -34,14 +43,14 @@ sources locales : régénérer aussi après toute modification de leurs notices.
 Les empreintes portent sur le texte UTF-8 avec fins de ligne LF, afin que la
 conversion CRLF de Git sous Windows ne rende pas les notices périmées.
 
-`-Offline` permet une génération avec les sources déjà en cache, mais certaines
+`-Offline` (`--offline` sous Linux) permet une génération avec les sources déjà en cache, mais certaines
 crates mal empaquetées nécessitent des licences récupérées sur leurs dépôts
 amont ; ce mode peut perdre leurs copyrights spécifiques. Préférer le mode en
 ligne pour une livraison. La future distribution devra exécuter la génération
 et la vérification, puis inclure ce dossier et le LICENSE de Soliton.
 
 The commands above generate and verify dependency notices for the entire Soliton
-workspace. The report preserves upstream license texts and supplemental notices;
+workspace, on Windows (PowerShell) or Linux (sh and Python 3) with identical results. The report preserves upstream license texts and supplemental notices;
 `assets/` contains resource licenses and attributions. Regenerate after dependency
 or attribution changes. Prefer online generation for releases. Future packages
 must include this directory and Soliton's root LICENSE.
