@@ -3,16 +3,6 @@
 ## Présentation
 Soliton est un lecteur de musique haute performance écrit en **Rust**, conçu pour gérer de grandes collections de fichiers audio (FLAC, MP3, WAV, etc) avec une interface fluide et réactive. Le projet met l'accent sur la richesse des métadonnées et la rapidité de navigation via une base de données locale.
 
-## Stack Technique
-
-*   **Langage :** Rust
-*   **Interface Graphique (GUI) :** [GPUI](https://github.com/zed-industries/zed), le framework UI de Zed. Version envisagée : `0.2.2`, à valider lors de l'initialisation.
-*   **Moteur Audio :** Codecs via `symphonia` et sortie via `cpal`.
-*   **Base de Données :** `SQLite` (via `rusqlite`) pour la persistance de la bibliothèque.
-*   **Gestion des Métadonnées :** `lofty` pour l'extraction de tags ID3/Vorbis et des pochettes d'albums.
-
-Les versions exactes restent à valider. Une fois le workspace initialisé, les manifestes `Cargo.toml` font référence pour les dépendances déclarées.
-
 ## Références
 
 - [Spécifications de Soliton](docs/SOLITON_SPECIFICATIONS.md) : périmètre fonctionnel, contraintes et phases de développement. Ce fichier `AGENTS.md` porte les consignes de travail ; éviter de dupliquer les spécifications. Signaler les contradictions avant d'implémenter le comportement concerné.
