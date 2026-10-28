@@ -53,6 +53,13 @@ développement et de validation. Silverblue reste à vérifier sur un hôte rée
   (téléchargement et installateur Windows), Bluetooth dédié, notifications
   natives de sorties audio, accent système. Audio exclusif et Flatpak restent hors périmètre ; DLNA/Cast
   sont compilés mais non validés sous Linux.
+- **Surveillance** : inotify sur chaque dossier des sources. Si la limite du
+  système (`fs.inotify.max_user_watches`) empêche de surveiller toute une
+  source, ses surveillances partielles sont retirées : elle n'est couverte que
+  par les analyses (démarrage, toutes les 30 min, rafraîchissement), un
+  avertissement est journalisé et la surveillance est retentée après chaque
+  analyse. Une limite atteinte en cours de route (nouveau dossier) déclenche une
+  analyse complète.
 - **Sources** : un dossier démonté garde ses albums, signalés indisponibles et
   masqués par défaut ; remonté, il réapparaît en quelques secondes sans
   rafraîchissement (sonde des sources hors ligne toutes les 5 s).
@@ -115,19 +122,27 @@ cargo +1.98.1 run -p soliton-app --bin Soliton-index --locked -- \
   "$SOLITON_DATA_DIR" /chemin/vers/une/collection-de-test
 ```
 
-Tests explicites sur une session de bureau (volume nul pour l'audio ; les deux derniers créent un sink PipeWire muet temporaire) :
+Tests explicites sur une session de bureau (volume nul pour l'audio) :
 
 ```sh
 cargo +1.98.1 test -p soliton-audio native_output -- --ignored
 cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
 cargo +1.98.1 test -p soliton-audio chosen_sink -- --ignored
 cargo +1.98.1 test -p soliton-audio engine_pauses -- --ignored
+cargo +1.98.1 test -p soliton-audio default_following -- --ignored
 cargo +1.98.1 test -p soliton-platform session_bus -- --ignored
+cargo +1.98.1 test -p soliton-library watch_limit -- --ignored
 cargo +1.98.1 test -p soliton-app remounted_source -- --ignored
 ```
 
-Le dernier renomme puis rétablit un dossier source temporaire et attend son
-retour sans analyse manuelle (environ 5 s).
+`chosen_sink`, `engine_pauses` et `default_following` créent un sink PipeWire
+muet temporaire. `default_following` en fait brièvement la sortie par défaut du
+système (`pw-metadata`, paquet `pipewire-utils`) : les autres applications y
+passent pendant environ une seconde, puis la sortie configurée est rétablie,
+même en cas d'échec. `watch_limit` se relance dans un espace de noms
+utilisateur (`unshare`) dont la limite inotify est abaissée, sans toucher à
+celle du système. `remounted_source` renomme puis rétablit un dossier source
+temporaire et attend son retour sans analyse manuelle (environ 5 s).
 
 ## Construire l'archive
 
@@ -182,24 +197,28 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 | Vérification | Résultat |
 | --- | --- |
 | Format, `cargo check` et `cargo clippy` du workspace sans avertissement | Réussis |
-| Suite de tests du workspace | Réussie, 8 tests natifs ignorés par défaut |
+| Suite de tests du workspace | Réussie, 10 tests natifs ignorés par défaut |
 | Tests natifs : lecture/pause/seek/suivant/arrêt et sélection explicite sur PipeWire, préférence indisponible sans repli, MPRIS | Réussis |
 | Test natif : sink temporaire choisi, lié, puis retiré ; échec signalé sans déplacement vers une autre sortie | Réussi |
 | Test natif du moteur : pause à la perte du sink choisi, reprise sur la sortie par défaut, retour au sink recréé | Réussi |
-| `soliton-audio` pour `x86_64-pc-windows-msvc` (`cargo xwin check`, tests compris) | Réussi |
+| `soliton-audio` et `soliton-library` pour `x86_64-pc-windows-msvc` (`cargo xwin check`, tests compris) | Réussi |
 | Restauration de la taille et de l'état agrandi sous Wayland | Réussie après correctif |
 | Binaire lié à `libpipewire-0.3`, plus à `libasound` (`ldd`) | Vérifié |
 | Choix d'un casque Bluetooth dans Soliton, son extinction (pause, avertissement, reprise sur la sortie par défaut) et son retour | Réussis (essai manuel) |
 | Démontage d'une source : albums indisponibles ; remontage : retour sans rafraîchissement (test explicite et correctif) | Réussis |
 | Notices régénérées par `update-third-party-licenses.sh`, identiques octet pour octet à la génération Windows sur le même verrou | Vérifié |
 | `build-linux.sh` : vérification des licences, build release, archive et empreinte | Réussi |
+| Rendu GPUI accéléré : Blade sur l'adaptateur Vulkan « Intel(R) Graphics (RPL-S) », présentation MAILBOX, sans avertissement | Vérifié |
+| Test natif : lecture sans sortie choisie déplacée vers une nouvelle sortie par défaut du système puis ramenée, sans pause ni repli, sortie affichée suivie | Réussi |
+| Limite inotify atteinte (espace de noms utilisateur, limite 8) : surveillances partielles retirées, quota rendu à une autre source (test et correctif) | Réussis |
+| Collection réelle de 7 206 pistes sur NTFS (`ntfs-3g`, 99 dossiers) : 372 surveillances inotify utilisées sur tout le système pour une limite de 557 977 | Vérifié |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
 
-À vérifier encore sur matériel réel : accélération GPU, interactions manuelles de
+À vérifier encore sur matériel réel : interactions manuelles de
 la barre de titre et du redimensionnement sous Wayland, panneau média et touches
-multimédias GNOME, rafraîchissement de l'icône du lanceur, portail de choix de dossiers, quotas
-inotify, changement de sortie
-dans GNOME pendant la lecture, Silverblue (binaire de l'archive sur l'hôte,
+multimédias GNOME, rafraîchissement de l'icône du lanceur, portail de choix de
+dossiers, changement de sortie depuis les paramètres Son de GNOME pendant la
+lecture, Silverblue (binaire de l'archive sur l'hôte,
 `ldd`).

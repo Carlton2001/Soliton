@@ -60,7 +60,8 @@ impl SourceWatcher {
 
     /// Watches available sources and stops watching the others. Call only with
     /// sources just confirmed reachable: registering an offline share may block.
-    /// Returns per-source failures; scans still cover those sources.
+    /// Returns per-source failures; scans still cover those sources, and the next
+    /// call tries again.
     pub fn sync(&mut self, sources: &[Source]) -> Vec<String> {
         let mut errors = Vec::new();
         let wanted: HashMap<_, _> = sources
@@ -83,7 +84,13 @@ impl SourceWatcher {
                 Ok(()) => {
                     self.watched.insert(id, path.clone());
                 }
-                Err(error) => errors.push(format!("{}: {error}", path.display())),
+                Err(error) => {
+                    // A recursive watch stopped by the system limit keeps the
+                    // folders already registered: only some changes would be
+                    // noticed, and the quota stays taken from other applications.
+                    let _ = self.inner.unwatch(path);
+                    errors.push(format!("{}: {error}", path.display()));
+                }
             }
         }
         errors

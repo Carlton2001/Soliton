@@ -106,3 +106,54 @@ fn native_watcher_observes_files_before_and_after_source_reactivation() {
     std::fs::write(&second, b"synthetic watcher fixture").unwrap();
     await_path(&second);
 }
+
+/// Reruns itself in a user namespace with a lowered inotify limit, so the
+/// limit is reached without changing the system's.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "Needs unprivileged user namespaces; reruns itself under unshare"]
+fn watch_limit_releases_partial_watches() {
+    const CHILD: &str = "SOLITON_WATCH_LIMIT_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new("unshare")
+            .args(["-Ur", "sh", "-c"])
+            .arg(r#"echo 8 > /proc/sys/user/max_inotify_watches && exec "$0" "$@""#)
+            .arg(std::env::current_exe().unwrap())
+            .args(["--exact", "--ignored", "--nocapture"])
+            .arg("watch::tests::watch_limit_releases_partial_watches")
+            .env(CHILD, "1")
+            .status()
+            .expect("unshare from util-linux");
+        assert!(status.success());
+        return;
+    }
+    let source = |id, folders| {
+        let directory = tempfile::tempdir().unwrap();
+        for folder in 0..folders {
+            std::fs::create_dir(directory.path().join(format!("{folder:02}"))).unwrap();
+        }
+        let source = Source {
+            id,
+            path: directory.path().canonicalize().unwrap(),
+            available: true,
+        };
+        (directory, source)
+    };
+    let (_large_dir, large) = source(1, 20);
+    let (_small_dir, small) = source(2, 3);
+    let (sender, events) = crossbeam_channel::bounded(256);
+    let mut watcher = SourceWatcher::new(sender).unwrap();
+    let errors = watcher.sync(std::slice::from_ref(&large));
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    // The large source is left to scans: none of its folders is still watched.
+    std::fs::write(large.path.join("00/large.wav"), b"x").unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(events.try_iter().next().is_none());
+    // Its released quota covers the small source, while the large one is retried.
+    let both = [large.clone(), small.clone()];
+    assert_eq!(watcher.sync(&both).len(), 1);
+    let file = small.path.join("02/small.wav");
+    std::fs::write(&file, b"x").unwrap();
+    let event = events.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(matches!(event, WatchEvent::Paths(paths) if paths.contains(&file)));
+}

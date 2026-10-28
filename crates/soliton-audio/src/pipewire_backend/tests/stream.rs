@@ -152,3 +152,98 @@ fn engine_pauses_on_sink_loss_resumes_on_the_default_and_returns_to_the_sink() {
     wait("stop", &|p| p.state == PlaybackState::Stopped);
     sink.remove();
 }
+
+const DEFAULT_KEY: &str = "default.configured.audio.sink";
+
+/// The configured default sink, restored on drop even when the test fails:
+/// WirePlumber persists it as the user's choice.
+struct ConfiguredDefault(Option<String>);
+
+impl ConfiguredDefault {
+    fn replace(name: &str) -> Self {
+        let output = std::process::Command::new("pw-metadata")
+            .args(["0", DEFAULT_KEY])
+            .output()
+            .expect("pw-metadata from pipewire-utils");
+        let listing = String::from_utf8_lossy(&output.stdout);
+        let original = listing.lines().find_map(|line| {
+            let value = line.split_once("value:'")?.1;
+            Some(value.rsplit_once("' type:")?.0.to_owned())
+        });
+        let saved = Self(original);
+        set_default(Some(&format!(r#"{{ "name": "{name}" }}"#)));
+        saved
+    }
+}
+
+impl Drop for ConfiguredDefault {
+    fn drop(&mut self) {
+        set_default(self.0.as_deref());
+    }
+}
+
+fn set_default(value: Option<&str>) {
+    let mut command = std::process::Command::new("pw-metadata");
+    match value {
+        Some(value) => command.args(["0", DEFAULT_KEY, value, "Spa:String:JSON"]),
+        None => command.args(["-d", "0", DEFAULT_KEY]),
+    };
+    assert!(command.output().unwrap().status.success());
+}
+
+#[test]
+#[ignore = "Requires a PipeWire session; briefly makes a temporary silent sink the system default"]
+fn default_following_playback_moves_with_the_system_default() {
+    use crate::{Command, Engine, Playback, PlaybackState};
+    let name = format!("soliton-test-default-{}", std::process::id());
+    let sink = NullSink::create(&name);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fixture.wav");
+    crate::test_support::wav(&path, 44100, 20);
+    let engine = Engine::start(0., None).unwrap();
+    let wait = |what: &str, predicate: &dyn Fn(&Playback) -> bool| {
+        let start = Instant::now();
+        loop {
+            assert!(start.elapsed() < Duration::from_secs(8), "{what} timed out");
+            let value = engine.events.recv_timeout(Duration::from_secs(2)).unwrap();
+            assert_ne!(value.state, PlaybackState::Failed, "{:?}", value.error);
+            if predicate(&value) {
+                return value;
+            }
+        }
+    };
+    let on = |p: &Playback, sink: &str| p.output.as_ref().is_some_and(|o| o.device_name == sink);
+    wait("listed sink", &|p| p.outputs.iter().any(|o| o.name == name));
+    engine
+        .send(Command::Play {
+            tracks: vec![soliton_core::model::Track {
+                id: 1,
+                source_id: 1,
+                path,
+                metadata: Default::default(),
+                cover: None,
+                available: true,
+            }],
+            start: 0,
+        })
+        .unwrap();
+    let before = wait("playback on the default", &|p| {
+        p.state == PlaybackState::Playing
+            && p.position_ms > 200
+            && p.output.as_ref().is_some_and(|o| !o.device_name.is_empty())
+    });
+    let original = before.output.unwrap().device_name;
+    assert_ne!(original, name);
+    let configured = ConfiguredDefault::replace(&name);
+    let moved = wait("move to the new default", &|p| on(p, &name));
+    assert_eq!(moved.state, PlaybackState::Playing);
+    assert!(!moved.fallback && moved.interruption.is_none());
+    assert_eq!(moved.selected_output, None);
+    drop(configured);
+    let back = wait("return to the restored default", &|p| on(p, &original));
+    assert_eq!(back.state, PlaybackState::Playing);
+    assert!(back.position_ms > moved.position_ms);
+    engine.send(Command::Stop).unwrap();
+    wait("stop", &|p| p.state == PlaybackState::Stopped);
+    sink.remove();
+}
