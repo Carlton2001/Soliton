@@ -4,9 +4,7 @@ use crate::{
     app::{Section, Soliton},
     catalog::{Period, Quality},
     i18n::{Text, decade},
-    widgets::{
-        CONTROL_HEIGHT, RADIUS, button, menu_item, nav_item, popover, tinted_icon, toggle_button,
-    },
+    widgets::{button, menu_item, nav_item, popover, tinted_icon, toggle_button},
 };
 use gpui::{prelude::*, *};
 use soliton_core::{config::AlbumSort, text::fold};
@@ -185,7 +183,7 @@ impl Soliton {
                 toggle_button(
                     "filters",
                     "tag",
-                    self.t(Text::Filters),
+                    self.filters_label(),
                     open || self.filter.active(),
                     self.theme(),
                 )
@@ -204,44 +202,16 @@ impl Soliton {
             })
     }
 
-    /// Removable active filters and a reset, shown only while filtering.
-    pub fn filter_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme();
-        let active = self.filter.active();
-        div()
-            .flex()
-            .flex_wrap()
-            .gap(rems(0.5))
-            .items_center()
-            .children(FilterKind::ALL.into_iter().filter_map(|kind| {
-                let value = self.current(kind)?;
-                Some(
-                    div()
-                        .id(("chip", kind as usize))
-                        .h(CONTROL_HEIGHT)
-                        .flex()
-                        .items_center()
-                        .gap(rems(0.375))
-                        .pl(rems(0.75))
-                        .pr(rems(0.5))
-                        .rounded(RADIUS)
-                        .border_1()
-                        .border_color(theme.accent)
-                        .bg(theme.selected)
-                        .text_color(theme.accent)
-                        .hover(move |s| s.bg(theme.hover))
-                        .active(move |s| s.bg(theme.pressed))
-                        .child(self.labelled(self.t(kind.label()), &value))
-                        .child(tinted_icon("x", theme.accent))
-                        .on_click(cx.listener(move |this, _, _, cx| this.apply(kind, None, cx))),
-                )
-            }))
-            .when(active, |bar| {
-                bar.child(
-                    button("clear", "x", self.t(Text::Clear), theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.clear(cx))),
-                )
-            })
+    /// Filters button label, with the number of active filters.
+    fn filters_label(&self) -> SharedString {
+        let count = FilterKind::ALL
+            .into_iter()
+            .filter(|&kind| self.current(kind).is_some())
+            .count();
+        match count {
+            0 => self.t(Text::Filters).into(),
+            n => format!("{} ({n})", self.t(Text::Filters)).into(),
+        }
     }
 
     pub fn sort_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -361,6 +331,14 @@ impl Soliton {
                     cx.listener(move |this, _, _, cx| this.open_menu(Menu::Filters(kind), cx)),
                 )
             }))
+            // Resetting stays in the menu, at the foot of the filter kinds.
+            .when(self.filter.active(), |column| {
+                column.child(
+                    button("clear", "x", self.t(Text::Clear), theme)
+                        .mt_auto()
+                        .on_click(cx.listener(|this, _, _, cx| this.clear(cx))),
+                )
+            })
     }
 
     fn values_column(&self, kind: FilterKind, cx: &mut Context<Self>) -> impl IntoElement {

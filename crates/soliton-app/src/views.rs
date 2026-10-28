@@ -34,6 +34,11 @@ impl Soliton {
 
     /// Name of the current section, below the title bar and above its toolbar.
     pub fn page_title(&self, label: Text, cx: &App) -> Div {
+        self.page_heading(self.t(label).into(), cx)
+    }
+
+    /// Page title with free text, such as the artist whose albums are listed.
+    pub fn page_heading(&self, label: SharedString, cx: &App) -> Div {
         let title_font = Font {
             weight: FontWeight::SEMIBOLD,
             ..font("Inter")
@@ -75,7 +80,8 @@ impl Soliton {
             .text_size(crate::widgets::TEXT_DISPLAY)
             .line_height(line_height)
             .font(title_font)
-            .child(self.t(label))
+            .truncate()
+            .child(label)
     }
 
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -139,9 +145,6 @@ impl Soliton {
                         )
                     }),
             )
-            .when(albums && self.filter.active(), |view| {
-                view.child(self.filter_bar(cx))
-            })
     }
     fn empty_state(
         &self,
