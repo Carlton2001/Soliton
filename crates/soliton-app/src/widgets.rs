@@ -635,16 +635,20 @@ pub fn list_box(rows: impl IntoIterator<Item = AnyElement>, theme: Theme) -> Div
 struct Tip(Rc<dyn Fn(&App) -> SharedString>, Theme);
 impl Render for Tip {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .px(rems(0.5))
-            .py(rems(0.25))
-            .rounded(RADIUS)
-            .border_1()
-            .border_color(self.1.control_border)
-            .bg(self.1.panel)
-            .text_color(self.1.text)
-            .text_size(TEXT_SMALL)
-            .child((self.0)(cx))
+        // GPUI places tooltips one pixel from the pointer tip: a transparent
+        // margin puts them below the pointer, like system tooltips.
+        div().pt(px(20.)).child(
+            div()
+                .px(rems(0.5))
+                .py(rems(0.25))
+                .rounded(RADIUS)
+                .border_1()
+                .border_color(self.1.control_border)
+                .bg(self.1.panel)
+                .text_color(self.1.text)
+                .text_size(TEXT_SMALL)
+                .child((self.0)(cx)),
+        )
     }
 }
 
