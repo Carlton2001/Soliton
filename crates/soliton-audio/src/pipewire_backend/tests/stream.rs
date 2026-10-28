@@ -239,11 +239,15 @@ fn default_following_playback_moves_with_the_system_default() {
     assert_eq!(moved.state, PlaybackState::Playing);
     assert!(!moved.fallback && moved.interruption.is_none());
     assert_eq!(moved.selected_output, None);
+    // A lost default, like a headset turned off, is replaced by the next one.
+    sink.remove();
+    let replaced = wait("move to the next default", &|p| {
+        assert_eq!(p.state, PlaybackState::Playing, "{:?}", p.interruption);
+        on(p, &original)
+    });
+    assert!(replaced.interruption.is_none());
+    assert!(replaced.position_ms > moved.position_ms);
     drop(configured);
-    let back = wait("return to the restored default", &|p| on(p, &original));
-    assert_eq!(back.state, PlaybackState::Playing);
-    assert!(back.position_ms > moved.position_ms);
     engine.send(Command::Stop).unwrap();
     wait("stop", &|p| p.state == PlaybackState::Stopped);
-    sink.remove();
 }

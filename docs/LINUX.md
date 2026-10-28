@@ -26,7 +26,9 @@ développement et de validation. Silverblue reste à vérifier sur un hôte rée
   sinks PipeWire (nom du nœud persisté, description affichée, icône Bluetooth
   pour les appareils `bluez5`), suivis en direct par le registre : un casque
   appairé apparaît aussitôt, sans sondage. « Périphérique système par défaut »
-  suit immédiatement la sortie choisie dans les paramètres Son. Une sortie
+  suit immédiatement la sortie choisie dans les paramètres Son ; si cette sortie
+  disparaît en erreur (casque Bluetooth éteint), le flux est rouvert sur la
+  nouvelle sortie par défaut sans pause. Une sortie
   choisie est ciblée par `target.object` avec `node.dont-reconnect` et
   `node.dont-fallback` : PipeWire ne la remplace jamais. Sa disparition met la
   lecture en pause, avec un avertissement jusqu'à la reprise ; la reprise joue
@@ -130,6 +132,7 @@ cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
 cargo +1.98.1 test -p soliton-audio chosen_sink -- --ignored
 cargo +1.98.1 test -p soliton-audio engine_pauses -- --ignored
 cargo +1.98.1 test -p soliton-audio default_following -- --ignored
+cargo +1.98.1 test -p soliton-audio default_output_loss -- --ignored
 cargo +1.98.1 test -p soliton-platform session_bus -- --ignored
 cargo +1.98.1 test -p soliton-library watch_limit -- --ignored
 cargo +1.98.1 test -p soliton-app remounted_source -- --ignored
@@ -197,7 +200,7 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 | Vérification | Résultat |
 | --- | --- |
 | Format, `cargo check` et `cargo clippy` du workspace sans avertissement | Réussis |
-| Suite de tests du workspace | Réussie, 10 tests natifs ignorés par défaut |
+| Suite de tests du workspace | Réussie, 11 tests natifs ignorés par défaut |
 | Tests natifs : lecture/pause/seek/suivant/arrêt et sélection explicite sur PipeWire, préférence indisponible sans repli, MPRIS | Réussis |
 | Test natif : sink temporaire choisi, lié, puis retiré ; échec signalé sans déplacement vers une autre sortie | Réussi |
 | Test natif du moteur : pause à la perte du sink choisi, reprise sur la sortie par défaut, retour au sink recréé | Réussi |
@@ -211,14 +214,17 @@ Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
 | Rendu GPUI accéléré : Blade sur l'adaptateur Vulkan « Intel(R) Graphics (RPL-S) », présentation MAILBOX, sans avertissement | Vérifié |
 | Test natif : lecture sans sortie choisie déplacée vers une nouvelle sortie par défaut du système puis ramenée, sans pause ni repli, sortie affichée suivie | Réussi |
 | Limite inotify atteinte (espace de noms utilisateur, limite 8) : surveillances partielles retirées, quota rendu à une autre source (test et correctif) | Réussis |
+| Interactions de la barre de titre (déplacement, double-clic, boutons) et redimensionnement sous Wayland | Réussis (essais manuels) |
+| Panneau média et touches multimédias GNOME | Réussis (essais manuels) |
+| Portail de choix de dossiers à l'ajout d'une source | Réussi (essai manuel) |
+| Icône du lanceur suivant la palette (copie installée) | Réussie (essai manuel) |
+| Sortie par défaut : casque Bluetooth allumé, la lecture le suit ; casque éteint, elle se mettait en pause | Défaut corrigé (reprise sur la nouvelle sortie par défaut), à confirmer |
+| Test natif du moteur : perte de la sortie par défaut, session rouverte sur la nouvelle sans pause ni avertissement, position gardée | Réussi |
 | Collection réelle de 7 206 pistes sur NTFS (`ntfs-3g`, 99 dossiers) : 372 surveillances inotify utilisées sur tout le système pour une limite de 557 977 | Vérifié |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
 
-À vérifier encore sur matériel réel : interactions manuelles de
-la barre de titre et du redimensionnement sous Wayland, panneau média et touches
-multimédias GNOME, rafraîchissement de l'icône du lanceur, portail de choix de
-dossiers, changement de sortie depuis les paramètres Son de GNOME pendant la
-lecture, Silverblue (binaire de l'archive sur l'hôte,
+À vérifier encore : extinction du casque Bluetooth avec « Périphérique système
+par défaut » après correctif, Silverblue (binaire de l'archive sur l'hôte,
 `ldd`).

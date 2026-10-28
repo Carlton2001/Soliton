@@ -143,10 +143,13 @@ Ces règles restent en vigueur pour toute évolution.
 - Sortie partagée locale (`cpal`, PipeWire sous Linux), sélection persistée,
   changement sans perte de piste ni de position, aucun repli silencieux vers une
   autre sortie.
-- Sortie perdue ou absente : pause à la même position et avertissement affiché
-  jusqu'à la reprise. Si une sortie avait été choisie, la reprise se fait sur la
-  sortie système par défaut ; Soliton revient sur la sortie choisie dès qu'elle
-  réapparaît, sans changer la préférence enregistrée.
+- Avec « Périphérique système par défaut », une sortie perdue (casque éteint)
+  laisse la lecture continuer sur la nouvelle sortie par défaut du système ;
+  pause seulement si aucune ne s'ouvre.
+- Sortie choisie perdue ou absente : pause à la même position et avertissement
+  affiché jusqu'à la reprise. La reprise se fait sur la sortie système par
+  défaut ; Soliton revient sur la sortie choisie dès qu'elle réapparaît, sans
+  changer la préférence enregistrée.
 - Linux : sinks PipeWire listés en direct, Bluetooth compris ; la sortie système
   par défaut suit les paramètres Son. Jamais de carte ALSA brute.
 - Bluetooth via les paramètres Windows et les sorties exposées par le système.

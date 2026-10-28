@@ -28,6 +28,11 @@ compilée pour Windows depuis Linux (shaders GPUI, `aws-lc-sys`).
 - **Perte de sortie** (commun à Windows) : la lecture passe en pause au lieu de
   l'état d'échec ; la reprise utilise la sortie par défaut, puis Soliton revient
   sur la sortie choisie quand l'énumération la montre de nouveau.
+- **Perte de la sortie par défaut** (commun à Windows) : avec « Périphérique
+  système par défaut », une sortie perdue ne met plus en pause ; le moteur
+  rouvre aussitôt la session sur la nouvelle sortie par défaut de Windows, à la
+  même position. Pause seulement si aucune ne s'ouvre ou si le flux perdu
+  n'avait jamais tourné.
 - **Restauration de la fenêtre** : sans écran connu à l'ouverture, la position
   enregistrée est reprise sans contrôle. Windows connaît ses écrans dès
   l'ouverture : le contrôle s'applique toujours.
@@ -102,6 +107,10 @@ Paramètres :
   format affiché et l'infobulle de sortie du lecteur nomment ce périphérique.
 - [ ] Le texte sous la liste reste « Le choix système par défaut s'applique au
   démarrage d'une piste… ».
+- [ ] Avec « Périphérique système par défaut », débrancher ou éteindre la sortie
+  par défaut (casque USB ou Bluetooth) pendant la lecture la fait continuer sans
+  pause sur la nouvelle sortie par défaut de Windows, sans avertissement.
+  `cargo test -p soliton-audio default_output_loss -- --ignored` réussit.
 - [ ] Une sortie choisie puis débranchée met la lecture en pause, avec
   l'avertissement « Lecture en pause » au-dessus de la barre de lecture. La
   reprise joue sur la sortie par défaut ; rebrancher la sortie y ramène la

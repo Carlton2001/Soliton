@@ -384,6 +384,56 @@ fn unavailable_preference_pauses_then_resumes_on_the_default_and_output_loss_pau
 }
 
 #[test]
+#[ignore = "Requires a native output device; run explicitly with volume zero"]
+fn default_output_loss_goes_on_with_the_next_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fixture.wav");
+    support::wav(&path, 44100, 5);
+    let mut worker = Worker {
+        playback: Playback {
+            volume: 0.,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    worker
+        .command(Command::Play {
+            tracks: vec![soliton_core::model::Track {
+                id: 1,
+                source_id: 1,
+                path,
+                metadata: Default::default(),
+                cover: None,
+                available: true,
+            }],
+            start: 0,
+        })
+        .unwrap();
+    for _ in 0..15 {
+        worker.pump().unwrap();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let position = worker.playback.position_ms;
+    assert!(position > 0);
+    // Simulate the callback's disconnect signal without changing system devices.
+    worker
+        .session
+        .as_ref()
+        .unwrap()
+        .output
+        .failed
+        .store(true, Ordering::Relaxed);
+    worker.pump().unwrap();
+    assert_eq!(worker.playback.state, PlaybackState::Playing);
+    assert!(worker.playback.interruption.is_none());
+    assert!(worker.playback.output.is_some());
+    assert!(worker.playback.position_ms.abs_diff(position) < 200);
+    let session = worker.session.as_ref().unwrap();
+    assert!(!session.output.failed.load(Ordering::Relaxed));
+    worker.command(Command::Stop).unwrap();
+}
+
+#[test]
 fn a_missing_output_pauses_at_the_position_and_its_return_ends_the_fallback() {
     let track = soliton_core::model::Track {
         id: 1,

@@ -507,33 +507,42 @@ impl Worker {
         if self.playback.network_output.is_some() {
             return self.select_local(selected);
         }
-        if let Some(current) = &self.session {
-            let track = self
-                .playback
-                .track
-                .as_ref()
-                .expect("Active session has a track");
-            let reader = Reader::open(&track.path)?;
-            let mut session =
-                Session::open(reader, self.playback.volume, selected.as_deref(), None)?;
-            // Slow device opening must not rewind the audio consumed meanwhile.
-            // Pause only once the replacement is ready, then sample the position.
-            let active = current.output.playing.swap(false, Ordering::Relaxed);
-            let position = current.base_ms + current.output.position_ms();
-            match session.reader.seek(position) {
-                Ok(base_ms) => session.base_ms = base_ms,
-                Err(error) => {
-                    current.output.playing.store(active, Ordering::Relaxed);
-                    return Err(error);
-                }
-            }
-            self.playback.position_ms = session.base_ms;
-            self.playback.output = Some(session.output.info());
-            self.session = Some(session);
+        if self.session.is_some() {
+            self.replace_output(selected.as_deref())?;
         } else if let Some(name) = &selected {
             crate::backend::check(name)?;
         }
         self.playback.selected_output = selected;
+        Ok(())
+    }
+
+    /// Moves the active session to `target`, at the position played so far;
+    /// a failure keeps the current stream.
+    fn replace_output(&mut self, target: Option<&str>) -> Result<()> {
+        let Some(current) = &self.session else {
+            return Ok(());
+        };
+        let track = self
+            .playback
+            .track
+            .as_ref()
+            .expect("Active session has a track");
+        let reader = Reader::open(&track.path)?;
+        let mut session = Session::open(reader, self.playback.volume, target, None)?;
+        // Slow device opening must not rewind the audio consumed meanwhile.
+        // Pause only once the replacement is ready, then sample the position.
+        let active = current.output.playing.swap(false, Ordering::Relaxed);
+        let position = current.base_ms + current.output.position_ms();
+        match session.reader.seek(position) {
+            Ok(base_ms) => session.base_ms = base_ms,
+            Err(error) => {
+                current.output.playing.store(active, Ordering::Relaxed);
+                return Err(error);
+            }
+        }
+        self.playback.position_ms = session.base_ms;
+        self.playback.output = Some(session.output.info());
+        self.session = Some(session);
         Ok(())
     }
 
@@ -574,11 +583,15 @@ impl Worker {
         if self.remote_generation.is_some() {
             return Ok(());
         }
-        let Some(session) = self.session.as_mut() else {
-            return Ok(());
-        };
-        if session.output.failed.load(Ordering::Relaxed) {
-            let label = session.output.info().device_label;
+        if let Some(session) = &self.session
+            && session.output.failed.load(Ordering::Relaxed)
+            && !self.follow_default()
+        {
+            let label = self
+                .session
+                .as_ref()
+                .map(|session| session.output.info().device_label)
+                .unwrap_or_default();
             return Err(if label.is_empty() {
                 Failure::new(Kind::OutputDisconnected)
             } else {
@@ -586,6 +599,9 @@ impl Worker {
             }
             .into());
         }
+        let Some(session) = self.session.as_mut() else {
+            return Ok(());
+        };
         if self.playback.state != PlaybackState::Playing {
             return Ok(());
         }

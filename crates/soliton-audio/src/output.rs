@@ -75,6 +75,11 @@ impl Output {
         info
     }
 
+    /// Whether the device has called back at least once.
+    pub fn ran(&self) -> bool {
+        self.callbacks.load(Ordering::Relaxed) > 0
+    }
+
     pub fn position_ms(&self) -> u64 {
         self.played.load(Ordering::Relaxed) * 1000 / self.rate as u64
     }

@@ -106,11 +106,13 @@ direct par le registre. Identifiants ambigus non sélectionnables. `None` =
 périphérique par défaut, résolu à chaque ouverture sous CPAL, suivi en continu
 par PipeWire. Un changement
 prépare la nouvelle session avant de remplacer l'ancienne ; un échec la conserve.
-Une sortie perdue ou absente met en pause à la même position (`interruption`,
-effacée à la reprise) ; si une sortie avait été choisie, les flux s'ouvrent sur
-la sortie par défaut (`fallback`) jusqu'à ce que la liste la montre de nouveau,
-puis la session y revient. Jamais de lecture sur une autre sortie sans action
-de l'utilisateur.
+Avec `None`, une sortie perdue est remplacée aussitôt par une session sur la
+nouvelle sortie par défaut, à la position jouée, si le flux perdu avait tourné
+(un défaut qui échoue en boucle met en pause). Une sortie choisie perdue ou
+absente met en pause à la même position (`interruption`, effacée à la reprise) ;
+les flux s'ouvrent ensuite sur la sortie par défaut (`fallback`) jusqu'à ce que
+la liste la montre de nouveau, puis la session y revient. Jamais de lecture sur
+une autre sortie que la sortie choisie sans action de l'utilisateur.
 
 **Bluetooth.** Énumération Windows (Devices Enumeration, Bluetooth, Media Devices)
 hors thread UI ; association aux sorties par identifiant de conteneur, sans

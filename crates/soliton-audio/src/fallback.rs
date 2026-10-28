@@ -1,6 +1,7 @@
-//! Lost or missing local outputs. Playback pauses where it was and never moves
-//! to another output by itself: resuming plays on the system default until the
-//! chosen output is listed again, then playback returns to it.
+//! Lost or missing local outputs. Following the system default, playback goes
+//! on with the next default. A chosen output is never replaced by itself:
+//! playback pauses where it was, resuming plays on the system default until
+//! the chosen output is listed again, then playback returns to it.
 use super::*;
 
 impl Worker {
@@ -11,6 +12,20 @@ impl Worker {
         } else {
             self.playback.selected_output.as_deref()
         }
+    }
+
+    /// With the system default chosen, a lost output (a headset turned off) is
+    /// replaced by the next default without pausing. `false` when none opens,
+    /// or when the lost stream never ran, so a failing default cannot loop.
+    pub(super) fn follow_default(&mut self) -> bool {
+        let ran = self
+            .session
+            .as_ref()
+            .is_some_and(|session| session.output.ran());
+        ran && self.playback.selected_output.is_none()
+            && self.playback.network_output.is_none()
+            && self.remote_generation.is_none()
+            && self.replace_output(None).is_ok()
     }
 
     /// Pauses at the current position on local output failures; `false`, and
