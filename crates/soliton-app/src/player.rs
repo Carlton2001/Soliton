@@ -322,7 +322,7 @@ impl Soliton {
                 .top(rems(if compact { 0.375 } else { 0.5 }))
                 .when(compact, |button| button.size(rems(1.75)))
                 .on_click(cx.listener(|this, _, window, cx| {
-                    this.focus.focus(window);
+                    this.leave_listening(window);
                     this.navigate(crate::app::Section::Queue, cx);
                 })),
             )

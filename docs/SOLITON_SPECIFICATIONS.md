@@ -101,8 +101,8 @@ Ces règles restent en vigueur pour toute évolution.
   `Alt+←/→` parcourent l'historique. Chaque section principale affiche son titre
   sous la barre de titre compacte et au-dessus de ses contrôles ; la barre de titre
   reste indépendante, haute de 32 pixels logiques avec des symboles système de
-  12 pixels logiques. Les fiches (album, playlist) et « Lecture en cours »
-  gardent leur propre en-tête.
+  12 pixels logiques. Les fiches (album, playlist) gardent leur propre en-tête ;
+  « Lecture en cours » n'en a pas.
 - Barre de titre, navigation et lecteur partagent le fond de l'application. Un trait
   sépare la navigation, le lecteur et l'en-tête de chaque page du contenu.
   Recherche à gauche des contrôles de tri ; Grille/Liste à droite, sur la même
@@ -118,7 +118,10 @@ Ces règles restent en vigueur pour toute évolution.
 - Lecteur : progression au-dessus ; pochette et métadonnées à gauche ; Aléatoire,
   Précédent, Lecture/Pause (centré), Suivant, Répéter, File ; volume à droite,
   dans un panneau en fenêtre étroite. « Lecture en cours » par le bouton Agrandir,
-  fermée par Échap. F11 : plein écran de la page active.
+  qui devient Réduire pour la fermer, comme Échap ; pochette et métadonnées
+  réunies dans un cartouche. F11 : plein écran d'écoute, le cartouche seul avec
+  progression et commandes de lecture ; Échap, F11 ou son bouton Réduire en
+  sortent, comme les liens artiste, album et File.
 - Thèmes clair, sombre et système, accent configurable, système de design centralisé.
 - Icône : onde continue sur carré arrondi, six palettes au choix (Graphite et
   menthe par défaut), appliquée sans redémarrage, indépendante du thème. Titre de

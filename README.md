@@ -64,7 +64,7 @@ For release builds, Windows packaging, and update behavior, see the [distributio
 | Seek backward / forward 10 seconds | Ctrl + Left / Right |
 | Adjust volume | Ctrl + Up / Down |
 | Navigate history | Alt + Left / Right |
-| Fullscreen | F11 |
+| Full screen listening view | F11 |
 | Go back | Escape |
 | Navigate / activate controls | Tab / Enter |
 

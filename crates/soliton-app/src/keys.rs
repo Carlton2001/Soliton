@@ -61,8 +61,10 @@ impl Soliton {
             }
             return;
         }
+        // The full screen listening mode hides the library and its shortcuts.
+        let listening = window.is_fullscreen();
         match key {
-            "f" if control => {
+            "f" if control && !listening => {
                 self.now_playing = false;
                 self.selected = None;
                 self.menu = None;
@@ -74,12 +76,12 @@ impl Soliton {
                 cx.notify();
                 return;
             }
-            "left" if event.keystroke.modifiers.alt => {
+            "left" if event.keystroke.modifiers.alt && !listening => {
                 self.go_back(cx);
                 self.focus.focus(window);
                 return;
             }
-            "right" if event.keystroke.modifiers.alt => {
+            "right" if event.keystroke.modifiers.alt && !listening => {
                 self.go_forward(cx);
                 self.focus.focus(window);
                 return;
@@ -97,6 +99,7 @@ impl Soliton {
                 return;
             }
             "f11" => {
+                self.volume_popup = false;
                 window.toggle_fullscreen();
                 return;
             }
@@ -148,6 +151,9 @@ impl Soliton {
                 return self.audio_command(Command::Seek(target), cx);
             }
             _ => {}
+        }
+        if listening {
+            return;
         }
         if self.section == Section::Artists
             && !self.now_playing

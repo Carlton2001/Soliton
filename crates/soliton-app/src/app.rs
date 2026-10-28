@@ -740,6 +740,7 @@ impl Render for Soliton {
             )
             .child(body);
         let notices = self.notices_view(cx);
+        let fullscreen = window.is_fullscreen();
         let content = div()
             .relative()
             .track_focus(&self.focus)
@@ -768,28 +769,39 @@ impl Render for Soliton {
             .text_color(theme.text)
             .font_family("Inter")
             .text_size(crate::widgets::TEXT_BODY)
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .child(self.navigation(window, cx))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .min_h_0()
-                            .flex()
-                            .flex_col()
-                            .child(self.title_bar(window, cx))
-                            .child(main),
-                    ),
-            )
+            // Full screen is a listening mode: the library chrome stays hidden.
+            .when(fullscreen, |content| {
+                content.child(self.fullscreen_view(window, cx))
+            })
+            .when(!fullscreen, |content| {
+                content.child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .flex()
+                        .child(self.navigation(window, cx))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .min_h_0()
+                                .flex()
+                                .flex_col()
+                                .child(self.title_bar(window, cx))
+                                .child(main),
+                        ),
+                )
+            })
             .children(notices)
-            .child(self.footer(window, cx))
-            .children(self.menu_view(cx))
+            .when(!fullscreen, |content| {
+                content
+                    .child(self.footer(window, cx))
+                    .children(self.menu_view(cx))
+            })
             .children(self.close_dialog(cx))
-            .children(self.playlist_dialog(cx));
+            .when(!fullscreen, |content| {
+                content.children(self.playlist_dialog(cx))
+            });
         crate::window_chrome::frame(content, window, theme)
     }
 }
