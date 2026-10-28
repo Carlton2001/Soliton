@@ -11,10 +11,14 @@ fn only_native_associations_with_unambiguous_active_outputs_are_selectable() {
     let outputs = vec![
         soliton_audio::OutputDevice {
             name: "Echo Stereo".into(),
+            label: "Echo Stereo".into(),
+            bluetooth: true,
             selectable: true,
         },
         soliton_audio::OutputDevice {
             name: "Duplicate".into(),
+            label: "Duplicate".into(),
+            bluetooth: true,
             selectable: false,
         },
     ];

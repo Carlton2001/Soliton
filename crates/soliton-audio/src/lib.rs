@@ -1,4 +1,13 @@
 //! Independent audio engine. Commands and events are connected by the application.
+#[cfg(not(target_os = "linux"))]
+mod cpal_backend;
+#[cfg(not(target_os = "linux"))]
+use cpal_backend as backend;
+#[cfg(target_os = "linux")]
+mod pipewire_backend;
+#[cfg(target_os = "linux")]
+use pipewire_backend as backend;
+
 mod decoder;
 mod devices;
 mod engine;
@@ -10,7 +19,10 @@ mod resample;
 #[path = "tests/support.rs"]
 mod test_support;
 
-pub use devices::{OUTPUTS_LISTED, OutputDevice, OutputInfo};
+pub use devices::{OutputDevice, OutputInfo};
+/// Whether a stream on the system default moves as soon as the default
+/// changes, rather than when the next stream opens.
+pub const DEFAULT_FOLLOWED: bool = cfg!(target_os = "linux");
 pub use engine::Engine;
 pub use soliton_core::config::Repeat;
 use soliton_core::{failure::Failure, model::Track};
@@ -71,6 +83,11 @@ pub struct Playback {
     pub network_error: Option<Failure>,
     /// Discovery/selection errors do not interrupt an existing working stream.
     pub output_error: Option<Failure>,
+    /// The chosen output is missing: streams open on the system default until
+    /// it is listed again.
+    pub fallback: bool,
+    /// Why the engine paused playback; cleared once playback resumes.
+    pub interruption: Option<Failure>,
     pub output_changing: bool,
     pub error: Option<Failure>,
     /// Latest problem playback went past: skipped passages or unreadable tracks.

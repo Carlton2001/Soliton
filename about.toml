@@ -6,6 +6,9 @@ ignore-dev-dependencies = false
 [ar_archive_writer]
 accepted = ["Apache-2.0 WITH LLVM-exception"]
 
+[target-lexicon]
+accepted = ["Apache-2.0 WITH LLVM-exception"]
+
 [libfuzzer-sys]
 accepted = ["MIT", "NCSA"]
 

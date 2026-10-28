@@ -60,7 +60,9 @@ Ces règles restent en vigueur pour toute évolution.
   pas être reconstruits depuis les fichiers.
 - Une source inaccessible conserve ses albums, métadonnées et pochettes en cache ;
   ses pistes sont signalées indisponibles et non lisibles. Une disparition n'est
-  établie qu'après un parcours complet d'une source accessible.
+  établie qu'après un parcours complet d'une source accessible. « Masquer les
+  albums indisponibles » est cochée par défaut ; une source remontée réapparaît
+  d'elle-même en quelques secondes.
 - Indexation en arrière-plan, incrémentale, annulable, tolérante aux fichiers
   corrompus, avec progression. Surveillance temps réel complétée par une analyse
   au démarrage et périodique.
@@ -138,10 +140,15 @@ Ces règles restent en vigueur pour toute évolution.
 
 ## 3.5 Sorties et réseau
 
-- Sortie partagée locale (`cpal`), sélection persistée, changement sans perte de
-  piste ni de position, aucun repli silencieux vers une autre sortie.
-- Linux : sortie système par défaut uniquement (PipeWire ou PulseAudio via ALSA),
-  périphérique choisi dans les paramètres Son ; jamais de carte ALSA brute.
+- Sortie partagée locale (`cpal`, PipeWire sous Linux), sélection persistée,
+  changement sans perte de piste ni de position, aucun repli silencieux vers une
+  autre sortie.
+- Sortie perdue ou absente : pause à la même position et avertissement affiché
+  jusqu'à la reprise. Si une sortie avait été choisie, la reprise se fait sur la
+  sortie système par défaut ; Soliton revient sur la sortie choisie dès qu'elle
+  réapparaît, sans changer la préférence enregistrée.
+- Linux : sinks PipeWire listés en direct, Bluetooth compris ; la sortie système
+  par défaut suit les paramètres Son. Jamais de carte ALSA brute.
 - Bluetooth via les paramètres Windows et les sorties exposées par le système.
   Soliton ne prétend pas établir la connexion, n'annonce ni lossless ni bit-perfect et
   ne change pas la sortie par défaut de Windows.
@@ -158,9 +165,9 @@ Ces règles restent en vigueur pour toute évolution.
   commande Quitter explicite, démarrage automatique optionnel.
 - La notification ne doit pas être le seul moyen de retrouver une fenêtre masquée.
 - Linux : MPRIS (panneau média et touches multimédias du bureau, sans ouverture
-  d'URI), démarrage automatique XDG optionnel, icône du lanceur suivant la palette
-  pour une installation par `install.sh`. Sans zone de notification sous GNOME,
-  la fermeture quitte toujours. Notification reportée.
+  d'URI), icône du lanceur suivant la palette pour une installation par
+  `install.sh`. Sans zone de notification sous GNOME, la fermeture quitte
+  toujours et aucun démarrage automatique n'est proposé. Notification reportée.
 
 ---
 

@@ -155,6 +155,7 @@ fn advancing_past_the_end_clears_output_details_but_keeps_preference() {
             selected_output: Some("Disconnected DAC".into()),
             output: Some(crate::OutputInfo {
                 device_name: "Disconnected DAC".into(),
+                device_label: "Disconnected DAC".into(),
                 sample_rate: 48000,
                 channels: 2,
                 sample_format: "F32".into(),
@@ -252,7 +253,10 @@ fn native_output_play_pause_seek_next_and_stop() {
     assert_eq!(paused.position_ms, still.position_ms);
     engine.send(Command::Seek(2000)).unwrap();
     wait(&|p| p.state == PlaybackState::Paused && p.position_ms == 2000);
-    let named = wait(&|p| !crate::OUTPUTS_LISTED || !p.outputs.is_empty());
+    // The device actually linked, once the sound server reports it.
+    let named = wait(&|p| {
+        !p.outputs.is_empty() && p.output.as_ref().is_some_and(|o| !o.device_name.is_empty())
+    });
     let output = named.output.unwrap();
     assert!(output.sample_rate > 0);
     assert!(output.channels > 0);
@@ -295,7 +299,7 @@ fn native_output_play_pause_seek_next_and_stop() {
 
 #[test]
 #[ignore = "Requires a native output device; run explicitly with volume zero"]
-fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered() {
+fn unavailable_preference_pauses_then_resumes_on_the_default_and_output_loss_pauses() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture.wav");
     support::wav(&path, 44100, 1);
@@ -323,18 +327,27 @@ fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered()
             start: 0,
         })
         .unwrap_err();
-    worker.fail(error);
+    // Nothing plays until the user resumes: never straight to another output.
+    assert!(worker.interrupt(&error));
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
     assert_eq!(
-        worker.playback.error,
+        worker.playback.interruption,
         Some(Failure::with(Kind::OutputUnavailable, preferred))
     );
+    assert!(worker.playback.fallback);
     assert!(worker.playback.output.is_none());
-    assert_eq!(worker.playback.selected_output.as_deref(), Some(preferred));
-    worker.command(Command::SelectOutput(None)).unwrap();
-    assert_eq!(worker.playback.state, PlaybackState::Failed);
+    assert!(worker.playback.error.is_none());
     worker.command(Command::Resume).unwrap();
     assert_eq!(worker.playback.state, PlaybackState::Playing);
     assert!(worker.playback.output.is_some());
+    assert!(worker.playback.interruption.is_none());
+    // The preference is kept for its return.
+    assert_eq!(worker.playback.selected_output.as_deref(), Some(preferred));
+    for _ in 0..10 {
+        worker.pump().unwrap();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let position = worker.playback.position_ms;
     // Simulate the callback's disconnect signal without changing system devices.
     worker
         .session
@@ -344,12 +357,17 @@ fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered()
         .failed
         .store(true, Ordering::Relaxed);
     let error = worker.pump().unwrap_err();
-    worker.fail(error);
-    assert_eq!(worker.playback.state, PlaybackState::Failed);
+    worker.recover(error);
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
+    assert_eq!(
+        worker.playback.interruption.as_ref().map(|f| f.kind),
+        Some(Kind::OutputDisconnected)
+    );
     assert!(worker.playback.output.is_none());
+    assert_eq!(worker.playback.position_ms, position);
     assert_eq!(worker.playback.track.as_ref().unwrap().id, 1);
     worker.command(Command::Resume).unwrap();
-    assert!(worker.playback.error.is_none());
+    assert!(worker.playback.interruption.is_none());
     assert_eq!(worker.playback.state, PlaybackState::Playing);
     worker.command(Command::Pause).unwrap();
     worker.command(Command::Seek(1000)).unwrap();
@@ -363,6 +381,70 @@ fn unavailable_preference_never_falls_back_and_output_failure_can_be_recovered()
     }
     assert_eq!(worker.playback.state, PlaybackState::Stopped);
     assert!(worker.playback.output.is_none());
+}
+
+#[test]
+fn a_missing_output_pauses_at_the_position_and_its_return_ends_the_fallback() {
+    let track = soliton_core::model::Track {
+        id: 1,
+        source_id: 1,
+        path: "unopened.flac".into(),
+        metadata: soliton_core::model::Metadata {
+            duration_ms: 60_000,
+            ..Default::default()
+        },
+        cover: None,
+        available: true,
+    };
+    let mut worker = Worker {
+        playback: Playback {
+            selected_output: Some("headset".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    worker
+        .command(Command::Load {
+            tracks: vec![track],
+            start: 0,
+            position_ms: 12_000,
+        })
+        .unwrap();
+    let lost = Failure::with(Kind::OutputDisconnected, "Headset");
+    assert!(worker.interrupt(&lost.clone().into()));
+    assert_eq!(worker.playback.state, PlaybackState::Paused);
+    assert_eq!(worker.resume_at, Some(12_000));
+    assert_eq!(worker.output_target(), None);
+    // Track and network errors are not output interruptions.
+    assert!(!worker.interrupt(&Failure::new(Kind::UnreadableAudio).into()));
+    let speakers = crate::OutputDevice {
+        name: "speakers".into(),
+        label: "Speakers".into(),
+        bluetooth: false,
+        selectable: true,
+    };
+    let headset = crate::OutputDevice {
+        name: "headset".into(),
+        label: "Headset".into(),
+        bluetooth: true,
+        selectable: true,
+    };
+    // A listing sent before the loss was noticed still contains the output.
+    let stale = vec![speakers.clone(), headset.clone()];
+    worker.playback.outputs = Arc::new(stale.clone());
+    worker.outputs_changed(&stale);
+    assert!(worker.playback.fallback);
+    worker.playback.outputs = Arc::new(vec![speakers.clone()]);
+    worker.outputs_changed(&stale);
+    assert!(worker.playback.fallback);
+    worker.playback.outputs = Arc::new(vec![speakers.clone(), headset]);
+    worker.outputs_changed(&[speakers]);
+    assert!(!worker.playback.fallback);
+    assert_eq!(worker.output_target(), Some("headset"));
+    // Shown until playback resumes, even once the output is back.
+    assert_eq!(worker.playback.interruption, Some(lost));
+    worker.command(Command::Stop).unwrap();
+    assert!(worker.playback.interruption.is_none());
 }
 
 #[test]

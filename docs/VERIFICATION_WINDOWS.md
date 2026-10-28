@@ -1,6 +1,7 @@
 # Vérifications Windows après le support Linux
 
-Commit concerné : `76ea35f Make Soliton functional on Linux`.
+Commits concernés : `76ea35f Make Soliton functional on Linux`, puis la sortie
+PipeWire native sous Linux.
 
 Sous Linux, tout a été validé. Côté Windows, seul `soliton-platform` a été
 vérifié par `cargo check` croisé, tests compris. L'application n'a pas pu être
@@ -18,9 +19,20 @@ compilée pour Windows depuis Linux (shaders GPUI, `aws-lc-sys`).
 - **Inventaire des licences** : les empreintes de `Cargo.lock`,
   `crates/soliton-app/Cargo.toml` et `crates/soliton-platform/Cargo.toml` ont
   changé. Les notices régénérées sont identiques.
-- **Sans effet sous Windows** : la politique des sorties audio
-  (`OUTPUTS_LISTED` vaut `true`) et la restauration de l'état agrandi sont
-  limitées à Linux.
+- **Sortie audio** : le code CPAL a été déplacé dans `cpal_backend.rs`, désormais
+  compilé hors Linux seulement, sans changement de comportement voulu. Le rendu
+  du callback reçoit la conversion d'échantillon en paramètre. Les sorties
+  portent un libellé (égal au nom sous Windows) et un indicateur Bluetooth
+  (toujours faux sous Windows). `soliton-audio` a été vérifié par
+  `cargo xwin check` pour `x86_64-pc-windows-msvc`, tests compris.
+- **Perte de sortie** (commun à Windows) : la lecture passe en pause au lieu de
+  l'état d'échec ; la reprise utilise la sortie par défaut, puis Soliton revient
+  sur la sortie choisie quand l'énumération la montre de nouveau.
+- **Restauration de la fenêtre** : sans écran connu à l'ouverture, la position
+  enregistrée est reprise sans contrôle. Windows connaît ses écrans dès
+  l'ouverture : le contrôle s'applique toujours.
+- **Sans effet sous Windows** : la restauration de l'état agrandi au démarrage
+  reste limitée à Linux.
 
 ## 1. Compilation et tests
 
@@ -86,6 +98,14 @@ Paramètres :
   `Soliton` sous `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
 - [ ] La section « Sortie audio » liste toujours les périphériques, pas seulement
   la sortie système, sans la mention « choisir dans les paramètres Son ».
+- [ ] Choisir un périphérique pendant la lecture garde piste et position ; le
+  format affiché et l'infobulle de sortie du lecteur nomment ce périphérique.
+- [ ] Le texte sous la liste reste « Le choix système par défaut s'applique au
+  démarrage d'une piste… ».
+- [ ] Une sortie choisie puis débranchée met la lecture en pause, avec
+  l'avertissement « Lecture en pause » au-dessus de la barre de lecture. La
+  reprise joue sur la sortie par défaut ; rebrancher la sortie y ramène la
+  lecture dès que Windows signale le périphérique.
 
 Fermeture :
 

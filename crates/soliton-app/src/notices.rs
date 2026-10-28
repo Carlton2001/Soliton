@@ -64,8 +64,24 @@ impl Soliton {
         self.notices.push(level, label, text);
     }
 
+    /// Shown until playback resumes, apart from the dismissable messages.
+    fn interruption(&self) -> Option<Notice> {
+        let failure = self.playback.interruption.as_ref()?;
+        let next = self.t(if self.playback.fallback {
+            Text::ResumeOnDefaultOutput
+        } else {
+            Text::ResumePlayback
+        });
+        let reason = crate::i18n::describe(self.settings.language, failure);
+        Some(Notice {
+            level: Level::Warning,
+            label: Text::PlaybackPaused,
+            text: format!("{reason} — {next}"),
+        })
+    }
+
     pub fn notices_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let latest = self.notices.items.last()?;
+        let interruption = self.interruption();
         let theme = self.theme();
         let count = self.notices.items.len();
         let line = |notice: &Notice| {
@@ -89,6 +105,10 @@ impl Soliton {
                         .child(plain_paths(&notice.text)),
                 )
         };
+        let latest = self.notices.items.last();
+        if interruption.is_none() && latest.is_none() {
+            return None;
+        }
         let expanded = self.notices.expanded && count > 1;
         Some(
             div()
@@ -98,6 +118,9 @@ impl Soliton {
                 .bg(theme.panel)
                 .border_t_1()
                 .border_color(theme.border)
+                .when_some(interruption.as_ref(), |view, notice| {
+                    view.child(div().px(rems(0.75)).py(rems(0.375)).child(line(notice)))
+                })
                 .when(expanded, |view| {
                     view.child(
                         div()
@@ -120,41 +143,47 @@ impl Soliton {
                             ),
                     )
                 })
-                .child(
-                    div()
-                        .px(rems(0.75))
-                        .py(rems(0.375))
-                        .flex()
-                        .items_center()
-                        .gap(rems(0.75))
-                        .child(line(latest).flex_1())
-                        .when(count > 1, |row| {
-                            row.child(
-                                button(
-                                    "notices-toggle",
-                                    "chevron-down",
-                                    format!(
-                                        "{} ({count})",
-                                        self.t(if expanded { Text::Hide } else { Text::ShowAll })
-                                    ),
-                                    theme,
+                .when_some(latest, |view, latest| {
+                    view.child(
+                        div()
+                            .px(rems(0.75))
+                            .py(rems(0.375))
+                            .flex()
+                            .items_center()
+                            .gap(rems(0.75))
+                            .child(line(latest).flex_1())
+                            .when(count > 1, |row| {
+                                row.child(
+                                    button(
+                                        "notices-toggle",
+                                        "chevron-down",
+                                        format!(
+                                            "{} ({count})",
+                                            self.t(if expanded {
+                                                Text::Hide
+                                            } else {
+                                                Text::ShowAll
+                                            })
+                                        ),
+                                        theme,
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, _, cx| {
+                                            this.notices.expanded = !this.notices.expanded;
+                                            cx.notify();
+                                        },
+                                    )),
                                 )
-                                .on_click(cx.listener(
-                                    |this, _, _, cx| {
-                                        this.notices.expanded = !this.notices.expanded;
+                            })
+                            .child(
+                                button("notices-dismiss", "x", self.t(Text::DismissAll), theme)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.notices.clear();
                                         cx.notify();
-                                    },
-                                )),
-                            )
-                        })
-                        .child(
-                            button("notices-dismiss", "x", self.t(Text::DismissAll), theme)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.notices.clear();
-                                    cx.notify();
-                                })),
-                        ),
-                )
+                                    })),
+                            ),
+                    )
+                })
                 .into_any_element(),
         )
     }

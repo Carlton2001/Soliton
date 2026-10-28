@@ -1,8 +1,7 @@
 # Soliton sous Linux
 
 Soliton fonctionne sous Linux : bibliothèque, lecture locale, interface GPUI
-Wayland/X11, contrôles média du bureau (MPRIS), démarrage automatique et
-installation par utilisateur. Windows conserve son backend GPUI, WASAPI et ses
+Wayland/X11, contrôles média du bureau (MPRIS) et installation par utilisateur. Windows conserve son backend GPUI, WASAPI et ses
 intégrations natives. L'[audit initial](PORTABILITE_LINUX.md) décrit les
 obstacles et le périmètre du portage.
 
@@ -14,17 +13,26 @@ développement et de validation. Silverblue reste à vérifier sur un hôte rée
 - **Fenêtre** : décorations clientes ; déplacement au clic gauche depuis la barre
   de titre et le logo, double-clic pour agrandir/restaurer, réduction, fermeture
   et redimensionnement par une marge transparente autour de la fenêtre, qui porte
-  l'ombre portée et le curseur de redimensionnement des bords libres. État
-  agrandi restauré au démarrage (GPUI ne l'applique pas à l'ouverture sous Linux).
+  l'ombre portée et le curseur de redimensionnement des bords libres. Taille et
+  état agrandi restaurés au démarrage (GPUI n'applique pas l'état agrandi à
+  l'ouverture sous Linux). Sous Wayland, le compositeur choisit la position et
+  GPUI ne connaît aucun écran avant l'ouverture : la taille enregistrée est alors
+  reprise sans contrôle d'écran.
   Identifiant `io.github.Carlton2001.Soliton`, partagé par la fenêtre, l'entrée de
   bureau, l'icône et MPRIS.
-- **Audio** : Symphonia → Rubato → CPAL 0.16/ALSA `default` → PipeWire
-  (`pipewire-alsa`) ou PulseAudio (`alsa-plugins-pulseaudio`). Seule la sortie
-  système par défaut est proposée : le périphérique, Bluetooth compris, se choisit
-  dans les paramètres Son. Les autres entrées CPAL étaient des alias de cette
-  sortie ou des cartes ALSA brutes (`plughw`) contournant PipeWire, et leur
-  énumération ouvrait chaque périphérique toutes les 5 s. La sélection native des
-  sinks PipeWire est reportée.
+- **Audio** : Symphonia → Rubato → flux PipeWire natif (`pipewire` 0.10, sans
+  CPAL ni ALSA sous Linux), 32 bits flottants, mono ou stéréo au débit de la
+  piste ; PipeWire convertit vers le format de la sortie. Les sorties sont les
+  sinks PipeWire (nom du nœud persisté, description affichée, icône Bluetooth
+  pour les appareils `bluez5`), suivis en direct par le registre : un casque
+  appairé apparaît aussitôt, sans sondage. « Périphérique système par défaut »
+  suit immédiatement la sortie choisie dans les paramètres Son. Une sortie
+  choisie est ciblée par `target.object` avec `node.dont-reconnect` et
+  `node.dont-fallback` : PipeWire ne la remplace jamais. Sa disparition met la
+  lecture en pause, avec un avertissement jusqu'à la reprise ; la reprise joue
+  sur la sortie par défaut, puis Soliton revient sur la sortie choisie dès
+  qu'elle réapparaît (casque rallumé). Le format affiché nomme la sortie réellement liée au flux.
+  PulseAudio seul (sans PipeWire) n'est plus pris en charge.
 - **MPRIS** (`org.mpris.MediaPlayer2.soliton`, suffixe `.instance<pid>` pour une
   seconde instance) : titre, artiste, album, durée, pochette du cache Soliton,
   état, position et `Seeked` ; lecture, pause, bascule, arrêt, précédent,
@@ -32,19 +40,22 @@ développement et de validation. Silverblue reste à vérifier sur un hôte rée
   GNOME et son panneau média passent par ce service. Aucune URI ni fichier hors
   bibliothèque n'est accepté. Sans bus de session, la lecture continue et un
   avertissement est affiché.
-- **Démarrage automatique** : entrée XDG
-  `~/.config/autostart/io.github.Carlton2001.Soliton.desktop`, écrite ou retirée
-  seulement par la case des paramètres. Elle désigne l'exécutable courant.
 - **Fermeture** : GNOME n'a pas de zone de notification ; la fermeture quitte
-  toujours Soliton par le nettoyage normal, sans masquage.
+  toujours Soliton par le nettoyage normal, sans masquage. Pour la même raison,
+  aucun démarrage automatique n'est proposé : la fenêtre s'ouvrirait à chaque
+  ouverture de session. La section d'intégration du bureau des paramètres est
+  donc absente.
 - **Icône** : quand Soliton a été installé par `install.sh` (marqueur
   `X-Soliton-Install=user` dans son entrée de bureau), la palette choisie remplace
   l'icône `~/.local/share/icons/hicolor/scalable/apps/io.github.Carlton2001.Soliton.svg`.
   Une entrée ou une icône installée autrement n'est jamais modifiée.
-- **Indisponible sous Linux** : mises à jour intégrées (téléchargement et
-  installateur Windows), Bluetooth dédié, notifications natives de sorties audio,
-  accent système. Audio exclusif et Flatpak restent hors périmètre ; DLNA/Cast
+- **Indisponible sous Linux** : démarrage automatique, mises à jour intégrées
+  (téléchargement et installateur Windows), Bluetooth dédié, notifications
+  natives de sorties audio, accent système. Audio exclusif et Flatpak restent hors périmètre ; DLNA/Cast
   sont compilés mais non validés sous Linux.
+- **Sources** : un dossier démonté garde ses albums, signalés indisponibles et
+  masqués par défaut ; remonté, il réapparaît en quelques secondes sans
+  rafraîchissement (sonde des sources hors ligne toutes les 5 s).
 - Bibliothèque, paramètres et caches dans `~/.local/share/Soliton`
   (`SOLITON_DATA_DIR` pour isoler un essai), jamais dans les sources musicales.
 
@@ -59,13 +70,12 @@ cd Soliton-0.1.0-x86_64-linux
 Installation pour l'utilisateur courant, sans root : `~/.local/bin/soliton`,
 entrée de bureau, métadonnées AppStream, icône et licences dans
 `~/.local/share`. Relancer `install.sh` d'une archive plus récente met à jour.
-`./uninstall.sh` retire ces fichiers et l'entrée de démarrage automatique, et
-conserve `~/.local/share/Soliton`. Il refuse d'agir sur une entrée de bureau
+`./uninstall.sh` retire ces fichiers et conserve `~/.local/share/Soliton`. Il refuse d'agir sur une entrée de bureau
 qu'il n'a pas installée.
 
 Prérequis d'exécution : Vulkan, session Wayland ou X11, D-Bus et portail XDG
-(choix des dossiers), PipeWire avec `pipewire-alsa` ou PulseAudio avec sa
-passerelle ALSA. Le binaire est lié à `libasound`, `libxcb` et `libxkbcommon`
+(choix des dossiers), PipeWire 0.3.49 ou plus récent. Le binaire est lié à
+`libpipewire-0.3`, `libxcb` et `libxkbcommon`
 (Vulkan, Wayland et Fontconfig sont chargés à l'exécution) ; construit sur
 Fedora 44, il requiert la glibc de cette version ou plus récente.
 
@@ -73,19 +83,19 @@ Fedora 44, il requiert la glibc de cette version ou plus récente.
 
 ```sh
 sudo dnf install gcc gcc-c++ make cmake pkgconf-pkg-config \
-  alsa-lib-devel libxkbcommon-devel libxkbcommon-x11-devel \
+  pipewire-devel clang-devel libxkbcommon-devel libxkbcommon-x11-devel \
   freetype-devel fontconfig-devel libxcb-devel wayland-devel rustup
 rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt
 . "$HOME/.cargo/env"
 ```
 
 Avec rustup déjà présent : `rustup toolchain install 1.98.1 --profile minimal
---component rustfmt`. Références Fedora :
+--component rustfmt`. `clang-devel` sert à générer les liaisons PipeWire
+(`bindgen`). Références Fedora :
 [Rust](https://developer.fedoraproject.org/tech/languages/rust/rust-installation.html),
-[ALSA](https://packages.fedoraproject.org/pkgs/alsa-lib/alsa-lib-devel/),
+[PipeWire](https://packages.fedoraproject.org/pkgs/pipewire/pipewire-devel/),
 [xkbcommon](https://packages.fedoraproject.org/pkgs/libxkbcommon/libxkbcommon-devel/),
-[Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/),
-[pipewire-alsa](https://packages.fedoraproject.org/pkgs/pipewire/pipewire-alsa/).
+[Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/).
 
 ## Compiler, tester, lancer
 
@@ -105,13 +115,19 @@ cargo +1.98.1 run -p soliton-app --bin Soliton-index --locked -- \
   "$SOLITON_DATA_DIR" /chemin/vers/une/collection-de-test
 ```
 
-Tests explicites sur une session de bureau (volume nul pour l'audio) :
+Tests explicites sur une session de bureau (volume nul pour l'audio ; les deux derniers créent un sink PipeWire muet temporaire) :
 
 ```sh
 cargo +1.98.1 test -p soliton-audio native_output -- --ignored
 cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
+cargo +1.98.1 test -p soliton-audio chosen_sink -- --ignored
+cargo +1.98.1 test -p soliton-audio engine_pauses -- --ignored
 cargo +1.98.1 test -p soliton-platform session_bus -- --ignored
+cargo +1.98.1 test -p soliton-app remounted_source -- --ignored
 ```
+
+Le dernier renomme puis rétablit un dossier source temporaire et attend son
+retour sans analyse manuelle (environ 5 s).
 
 ## Construire l'archive
 
@@ -125,9 +141,19 @@ version courante dans les métadonnées AppStream, construit en release, assembl
 `target/distribution/output/Soliton-<version>-x86_64-linux.tar.gz`, contrôle son
 contenu et écrit son empreinte SHA-256. `--skip-build` réutilise le binaire release
 existant. Les sources de l'entrée de bureau, des métadonnées et des scripts sont
-dans `installer/linux/`. La régénération des notices reste faite par
-`scripts/update-third-party-licenses.ps1` ; elle couvre toutes les cibles, dont
-Linux.
+dans `installer/linux/`.
+
+Après un changement de dépendances, régénérer les notices avant de construire
+(cargo-about 0.9.2 compilé une fois depuis crates.io ; Python 3 est présent sur
+Fedora) :
+
+```sh
+cargo +1.98.1 install cargo-about --version 0.9.2 --locked --features cli
+RUSTUP_TOOLCHAIN=1.98.1 scripts/update-third-party-licenses.sh
+```
+
+Le script produit les mêmes notices et le même inventaire que
+`scripts/update-third-party-licenses.ps1` ; l'inventaire couvre toutes les cibles.
 
 ## Validation
 
@@ -150,13 +176,30 @@ Le 26 octobre 2026, Fedora 44 Workstation, GNOME 50 Wayland, PipeWire 1.6, Rust
 | Archive release : installation dans un `HOME` isolé, entrée de bureau validée, lancement, icône suivant la palette, désinstallation conservant les données, refus d'une entrée étrangère | Réussis |
 | AppStream (`appstreamcli validate`) et entrée de bureau (`desktop-file-validate`) | Valides ; remarque pédante sur les majuscules de l'identifiant |
 
+Le 28 octobre 2026, sur matériel réel (Fedora 44 Workstation, GNOME Wayland,
+Intel UHD Raptor Lake via Mesa, PipeWire 1.6.10, Rust 1.98.1) :
+
+| Vérification | Résultat |
+| --- | --- |
+| Format, `cargo check` et `cargo clippy` du workspace sans avertissement | Réussis |
+| Suite de tests du workspace | Réussie, 8 tests natifs ignorés par défaut |
+| Tests natifs : lecture/pause/seek/suivant/arrêt et sélection explicite sur PipeWire, préférence indisponible sans repli, MPRIS | Réussis |
+| Test natif : sink temporaire choisi, lié, puis retiré ; échec signalé sans déplacement vers une autre sortie | Réussi |
+| Test natif du moteur : pause à la perte du sink choisi, reprise sur la sortie par défaut, retour au sink recréé | Réussi |
+| `soliton-audio` pour `x86_64-pc-windows-msvc` (`cargo xwin check`, tests compris) | Réussi |
+| Restauration de la taille et de l'état agrandi sous Wayland | Réussie après correctif |
+| Binaire lié à `libpipewire-0.3`, plus à `libasound` (`ldd`) | Vérifié |
+| Choix d'un casque Bluetooth dans Soliton, son extinction (pause, avertissement, reprise sur la sortie par défaut) et son retour | Réussis (essai manuel) |
+| Démontage d'une source : albums indisponibles ; remontage : retour sans rafraîchissement (test explicite et correctif) | Réussis |
+| Notices régénérées par `update-third-party-licenses.sh`, identiques octet pour octet à la génération Windows sur le même verrou | Vérifié |
+| `build-linux.sh` : vérification des licences, build release, archive et empreinte | Réussi |
+
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
 
 À vérifier encore sur matériel réel : accélération GPU, interactions manuelles de
 la barre de titre et du redimensionnement sous Wayland, panneau média et touches
-multimédias GNOME, case de démarrage automatique et ouverture de session,
-rafraîchissement de l'icône du lanceur, portail de choix de dossiers, surveillance
-lors du retrait/remontage d'une source et des quotas inotify, changement de sortie
+multimédias GNOME, rafraîchissement de l'icône du lanceur, portail de choix de dossiers, quotas
+inotify, changement de sortie
 dans GNOME pendant la lecture, Silverblue (binaire de l'archive sur l'hôte,
 `ldd`).

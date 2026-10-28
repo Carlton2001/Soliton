@@ -145,7 +145,7 @@ impl Soliton {
                 self.playback
                     .output
                     .as_ref()
-                    .map(|output| output.device_name.clone())
+                    .map(|output| self.output_label(output))
             })
             .unwrap_or_else(|| self.t(Text::AudioOutput).into());
         crate::widgets::with_tooltip(

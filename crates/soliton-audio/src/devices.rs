@@ -1,78 +1,55 @@
-//! Local CPAL outputs. Names are the only portable identifiers exposed by CPAL
-//! 0.16; ambiguous names are deliberately not selectable.
-use anyhow::Result;
-use cpal::traits::{DeviceTrait, HostTrait};
-use soliton_core::failure::{Failure, Kind};
+//! Local outputs listed by the platform backend: CPAL devices, or PipeWire
+//! sinks on Linux. Ambiguous identifiers are deliberately not selectable.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutputDevice {
+    /// Persisted identifier: the CPAL device name, or the PipeWire node name.
     pub name: String,
+    /// Shown to the user; the name itself when the backend has nothing better.
+    pub label: String,
+    pub bluetooth: bool,
     pub selectable: bool,
+}
+
+impl OutputDevice {
+    pub(crate) fn new(name: String, label: String, bluetooth: bool) -> Self {
+        Self {
+            name,
+            label,
+            bluetooth,
+            selectable: true,
+        }
+    }
 }
 
 /// Format of the stream opened by Soliton, before any downstream system processing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutputInfo {
+    /// Identifier of the device playing the stream, as in [`OutputDevice::name`];
+    /// empty until the sound server has linked a stream that follows its default.
     pub device_name: String,
+    pub device_label: String,
     pub sample_rate: u32,
     pub channels: u16,
     pub sample_format: String,
 }
 
-/// Linux plays through the sound server behind ALSA's `default` PCM. CPAL's
-/// other entries are aliases of it or raw cards that would bypass PipeWire, and
-/// listing them opens every device, so only the system default is offered.
-pub const OUTPUTS_LISTED: bool = !cfg!(target_os = "linux");
-
-pub(crate) fn list() -> Result<Vec<OutputDevice>> {
-    if !OUTPUTS_LISTED {
-        return Ok(Vec::new());
-    }
-    let names = cpal::default_host()
-        .output_devices()?
-        .map(|device| device.name())
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    Ok(describe(names))
-}
-
-fn describe(mut names: Vec<String>) -> Vec<OutputDevice> {
-    names.sort();
-    let mut devices: Vec<OutputDevice> = Vec::new();
-    for name in names {
-        if let Some(previous) = devices.last_mut().filter(|d| d.name == name) {
-            previous.selectable = false;
-        } else {
-            devices.push(OutputDevice {
-                name,
-                selectable: true,
-            });
+/// Sorted by label; a name shared by several devices identifies none of them.
+pub(crate) fn describe(mut devices: Vec<OutputDevice>) -> Vec<OutputDevice> {
+    devices.sort_by(|a, b| a.label.cmp(&b.label).then_with(|| a.name.cmp(&b.name)));
+    for index in 0..devices.len() {
+        let name = &devices[index].name;
+        if devices.iter().filter(|other| &other.name == name).count() > 1 {
+            devices[index].selectable = false;
         }
     }
+    let mut seen = Vec::new();
+    devices.retain(|device| {
+        let first = !seen.contains(&device.name);
+        seen.push(device.name.clone());
+        first
+    });
     devices
-}
-
-pub(crate) fn resolve(preferred: Option<&str>) -> Result<cpal::Device> {
-    let host = cpal::default_host();
-    let Some(name) = preferred else {
-        return Ok(host
-            .default_output_device()
-            .ok_or(Failure::new(Kind::NoOutputDevice))?);
-    };
-    let mut matching = Vec::new();
-    for device in host.output_devices()? {
-        if device.name().is_ok_and(|candidate| candidate == name) {
-            matching.push(device);
-        }
-    }
-    if matching.len() != 1 {
-        let kind = if matching.is_empty() {
-            Kind::OutputUnavailable
-        } else {
-            Kind::OutputAmbiguous
-        };
-        return Err(Failure::with(kind, name).into());
-    }
-    Ok(matching.pop().unwrap())
 }
 
 #[cfg(test)]

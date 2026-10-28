@@ -14,7 +14,8 @@ les documentations officielles. Pas de dépendance directe à Oxyde.
 | Canaux | crossbeam-channel 0.5 | MIT / Apache-2.0 | Files bornées entre services |
 | Surveillance | notify 8.2 | CC0-1.0 | ReadDirectoryChangesW sous Windows, inotify sous Linux ; 9.0 encore en RC. Regroupement des événements propre à Soliton, sans crate debouncer |
 | Décodage | symphonia 0.5.5 | MPL-2.0 | Rust pur, MP3/FLAC/AAC-LC/ALAC/Vorbis/PCM/AIFF ; pas Opus/WMA/APE |
-| Sortie | cpal 0.16 | Apache-2.0 | WASAPI Windows ; ALSA requiert bibliothèques de développement sous Linux |
+| Sortie | cpal 0.16 | Apache-2.0 | WASAPI Windows ; non compilé sous Linux |
+| Sortie Linux | pipewire 0.10.1 | MIT | Flux et registre PipeWire natifs ; `pipewire-devel` et `clang-devel` (bindgen) à la compilation, `libpipewire-0.3` à l'exécution |
 | Conversion | rubato 0.16.2 | MIT | Conversion sinc hors callback, compensation du délai et de la longueur finale |
 | Tampon PCM | crossbeam-queue 0.3 | MIT / Apache-2.0 | File préallouée de trames mono/stéréo complètes, pas de décalage des canaux après sous-alimentation |
 | Intégration Windows | windows 0.61.3 | MIT / Apache-2.0 | Déjà résolu par GPUI ; SMTC via interop HWND, Shell_NotifyIcon, menu natif ; uniquement sur cible Windows |

@@ -297,6 +297,8 @@ impl Soliton {
                 || playback.selected_output != self.playback.selected_output
                 || playback.outputs != self.playback.outputs
                 || playback.output_error != self.playback.output_error
+                || playback.fallback != self.playback.fallback
+                || playback.interruption != self.playback.interruption
                 || playback.output_changing != self.playback.output_changing
                 || playback.outputs_error != self.playback.outputs_error
                 || playback.network_outputs != self.playback.network_outputs

@@ -50,7 +50,9 @@ non monté.
 **Surveillance.** `notify`, file bornée à 256 événements ; une perte déclenche une
 analyse complète. Regroupement : 2 s de calme, 15 s au plus, 4 096 chemins au plus,
 convertis en dossiers à analyser. Sonde `read_dir` sur thread dédié, délai 5 s,
-chaque minute ; analyse complète au démarrage et toutes les 30 minutes.
+chaque minute ; les sources hors ligne sont sondées en plus toutes les 5 s
+(délai 1 s) et redeviennent disponibles dès le début de leur analyse, sans
+rafraîchissement manuel ; analyse complète au démarrage et toutes les 30 minutes.
 
 **Schéma.** Migrations séquentielles dans `schema.rs` (`user_version`), chacune
 transactionnelle avec `foreign_key_check`. Sources, artistes, albums, éditions,
@@ -96,12 +98,19 @@ Le moteur possède la file : occurrences à identifiant stable, dédoublonnage p
 chemin, provenance de playlist conservée, instantanés immuables partagés par `Arc`.
 Modifier la suite ne rouvre pas le flux courant.
 
-**Sorties locales.** Identifiées par leur nom (seul identifiant portable de CPAL
-0.16) ; noms ambigus non sélectionnables. Sous Linux, aucune énumération
-(`OUTPUTS_LISTED`) : seule la sortie ALSA `default` du serveur de son est utilisée. `None` = périphérique par défaut, résolu
-à chaque ouverture. Découverte toutes les 5 s sur un worker borné. Un changement
+**Sorties locales.** Un backend par cible derrière la même interface interne
+(`backend` dans `soliton-audio`) : CPAL hors Linux, identifié par le nom (seul
+identifiant portable de CPAL 0.16) et découvert toutes les 5 s sur un worker
+borné ; PipeWire natif sous Linux, identifié par le nom du nœud et suivi en
+direct par le registre. Identifiants ambigus non sélectionnables. `None` =
+périphérique par défaut, résolu à chaque ouverture sous CPAL, suivi en continu
+par PipeWire. Un changement
 prépare la nouvelle session avant de remplacer l'ancienne ; un échec la conserve.
-Pas de reprise automatique après déconnexion.
+Une sortie perdue ou absente met en pause à la même position (`interruption`,
+effacée à la reprise) ; si une sortie avait été choisie, les flux s'ouvrent sur
+la sortie par défaut (`fallback`) jusqu'à ce que la liste la montre de nouveau,
+puis la session y revient. Jamais de lecture sur une autre sortie sans action
+de l'utilisateur.
 
 **Bluetooth.** Énumération Windows (Devices Enumeration, Bluetooth, Media Devices)
 hors thread UI ; association aux sorties par identifiant de conteneur, sans
@@ -165,7 +174,8 @@ commandes système dans une file de 64. Les touches multimédias passent par SMT
 ## Intégration Linux
 
 `Desktop` expose des capacités distinctes : `HIDES` (zone de notification, Windows
-seulement), `AUTOSTART`. Sous Linux, un worker possède la connexion D-Bus de
+seulement), `AUTOSTART` (Windows seulement : sans zone de notification, GNOME
+ouvrirait la fenêtre à chaque session). Sous Linux, un worker possède la connexion D-Bus de
 session (`zbus` bloquant, déjà présent via GPUI) ; l'interface lui envoie l'état
 coalescé dans une file d'une entrée, les commandes reviennent dans une file de 64.
 Le handle de fenêtre n'est pas demandé : GPUI ne le fournit pas sous X11.
@@ -174,8 +184,6 @@ Le handle de fenêtre n'est pas demandé : GPUI ne le fournit pas sous X11.
   capacités émettent `PropertiesChanged`, la position est lue à la demande et un
   écart de plus de 1,5 s par rapport à la lecture attendue émet `Seeked`. Un
   identifiant de piste par occurrence protège `SetPosition` des requêtes périmées.
-- **Démarrage** : entrée XDG remplacée atomiquement, `Exec` cité selon la
-  spécification Desktop Entry, sans shell.
 - **Icône du lanceur** : réécrite seulement si l'entrée de bureau porte le marqueur
   d'`install.sh` ; la date du thème `hicolor` est mise à jour pour les caches.
 - **Fenêtre** : `Raise` active la fenêtre par GPUI ; l'état agrandi enregistré est

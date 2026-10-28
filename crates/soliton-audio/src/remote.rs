@@ -122,8 +122,8 @@ impl Worker {
                 Some(self.playback.position_ms),
             )?)
         } else {
-            if selected.is_some() {
-                crate::devices::resolve(selected.as_deref())?;
+            if let Some(name) = &selected {
+                crate::backend::check(name)?;
             }
             None
         };
@@ -134,7 +134,7 @@ impl Worker {
         self.remote_generation = None;
         self.playback.network_output = None;
         self.playback.selected_output = selected;
-        self.playback.output = replacement.as_ref().map(|s| s.output.info.clone());
+        self.playback.output = replacement.as_ref().map(|s| s.output.info());
         if let Some(session) = &replacement {
             self.playback.position_ms = session.base_ms;
         }

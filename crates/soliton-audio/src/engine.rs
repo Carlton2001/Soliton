@@ -4,6 +4,8 @@ use crate::{
 };
 use anyhow::Result;
 use soliton_core::failure::{Failure, Kind};
+#[path = "fallback.rs"]
+mod fallback;
 #[path = "remote.rs"]
 mod remote;
 use crossbeam_channel::{Receiver, Sender, bounded};
@@ -18,6 +20,7 @@ use std::{
 
 pub struct Engine {
     commands: Sender<Command>,
+    _outputs: crate::backend::Outputs,
     refresh_outputs: Sender<()>,
     /// Output changes are notified by the platform; polling is only a safety net.
     outputs_watched: Arc<AtomicBool>,
@@ -34,27 +37,7 @@ impl Engine {
         let (refresh_outputs, refresh) = bounded(1);
         let (discovered, devices) = bounded(1);
         let outputs_watched = Arc::new(AtomicBool::new(false));
-        let watched = outputs_watched.clone();
-        // Device enumeration can involve slow drivers. It never holds up decoding.
-        std::thread::Builder::new()
-            .name("soliton-outputs".into())
-            .spawn(move || {
-                loop {
-                    let result = crate::devices::list();
-                    if discovered.send(result).is_err() || !crate::devices::OUTPUTS_LISTED {
-                        break;
-                    }
-                    let interval = if watched.load(Ordering::Relaxed) {
-                        Duration::from_secs(60)
-                    } else {
-                        Duration::from_secs(5)
-                    };
-                    match refresh.recv_timeout(interval) {
-                        Ok(()) | Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
-                        Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
-                    }
-                }
-            })?;
+        let outputs = crate::backend::watch_outputs(discovered, refresh, outputs_watched.clone())?;
         let shutdown = Arc::new(AtomicBool::new(false));
         let worker_shutdown = shutdown.clone();
         std::thread::Builder::new()
@@ -78,8 +61,12 @@ impl Engine {
                     if let Ok(result) = devices.try_recv() {
                         match result {
                             Ok(outputs) => {
-                                worker.playback.outputs = Arc::new(outputs);
+                                let previous = std::mem::replace(
+                                    &mut worker.playback.outputs,
+                                    Arc::new(outputs),
+                                );
                                 worker.playback.outputs_error = None;
+                                worker.outputs_changed(&previous);
                             }
                             Err(error) => worker.playback.outputs_error = Some(Failure::of(&error)),
                         }
@@ -127,7 +114,9 @@ impl Engine {
                             if worker.playback.output_changing {
                                 let _ = events.try_send(worker.snapshot());
                             }
-                            if let Err(error) = worker.command(command) {
+                            if let Err(error) = worker.command(command)
+                                && !worker.interrupt(&error)
+                            {
                                 worker.fail(error);
                             }
                             worker.playback.output_changing = false;
@@ -151,6 +140,7 @@ impl Engine {
             })?;
         Ok(Self {
             commands,
+            _outputs: outputs,
             refresh_outputs,
             outputs_watched,
             events: snapshots,
@@ -245,10 +235,16 @@ struct Worker {
 
 impl Worker {
     fn snapshot(&self) -> Playback {
-        Playback {
+        let mut playback = Playback {
             queue: self.queue.snapshot.clone(),
             ..self.playback.clone()
+        };
+        if let Some(session) = &self.session
+            && playback.output.is_some()
+        {
+            playback.output = Some(session.output.info());
         }
+        playback
     }
     fn fail(&mut self, error: anyhow::Error) {
         if self.remote_generation.take().is_some()
@@ -271,6 +267,7 @@ impl Worker {
         self.session = None;
         self.playback.output = None;
         self.playback.error = None;
+        self.playback.interruption = None;
         self.playback.position_ms = position;
         let Some(track) = self.queue.current().cloned() else {
             self.stop_remote()?;
@@ -297,10 +294,10 @@ impl Worker {
         let session = Session::open(
             reader,
             self.playback.volume,
-            self.playback.selected_output.as_deref(),
+            self.output_target(),
             (position > 0).then_some(position),
         )?;
-        self.playback.output = Some(session.output.info.clone());
+        self.playback.output = Some(session.output.info());
         self.playback.state = PlaybackState::Playing;
         self.session = Some(session);
         Ok(())
@@ -337,6 +334,7 @@ impl Worker {
                 self.playback.track = track;
                 self.playback.output = None;
                 self.playback.error = None;
+                self.playback.interruption = None;
                 self.resume_at = Some(self.playback.position_ms);
             }
             Command::Enqueue { tracks, next } => {
@@ -398,6 +396,7 @@ impl Worker {
                 self.playback.state = PlaybackState::Stopped;
                 self.playback.position_ms = 0;
                 self.playback.error = None;
+                self.playback.interruption = None;
                 self.playback.output = None;
             }
             Command::Volume(value) => {
@@ -447,8 +446,11 @@ impl Worker {
             }
             Command::Seek(position) => self.seek(position)?,
             Command::SelectOutput(selected) => {
-                self.playback.output_error =
-                    self.select_output(selected).err().map(|e| Failure::of(&e));
+                let result = self.select_output(selected);
+                if result.is_ok() {
+                    self.playback.fallback = false;
+                }
+                self.playback.output_error = result.err().map(|e| Failure::of(&e));
             }
             Command::RefreshOutputs => {}
             Command::DiscoverNetworkOutputs => {
@@ -526,17 +528,18 @@ impl Worker {
                 }
             }
             self.playback.position_ms = session.base_ms;
-            self.playback.output = Some(session.output.info.clone());
+            self.playback.output = Some(session.output.info());
             self.session = Some(session);
-        } else if selected.is_some() {
-            crate::devices::resolve(selected.as_deref())?;
+        } else if let Some(name) = &selected {
+            crate::backend::check(name)?;
         }
         self.playback.selected_output = selected;
         Ok(())
     }
 
     /// A track that cannot be read is skipped during automatic playback, as long
-    /// as another one can start. Output and network failures stop playback.
+    /// as another one can start. Local output failures pause playback; network
+    /// failures stop it.
     fn recover(&mut self, mut error: anyhow::Error) {
         for _ in 0..self.queue.snapshot.entries.len() {
             let failure = Failure::of(&error);
@@ -561,7 +564,9 @@ impl Worker {
                 Err(next) => error = next,
             }
         }
-        self.fail(error);
+        if !self.interrupt(&error) {
+            self.fail(error);
+        }
     }
 
     fn pump(&mut self) -> Result<()> {
@@ -573,7 +578,13 @@ impl Worker {
             return Ok(());
         };
         if session.output.failed.load(Ordering::Relaxed) {
-            return Err(Failure::new(Kind::OutputDisconnected).into());
+            let label = session.output.info().device_label;
+            return Err(if label.is_empty() {
+                Failure::new(Kind::OutputDisconnected)
+            } else {
+                Failure::with(Kind::OutputDisconnected, label)
+            }
+            .into());
         }
         if self.playback.state != PlaybackState::Playing {
             return Ok(());

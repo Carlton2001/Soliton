@@ -43,13 +43,17 @@ impl Soliton {
                     let name = device.name.clone();
                     let selectable = device.selectable;
                     let label = if selectable {
-                        name.clone()
+                        device.label.clone()
                     } else {
-                        format!("{name} — {}", self.t(Text::AmbiguousOutput))
+                        format!("{} — {}", device.label, self.t(Text::AmbiguousOutput))
                     };
                     radio_row(
                         ("audio-output", index),
-                        "volume-2",
+                        if device.bluetooth {
+                            "bluetooth"
+                        } else {
+                            "volume-2"
+                        },
                         label,
                         local && selected == Some(&name),
                         theme,
@@ -63,7 +67,7 @@ impl Soliton {
                     .into_any_element()
                 }),
         );
-        if soliton_audio::OUTPUTS_LISTED && self.playback.outputs.is_empty() {
+        if self.playback.outputs.is_empty() {
             rows.push(
                 list_row()
                     .text_color(theme.muted)
@@ -81,7 +85,11 @@ impl Soliton {
                     format!(
                         "{} — {}",
                         selected.unwrap(),
-                        self.t(Text::PreferredOutputUnavailable)
+                        self.t(if self.playback.fallback {
+                            Text::PreferredOutputFallback
+                        } else {
+                            Text::PreferredOutputUnavailable
+                        })
                     ),
                     theme,
                 ))
@@ -99,10 +107,14 @@ impl Soliton {
                 theme,
             ))
             .when(local, |view| {
-                view.child(hint(self.t(Text::OutputStreamHint), theme))
-            })
-            .when(!soliton_audio::OUTPUTS_LISTED, |view| {
-                view.child(hint(self.t(Text::SystemSoundSettingsHint), theme))
+                view.child(hint(
+                    self.t(if soliton_audio::DEFAULT_FOLLOWED {
+                        Text::FollowedOutputStreamHint
+                    } else {
+                        Text::OutputStreamHint
+                    }),
+                    theme,
+                ))
             });
         section(self.t(Text::AudioOutput), None, body)
     }
@@ -127,11 +139,20 @@ impl Soliton {
         };
         Some(format!(
             "{} — {} Hz · {} {} · {format}",
-            info.device_name,
+            self.output_label(info),
             info.sample_rate,
             info.channels,
             self.t(Text::Channels)
         ))
+    }
+
+    /// A stream following the system default is unnamed until it is linked.
+    pub fn output_label(&self, info: &soliton_audio::OutputInfo) -> String {
+        if info.device_label.is_empty() {
+            self.t(Text::SystemOutput).into()
+        } else {
+            info.device_label.clone()
+        }
     }
 
     pub fn network_preferences(&self, cx: &mut Context<Self>) -> AnyElement {

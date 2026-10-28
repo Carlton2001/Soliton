@@ -1,9 +1,7 @@
-use crate::{OutputInfo, devices};
-use anyhow::{Result, bail};
-use cpal::{
-    FromSample, SampleFormat, SizedSample,
-    traits::{DeviceTrait, StreamTrait},
-};
+//! Device stream shared by the platform backends: the worker fills a
+//! preallocated queue that the device callback drains.
+use crate::{OutputInfo, backend};
+use anyhow::Result;
 use crossbeam_queue::ArrayQueue;
 use std::{
     sync::{
@@ -17,7 +15,7 @@ use std::{
 const CALLBACK_WAIT: Duration = Duration::from_millis(200);
 
 pub(crate) struct Output {
-    _stream: cpal::Stream,
+    stream: backend::Stream,
     pub samples: Arc<ArrayQueue<[f32; 2]>>,
     pub playing: Arc<AtomicBool>,
     pub volume: Arc<AtomicU32>,
@@ -29,79 +27,54 @@ pub(crate) struct Output {
     /// Channels carried by queued frames: mono, or stereo for any wider device,
     /// whose further channels stay silent.
     pub frame_channels: usize,
-    pub info: OutputInfo,
+    info: OutputInfo,
 }
 
 impl Output {
     pub fn open(rate: u32, channels: usize, volume: f32, preferred: Option<&str>) -> Result<Self> {
-        let device = devices::resolve(preferred)?;
-        let default = device.default_output_config()?;
-        let supported = device.supported_output_configs()?.find(|c| {
-            c.channels() as usize == channels
-                && c.min_sample_rate().0 <= rate
-                && c.max_sample_rate().0 >= rate
-                && c.sample_format() == SampleFormat::F32
-        });
-        let config = supported
-            .map(|c| c.with_sample_rate(cpal::SampleRate(rate)))
-            .unwrap_or(default);
-        // Shared-mode WASAPI only accepts the mix format's channel count, which
-        // is 6 or 8 for surround speakers: stereo goes to front left and right.
-        anyhow::ensure!(config.channels() > 0, "Output has no channel");
-        let rate = config.sample_rate().0;
-        let frame_channels = usize::from(config.channels()).min(2);
-        let info = OutputInfo {
-            device_name: device.name()?,
-            sample_rate: rate,
-            channels: config.channels(),
-            sample_format: format!("{:?}", config.sample_format()),
+        let callback = Callback {
+            samples: Arc::new(ArrayQueue::new(rate as usize * 2)),
+            playing: Arc::new(AtomicBool::new(false)),
+            volume: Arc::new(AtomicU32::new(volume.clamp(0., 1.).to_bits())),
+            played: Arc::new(AtomicU64::new(0)),
+            callbacks: Arc::new(AtomicU64::new(0)),
         };
-        let samples = Arc::new(ArrayQueue::new(rate as usize * 2));
-        let playing = Arc::new(AtomicBool::new(false));
-        let volume = Arc::new(AtomicU32::new(volume.clamp(0., 1.).to_bits()));
-        let played = Arc::new(AtomicU64::new(0));
-        let callbacks = Arc::new(AtomicU64::new(0));
+        let (samples, playing, volume, played, callbacks) = (
+            callback.samples.clone(),
+            callback.playing.clone(),
+            callback.volume.clone(),
+            callback.played.clone(),
+            callback.callbacks.clone(),
+        );
         let failed = Arc::new(AtomicBool::new(false));
-        let stream_config = config.config();
-        macro_rules! build {
-            ($sample:ty) => {
-                build::<$sample>(
-                    &device,
-                    &stream_config,
-                    Callback {
-                        channels: usize::from(stream_config.channels),
-                        samples: samples.clone(),
-                        playing: playing.clone(),
-                        volume: volume.clone(),
-                        played: played.clone(),
-                        callbacks: callbacks.clone(),
-                    },
-                    failed.clone(),
-                )?
-            };
-        }
-        let stream = match config.sample_format() {
-            SampleFormat::F32 => build!(f32),
-            SampleFormat::F64 => build!(f64),
-            SampleFormat::I16 => build!(i16),
-            SampleFormat::I32 => build!(i32),
-            SampleFormat::U16 => build!(u16),
-            format => bail!("Unsupported output sample format: {format:?}"),
-        };
-        stream.play()?;
+        let (stream, info) = backend::open(rate, channels, preferred, callback, failed.clone())?;
+        anyhow::ensure!(info.channels > 0, "Output has no channel");
+        // The device may run at another rate: the queue then holds slightly
+        // more or less than two seconds, which only changes buffering.
         Ok(Self {
-            _stream: stream,
+            stream,
             samples,
             playing,
             volume,
             played,
             callbacks,
             failed,
-            rate,
-            frame_channels,
+            rate: info.sample_rate,
+            frame_channels: usize::from(info.channels).min(2),
             info,
         })
     }
+
+    /// The device actually playing the stream, when the sound server moves it.
+    pub fn info(&self) -> OutputInfo {
+        let mut info = self.info.clone();
+        if let Some((name, label)) = self.stream.device() {
+            info.device_name = name;
+            info.device_label = label;
+        }
+        info
+    }
+
     pub fn position_ms(&self) -> u64 {
         self.played.load(Ordering::Relaxed) * 1000 / self.rate as u64
     }
@@ -134,8 +107,7 @@ fn flush(
 }
 
 /// State moved into the device callback.
-struct Callback {
-    channels: usize,
+pub(crate) struct Callback {
     samples: Arc<ArrayQueue<[f32; 2]>>,
     playing: Arc<AtomicBool>,
     volume: Arc<AtomicU32>,
@@ -145,38 +117,22 @@ struct Callback {
 
 impl Callback {
     /// Callback contract: only atomics and nonblocking preallocated queue access.
-    fn fill<T: SizedSample + FromSample<f32>>(&self, output: &mut [T]) {
+    pub fn fill<T>(&self, output: &mut [T], channels: usize, convert: impl Fn(f32) -> T) {
         let active = self.playing.load(Ordering::SeqCst);
         let gain = f32::from_bits(self.volume.load(Ordering::Relaxed));
-        let consumed = render(output, self.channels, &self.samples, active, gain);
+        let consumed = render(output, channels, &self.samples, active, gain, convert);
         self.played.fetch_add(consumed, Ordering::Relaxed);
         self.callbacks.fetch_add(1, Ordering::SeqCst);
     }
 }
 
-fn build<T>(
-    device: &cpal::Device,
-    config: &cpal::StreamConfig,
-    callback: Callback,
-    failed: Arc<AtomicBool>,
-) -> Result<cpal::Stream>
-where
-    T: SizedSample + FromSample<f32>,
-{
-    Ok(device.build_output_stream(
-        config,
-        move |output: &mut [T], _| callback.fill(output),
-        move |_| failed.store(true, Ordering::Relaxed),
-        None,
-    )?)
-}
-
-fn render<T: SizedSample + FromSample<f32>>(
+fn render<T>(
     output: &mut [T],
     channels: usize,
     frames: &ArrayQueue<[f32; 2]>,
     active: bool,
     gain: f32,
+    convert: impl Fn(f32) -> T,
 ) -> u64 {
     let mut consumed = 0;
     for frame in output.chunks_mut(channels) {
@@ -187,7 +143,7 @@ fn render<T: SizedSample + FromSample<f32>>(
         };
         for (channel, sample) in frame.iter_mut().enumerate() {
             let value = values.get(channel).copied().unwrap_or(0.);
-            *sample = T::from_sample((value * gain).clamp(-1., 1.));
+            *sample = convert((value * gain).clamp(-1., 1.));
         }
     }
     consumed

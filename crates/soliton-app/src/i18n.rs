@@ -64,10 +64,14 @@ pub enum Text {
     SystemOutput,
     NoAudioOutputs,
     PreferredOutputUnavailable,
+    PreferredOutputFallback,
+    PlaybackPaused,
+    ResumeOnDefaultOutput,
+    ResumePlayback,
     AmbiguousOutput,
     NoActiveOutput,
     OutputStreamHint,
-    SystemSoundSettingsHint,
+    FollowedOutputStreamHint,
     BluetoothAudio,
     AddBluetoothDevice,
     OpeningBluetoothSettings,
@@ -307,6 +311,19 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::AudioOutput => ("Sortie audio", "Audio output"),
         Text::SystemOutput => ("Périphérique système par défaut", "Default system device"),
         Text::NoAudioOutputs => ("Aucun périphérique détecté", "No devices detected"),
+        Text::PreferredOutputFallback => (
+            "sortie préférée indisponible ; la lecture utilise la sortie système par défaut jusqu’à son retour",
+            "preferred output unavailable; playback uses the default system output until it returns",
+        ),
+        Text::PlaybackPaused => ("Lecture en pause", "Playback paused"),
+        Text::ResumeOnDefaultOutput => (
+            "reprenez la lecture pour continuer sur la sortie système par défaut",
+            "resume playback to continue on the default system output",
+        ),
+        Text::ResumePlayback => (
+            "reprenez la lecture pour continuer",
+            "resume playback to continue",
+        ),
         Text::PreferredOutputUnavailable => (
             "sortie préférée indisponible ; reconnectez-la ou choisissez une autre sortie",
             "preferred output unavailable; reconnect it or choose another output",
@@ -323,9 +340,9 @@ pub fn text(language: Language, key: Text) -> &'static str {
             "Format envoyé par Soliton, avant les traitements du système et du périphérique. Le choix système par défaut s’applique au démarrage d’une piste ou après un changement de position ou de sortie.",
             "Format sent by Soliton, before system and device processing. The system default applies when starting a track or after seeking or switching outputs.",
         ),
-        Text::SystemSoundSettingsHint => (
-            "Le périphérique de sortie, Bluetooth compris, se choisit dans les paramètres Son du système.",
-            "Choose the output device, including Bluetooth, in the system Sound settings.",
+        Text::FollowedOutputStreamHint => (
+            "Format envoyé par Soliton, avant les traitements du système et du périphérique. Le choix système par défaut suit aussitôt la sortie choisie dans les paramètres Son.",
+            "Format sent by Soliton, before system and device processing. The system default immediately follows the output chosen in the Sound settings.",
         ),
         Text::BluetoothAudio => ("Appareils Bluetooth appairés", "Paired Bluetooth devices"),
         Text::AddBluetoothDevice => (
