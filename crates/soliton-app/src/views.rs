@@ -34,11 +34,26 @@ impl Soliton {
 
     /// Name of the current section, below the title bar and above its toolbar.
     pub fn page_title(&self, label: Text, cx: &App) -> Div {
-        self.page_heading(self.t(label).into(), cx)
+        self.title_block(self.t(label).into(), cx)
     }
 
-    /// Page title with free text, such as the artist whose albums are listed.
-    pub fn page_heading(&self, label: SharedString, cx: &App) -> Div {
+    /// Page title followed by what narrows it, such as the listed artist, in
+    /// the accent color; only that free text is truncated when too long.
+    pub fn page_title_with(&self, label: Text, detail: SharedString, cx: &App) -> Div {
+        self.title_block(SharedString::default(), cx)
+            .flex()
+            .gap(rems(0.75))
+            .child(div().flex_none().child(self.t(label)))
+            .child(
+                div()
+                    .min_w_0()
+                    .truncate()
+                    .text_color(self.theme().accent)
+                    .child(detail),
+            )
+    }
+
+    fn title_block(&self, label: SharedString, cx: &App) -> Div {
         let title_font = Font {
             weight: FontWeight::SEMIBOLD,
             ..font("Inter")
@@ -80,8 +95,7 @@ impl Soliton {
             .text_size(crate::widgets::TEXT_DISPLAY)
             .line_height(line_height)
             .font(title_font)
-            .truncate()
-            .child(label)
+            .when(!label.is_empty(), |title| title.child(label))
     }
 
     pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {

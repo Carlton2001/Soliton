@@ -34,7 +34,11 @@ impl Soliton {
                     .flex_col()
                     .child(match &self.filter.artist {
                         // Coming from an artist, the page is named after them.
-                        Some(artist) => self.page_heading(artist.clone().into(), cx),
+                        Some(artist) => self.page_title_with(
+                            crate::i18n::Text::Albums,
+                            artist.clone().into(),
+                            cx,
+                        ),
                         None => self.page_title(crate::i18n::Text::Albums, cx),
                     })
                     .child(self.header(cx))
