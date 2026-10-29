@@ -270,6 +270,80 @@ fn removed_files_are_forgotten_but_never_after_cancellation() {
 }
 
 #[test]
+fn system_folders_are_not_traversed() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("music");
+    wav(&source.join("Artist/Album/01.wav"));
+    wav(&source.join("$RECYCLE.BIN/S-1-5-21/02.wav"));
+    wav(&source.join("System Volume Information/03.wav"));
+    wav(&source.join("lost+found/#1234.wav"));
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    let id = library.add_source(&source).unwrap();
+    let report = scan(&mut library, id);
+    assert!(report.complete);
+    assert_eq!(report.progress.discovered, 1);
+}
+
+/// Unix permissions only; skipped where they are not enforced, as for root.
+#[cfg(unix)]
+#[test]
+fn an_unreadable_folder_keeps_its_entries_and_lets_the_rest_be_purged() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("music");
+    let locked = source.join("Locked");
+    let first = source.join("Artist/Album/01.wav");
+    wav(&first);
+    wav(&source.join("Artist/Album/02.wav"));
+    wav(&locked.join("03.wav"));
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    let id = library.add_source(&source).unwrap();
+    scan(&mut library, id);
+    let set_mode =
+        |mode| std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(mode)).unwrap();
+    set_mode(0o000);
+    if std::fs::read_dir(&locked).is_ok() {
+        set_mode(0o755);
+        return;
+    }
+    std::fs::remove_file(&first).unwrap();
+    let report = scan(&mut library, id);
+    set_mode(0o755);
+    assert!(report.complete);
+    assert_eq!(report.removed, 1);
+    assert_eq!(report.diagnostics.len(), 1);
+    assert_eq!(report.diagnostics[0].kind, Kind::FolderUnreadable);
+    let tracks = |library: &Library| -> Vec<(String, bool)> {
+        let mut tracks: Vec<_> = library
+            .snapshot()
+            .unwrap()
+            .albums
+            .iter()
+            .flat_map(|album| album.tracks())
+            .map(|t| {
+                (
+                    t.path.file_name().unwrap().to_string_lossy().into(),
+                    t.available,
+                )
+            })
+            .collect();
+        tracks.sort();
+        tracks
+    };
+    assert_eq!(
+        tracks(&library),
+        [("02.wav".into(), true), ("03.wav".into(), false)]
+    );
+    // Readable again, the folder's entries return.
+    let report = scan(&mut library, id);
+    assert!(report.diagnostics.is_empty());
+    assert_eq!(
+        tracks(&library),
+        [("02.wav".into(), true), ("03.wav".into(), true)]
+    );
+}
+
+#[test]
 fn rejects_storage_overlap_and_keeps_untagged_folders_separate() {
     let dir = tempfile::tempdir().unwrap();
     let storage = dir.path().join("data");

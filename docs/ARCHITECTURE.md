@@ -41,8 +41,12 @@ representation is reported and skipped without stopping the scan or its
 conclusions.
 
 **Removals.** After a full scan without traversal errors, on a source verified
-reachable before and after, files not encountered are removed. Cancellation, a
-traversal error or a source becoming unreachable prevent any conclusion. A root
+reachable before and after, files not encountered are removed. Cancellation, an
+unattributed traversal error or a source becoming unreachable prevent any
+conclusion. A folder that cannot be listed only keeps its own subtree: its
+entries stay, flagged unavailable, and the rest of the source is concluded.
+`lost+found`, `System Volume Information` and `$RECYCLE.BIN` below the root are
+not traversed. A root
 with no audio file at all is treated as an unmounted volume, unless it is still on
 the volume that held its music (stored device id, schema v8): the music was then
 deleted. Without a volume id (non-Unix), doubt remains and entries are kept.

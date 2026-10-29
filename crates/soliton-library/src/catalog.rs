@@ -242,6 +242,18 @@ impl Library {
         Ok(removed)
     }
 
+    /// Counts the entries below `dir` as seen by `generation`, so that the purge
+    /// keeps them, but flags them unavailable: the folder could not be listed.
+    pub(crate) fn keep_unreadable(&self, source: i64, dir: &Path, generation: i64) -> Result<()> {
+        let prefix = format!("{}{MAIN_SEPARATOR}", path_text(dir)?);
+        self.connection.execute(
+            "UPDATE files SET seen=?1,available=0 WHERE source_id=?2 AND seen<>?1
+             AND substr(path,1,length(?3))=?3",
+            params![generation, source, prefix],
+        )?;
+        Ok(())
+    }
+
     /// Keeps entries of files not seen by `generation` but flags them unavailable.
     pub(crate) fn mark_unseen_unavailable(&self, scope: &Scope, generation: i64) -> Result<()> {
         for prefix in scope.prefixes()? {

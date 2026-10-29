@@ -120,6 +120,7 @@ impl Library {
         let root = source.path.clone();
         let mut report = ScanReport::default();
         let mut traversal_failed = false;
+        let mut unreadable = Vec::new();
         std::thread::scope(|scope| -> Result<()> {
             let (found_tx, found_rx) = bounded(64);
             let (jobs_tx, jobs_rx) = bounded::<Candidate>(16);
@@ -208,6 +209,10 @@ impl Library {
                                     Known::Changed => pending = Some(file),
                                 }
                             }
+                            Ok(Discovered::Unreadable(dir)) => {
+                                report.error(Failure::new(Kind::FolderUnreadable).about(dir.display()));
+                                unreadable.push(dir);
+                            }
                             Ok(Discovered::Error(error)) => {
                                 traversal_failed = true;
                                 report.error(Failure::with(Kind::FolderUnreadable, error));
@@ -278,6 +283,10 @@ impl Library {
                 root: &source.path,
                 dirs: &dirs,
             };
+            // Entries below an unreadable folder are kept, flagged unavailable.
+            for dir in &unreadable {
+                self.keep_unreadable(source_id, dir, generation)?;
+            }
             let volume = crate::availability::volume(&source.path);
             let emptied = scope.whole() && report.progress.discovered == 0;
             // An empty root off the volume that held its music is more likely an
