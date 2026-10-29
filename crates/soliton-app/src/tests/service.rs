@@ -80,7 +80,8 @@ fn playlist_edits_pass_a_running_scan_instead_of_waiting_for_its_end() {
     loop {
         match services
             .events
-            .recv_timeout(Duration::from_secs(10))
+            // Shared Windows runners have stalled more than 10 s between events.
+            .recv_timeout(Duration::from_secs(60))
             .expect("Library worker did not finish the scan")
         {
             Event::Playlists(lists) if lists.len() == 1 => created_during_scan = true,

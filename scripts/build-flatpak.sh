@@ -30,8 +30,7 @@ flatpak install --user -y --noninteractive flathub \
     org.freedesktop.Sdk//26.08 org.freedesktop.Platform//26.08 \
     org.freedesktop.Sdk.Extension.rust-stable//26.08 \
     org.freedesktop.Sdk.Extension.llvm22//26.08 >/dev/null
-# GitHub runners cannot read the rofiles-fuse checkout during appstreamcli compose.
-flatpak-builder --user --force-clean --disable-rofiles-fuse \
+flatpak-builder --user --force-clean \
     --state-dir="$work/state" --repo="$work/repo" "$work/build" "$MANIFEST"
 lint manifest "$MANIFEST" || true
 lint repo "$work/repo" || true
