@@ -1,5 +1,6 @@
 //! Button content: icon and label, or the icon alone when space runs short.
 //! The choice is global, so buttons never show a partial or mixed state.
+//! Labels go only when the toolbar of the page cannot hold them.
 use gpui::{prelude::*, *};
 use std::cell::Cell;
 
@@ -21,6 +22,38 @@ thread_local! {
 /// Set once per frame, before any button is built.
 pub fn set_density(density: Density) {
     DENSITY.with(|d| d.set(density));
+}
+
+/// Builds with another density, for a row that cannot hold its labels at
+/// the window's minimum width; the page density is restored afterwards.
+pub fn with_density<R>(density: Density, build: impl FnOnce() -> R) -> R {
+    let page = DENSITY.with(|d| d.replace(density));
+    let built = build();
+    DENSITY.with(|d| d.set(page));
+    built
+}
+
+/// Width in rems of a button label at body size, as drawn.
+pub fn label_width(text: &str, window: &Window) -> f32 {
+    let rem = window.rem_size();
+    let run = TextRun {
+        len: text.len(),
+        font: Font {
+            weight: FontWeight::MEDIUM,
+            ..font(super::UI_FONT)
+        },
+        color: Hsla::default(),
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    };
+    let line = window.text_system().shape_line(
+        SharedString::from(text.to_owned()),
+        rem * super::TEXT_BODY.0,
+        &[run],
+        None,
+    );
+    f32::from(line.width) / f32::from(rem)
 }
 
 pub(super) struct Content {

@@ -722,19 +722,8 @@ impl Render for Soliton {
         } else {
             0.
         };
-        // Labels go all at once, the main actions last.
-        let main_width = if split {
-            width_in_rems - crate::collection::album_panel_width(width_in_rems)
-        } else {
-            width_in_rems
-        };
-        crate::widgets::set_density(if main_width < 40. {
-            crate::widgets::Density::Tight
-        } else if main_width < 52. {
-            crate::widgets::Density::Compact
-        } else {
-            crate::widgets::Density::Full
-        });
+        // Only the collection header may drop labels: see `header_density`.
+        crate::widgets::set_density(crate::widgets::Density::Full);
         let content = width_in_rems * f32::from(window.rem_size());
         let available = content - panel_width - reserved;
         self.columns = ((available + gap) / (tile + gap)).floor().max(1.) as usize;
@@ -783,7 +772,7 @@ impl Render for Soliton {
                 !self.now_playing && self.section == Section::Artists && self.selected.is_none(),
                 |v| {
                     v.child(self.page_title(Text::Artists, cx))
-                        .child(self.header(cx))
+                        .child(self.measured_header(window, cx))
                 },
             )
             .child(body);

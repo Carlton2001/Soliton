@@ -198,12 +198,16 @@ impl Soliton {
                 })),
             )
             .when(open, |anchor| {
-                anchor.child(dropdown(self.filters_menu(kind, cx), false))
+                // Menu entries keep their labels at every density.
+                let menu = crate::widgets::with_density(crate::widgets::Density::Full, || {
+                    self.filters_menu(kind, cx)
+                });
+                anchor.child(dropdown(menu, false))
             })
     }
 
     /// Filters button label, with the number of active filters.
-    fn filters_label(&self) -> SharedString {
+    pub(super) fn filters_label(&self) -> SharedString {
         let count = FilterKind::ALL
             .into_iter()
             .filter(|&kind| self.current(kind).is_some())
@@ -239,7 +243,6 @@ impl Soliton {
     fn sort_menu(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         popover(theme)
-            .w(rems(15.))
             .flex()
             .flex_col()
             .children(SORTS.iter().map(|&sort| {

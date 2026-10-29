@@ -82,7 +82,7 @@ impl Soliton {
                     .text_color(theme.accent)
                     .rounded(crate::widgets::RADIUS)
                     .hover(move |s| s.bg(theme.hover))
-                    .when(album.inferred("album_artist"), |artist| artist.italic())
+                    .when(album.artist_inferred(), |artist| artist.italic())
                     .child(self.album_artist(album))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.focus.focus(window);
@@ -308,6 +308,7 @@ impl Soliton {
                                                 self.t(Text::PlayNext),
                                                 theme,
                                             )
+                                            .justify_start()
                                             .on_click(
                                                 cx.listener(move |this, _, _, cx| {
                                                     this.menu = None;
@@ -327,6 +328,7 @@ impl Soliton {
                                                 self.t(Text::AppendQueue),
                                                 theme,
                                             )
+                                            .justify_start()
                                             .on_click(
                                                 cx.listener(move |this, _, _, cx| {
                                                     this.menu = None;

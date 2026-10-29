@@ -99,7 +99,6 @@ impl Soliton {
             .filter(|(selected, _)| *selected == selection);
         let menu = div()
             .id(("track-action-menu", key))
-            .w(rems(15.))
             .p(rems(0.5))
             .flex()
             .flex_col()
@@ -119,8 +118,8 @@ impl Soliton {
                     .into_iter()
                     .enumerate()
                     .map(|(i, (icon, label, action))| {
+                        // Stretched by the menu column to its widest entry.
                         button(("track-action", i), icon, self.t(label), theme)
-                            .w_full()
                             .justify_start()
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 cx.stop_propagation();

@@ -361,7 +361,9 @@ impl Soliton {
         id: impl Into<ElementId>,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let trigger = button(id, "list-plus", self.t(Text::AddToPlaylist), self.theme());
+        // Entry of the album actions menu, aligned with the others.
+        let trigger =
+            button(id, "list-plus", self.t(Text::AddToPlaylist), self.theme()).justify_start();
         trigger.on_click(cx.listener(move |this, _, window, cx| {
             cx.stop_propagation();
             if !tracks.is_empty() {

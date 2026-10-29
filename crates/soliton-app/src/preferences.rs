@@ -64,7 +64,8 @@ pub fn setting_row(
                 .flex()
                 .flex_col()
                 .gap(rems(0.125))
-                .flex_basis(rems(14.))
+                // A hint wraps beside the control; a bare label never pushes it down.
+                .when(hint.is_some(), |text| text.flex_basis(rems(14.)))
                 .flex_grow()
                 .min_w_0()
                 .child(label)

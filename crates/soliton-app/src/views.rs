@@ -98,7 +98,61 @@ impl Soliton {
             .when(!label.is_empty(), |title| title.child(label))
     }
 
-    pub fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    /// Labels kept by the collection header in `width` rems: all of them while
+    /// the row fits with the search at its minimum width, then Play all alone.
+    pub fn header_density(&self, width: f32, window: &Window) -> crate::widgets::Density {
+        use crate::widgets::{Density, label_width};
+        let albums = self.section == Section::Albums;
+        let border = 2. / 16.;
+        // Padding, borders, icon and gap of a button; the chevron of a menu.
+        let button = 1.5 + border + 1. + 0.5;
+        let chevron = 0.5 + 1.;
+        // Each grid/list option, then the bordered frame holding both.
+        let option = 1.25 + border + 1. + 0.375;
+        let frame = 0.375 + border + 0.125;
+        let gap = crate::widgets::CONTROL_GAP.0;
+        let mut fixed = 2. * CONTENT_PADDING + 8. + 2. * option + frame;
+        let mut labels =
+            label_width(self.t(Text::Grid), window) + label_width(self.t(Text::List), window);
+        let mut play = 0.;
+        if albums {
+            fixed += 3. * (button + gap) + 2. * chevron;
+            play = label_width(self.t(Text::PlayAll), window);
+            labels += label_width(&self.filters_label(), window)
+                + label_width(
+                    &self.labelled(
+                        self.t(Text::Sort),
+                        self.sort_label(self.settings.album_sort),
+                    ),
+                    window,
+                );
+        }
+        // Slack for rounding and the spacer between the two groups.
+        let fixed = fixed + gap + 1.;
+        if width >= fixed + play + labels {
+            Density::Full
+        } else if width >= fixed + play {
+            Density::Compact
+        } else {
+            Density::Tight
+        }
+    }
+
+    /// [`Self::header`] with the labels its width allows, beside the album
+    /// panel when one is open.
+    pub fn measured_header(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        let width = crate::navigation::content_width(window);
+        let width =
+            if crate::collection::split_collection(width, self.section, self.selected.is_some()) {
+                width - crate::collection::album_panel_width(width)
+            } else {
+                width
+            };
+        let density = self.header_density(width, window);
+        crate::widgets::with_density(density, || self.header(cx).into_any_element())
+    }
+
+    fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let albums = self.section == Section::Albums;
         let grid = match self.section {
@@ -117,7 +171,7 @@ impl Soliton {
             .flex_col()
             .gap(crate::widgets::PAGE_SECTION_GAP)
             .child(
-                // One row: the search narrows and the view toggle drops its labels.
+                // One row: the search narrows first, then the buttons drop their labels.
                 div()
                     .flex()
                     .items_center()
@@ -137,7 +191,7 @@ impl Soliton {
                     .child(div().flex_1())
                     .when_some(grid, |row, grid| {
                         row.child(
-                            div().min_w_0().child(segments(
+                            div().flex_none().child(segments(
                                 [
                                     segment(
                                         "grid",
@@ -296,7 +350,7 @@ impl Soliton {
                         .line_clamp(1)
                         .text_size(TEXT_SMALL)
                         .text_color(theme.muted)
-                        .when(album.inferred("album_artist"), |artist| artist.italic())
+                        .when(album.artist_inferred(), |artist| artist.italic())
                         .child(self.album_artist(album)),
                 )
                 .into_any_element();
@@ -335,7 +389,7 @@ impl Soliton {
                             .line_clamp(1)
                             .text_size(TEXT_SMALL)
                             .text_color(theme.muted)
-                            .when(album.inferred("album_artist"), |artist| artist.italic())
+                            .when(album.artist_inferred(), |artist| artist.italic())
                             .child(self.album_artist(album)),
                     )
                     .when(!available, |v| {

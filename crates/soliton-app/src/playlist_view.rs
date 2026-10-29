@@ -221,138 +221,159 @@ impl Soliton {
         let rows = uniform_list(
             "playlists",
             count,
-            cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+            cx.processor(|this, range: std::ops::Range<usize>, window, cx| {
                 let theme = this.theme();
-                range
-                    .map(|i| {
-                        let p = &this.playlists.lists[i];
-                        let id = p.id;
-                        let playable = p.entries.iter().any(|e| {
-                            e.track_id
-                                .and_then(|id| this.tracks.get(&id))
-                                .is_some_and(|t| t.available)
-                        });
-                        div()
-                            .id(("playlist", id as usize))
-                            .tab_index(0)
-                            .border_2()
-                            .border_color(gpui::transparent_black())
-                            .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
-                            .focus(move |s| {
-                                s.bg(theme.selected).border_2().border_color(theme.accent)
-                            })
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.focus.focus(window);
-                                this.open_playlist(id, cx);
-                            }))
-                            .h(rems(4.5))
-                            .w_full()
-                            .pl(rems(0.5))
-                            .child(
-                                div()
-                                    .h_full()
-                                    .flex()
-                                    .items_center()
-                                    .gap(rems(0.75))
-                                    .border_b_1()
-                                    .border_color(theme.border)
-                                    .child(
-                                        icon_button(
-                                            ("playlist-row-play", id as usize),
-                                            "play",
-                                            this.t(Text::Play),
-                                            false,
-                                            theme,
-                                        )
-                                        .opacity(if playable { 1. } else { 0.35 })
-                                        .on_click(
-                                            cx.listener(move |this, _, _, cx| {
-                                                cx.stop_propagation();
-                                                this.play_playlist(id, None, cx)
-                                            }),
-                                        ),
-                                    )
-                                    .child(cover(this.playlist_cover(p), 56., theme))
-                                    .child(
-                                        div()
-                                            .flex_1()
-                                            .min_w(rems(12.))
-                                            .flex()
-                                            .flex_col()
-                                            .child(
-                                                div()
-                                                    .text_size(crate::widgets::TEXT_SUBTITLE)
-                                                    .w_full()
-                                                    .truncate()
-                                                    .whitespace_normal()
-                                                    .line_clamp(1)
-                                                    .child(p.name.clone()),
+                // Row actions keep their labels unless the window is too narrow
+                // for them beside the play button, cover and a short title.
+                let labels: f32 = [Text::RenamePlaylist, Text::Delete, Text::OpenPlaylist]
+                    .into_iter()
+                    .map(|label| crate::widgets::label_width(this.t(label), window))
+                    .sum();
+                let fixed = 2. * crate::widgets::PAGE_INSET.0
+                    + 0.5
+                    + 2.5
+                    + 3.5
+                    + 6.
+                    + 3. * 3.125
+                    + 5. * 0.75
+                    + 1.5;
+                let density = if crate::navigation::content_width(window) >= fixed + labels {
+                    crate::widgets::Density::Full
+                } else {
+                    crate::widgets::Density::Tight
+                };
+                crate::widgets::with_density(density, || {
+                    range
+                        .map(|i| {
+                            let p = &this.playlists.lists[i];
+                            let id = p.id;
+                            let playable = p.entries.iter().any(|e| {
+                                e.track_id
+                                    .and_then(|id| this.tracks.get(&id))
+                                    .is_some_and(|t| t.available)
+                            });
+                            div()
+                                .id(("playlist", id as usize))
+                                .tab_index(0)
+                                .border_2()
+                                .border_color(gpui::transparent_black())
+                                .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
+                                .focus(move |s| {
+                                    s.bg(theme.selected).border_2().border_color(theme.accent)
+                                })
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.focus.focus(window);
+                                    this.open_playlist(id, cx);
+                                }))
+                                .h(rems(4.5))
+                                .w_full()
+                                .pl(rems(0.5))
+                                .child(
+                                    div()
+                                        .h_full()
+                                        .flex()
+                                        .items_center()
+                                        .gap(rems(0.75))
+                                        .border_b_1()
+                                        .border_color(theme.border)
+                                        .child(
+                                            icon_button(
+                                                ("playlist-row-play", id as usize),
+                                                "play",
+                                                this.t(Text::Play),
+                                                false,
+                                                theme,
                                             )
-                                            .child(
-                                                div()
-                                                    .text_size(TEXT_SMALL)
-                                                    .text_color(theme.muted)
-                                                    .child(format!(
-                                                        "{} {}",
-                                                        p.entries.len(),
-                                                        this.t(Text::Tracks)
-                                                    )),
+                                            .opacity(if playable { 1. } else { 0.35 })
+                                            .on_click(
+                                                cx.listener(move |this, _, _, cx| {
+                                                    cx.stop_propagation();
+                                                    this.play_playlist(id, None, cx)
+                                                }),
                                             ),
-                                    )
-                                    .child(
-                                        button(
-                                            ("playlist-rename", id as usize),
-                                            "pencil",
-                                            this.t(Text::RenamePlaylist),
-                                            theme,
                                         )
-                                        .on_click(
-                                            cx.listener(move |this, _, window, cx| {
-                                                cx.stop_propagation();
-                                                this.open_playlist_dialog(
-                                                    Dialog::Rename(id),
-                                                    window,
-                                                    cx,
-                                                );
-                                            }),
-                                        ),
-                                    )
-                                    .child(
-                                        button(
-                                            ("playlist-delete", id as usize),
-                                            "x",
-                                            this.t(Text::Delete),
-                                            theme,
+                                        .child(cover(this.playlist_cover(p), 56., theme))
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .min_w(rems(6.))
+                                                .flex()
+                                                .flex_col()
+                                                .child(
+                                                    div()
+                                                        .text_size(crate::widgets::TEXT_SUBTITLE)
+                                                        .w_full()
+                                                        .truncate()
+                                                        .whitespace_normal()
+                                                        .line_clamp(1)
+                                                        .child(p.name.clone()),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_size(TEXT_SMALL)
+                                                        .text_color(theme.muted)
+                                                        .child(format!(
+                                                            "{} {}",
+                                                            p.entries.len(),
+                                                            this.t(Text::Tracks)
+                                                        )),
+                                                ),
                                         )
-                                        .on_click(
-                                            cx.listener(move |this, _, window, cx| {
-                                                cx.stop_propagation();
-                                                this.open_playlist_dialog(
-                                                    Dialog::Delete(id),
-                                                    window,
-                                                    cx,
-                                                );
-                                            }),
-                                        ),
-                                    )
-                                    .child(
-                                        button(
-                                            ("playlist-open", id as usize),
-                                            "list",
-                                            this.t(Text::OpenPlaylist),
-                                            theme,
+                                        .child(
+                                            button(
+                                                ("playlist-rename", id as usize),
+                                                "pencil",
+                                                this.t(Text::RenamePlaylist),
+                                                theme,
+                                            )
+                                            .on_click(
+                                                cx.listener(move |this, _, window, cx| {
+                                                    cx.stop_propagation();
+                                                    this.open_playlist_dialog(
+                                                        Dialog::Rename(id),
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }),
+                                            ),
                                         )
-                                        .on_click(
-                                            cx.listener(move |this, _, window, cx| {
-                                                this.focus.focus(window);
-                                                cx.stop_propagation();
-                                                this.open_playlist(id, cx);
-                                            }),
+                                        .child(
+                                            button(
+                                                ("playlist-delete", id as usize),
+                                                "x",
+                                                this.t(Text::Delete),
+                                                theme,
+                                            )
+                                            .on_click(
+                                                cx.listener(move |this, _, window, cx| {
+                                                    cx.stop_propagation();
+                                                    this.open_playlist_dialog(
+                                                        Dialog::Delete(id),
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }),
+                                            ),
+                                        )
+                                        .child(
+                                            button(
+                                                ("playlist-open", id as usize),
+                                                "list",
+                                                this.t(Text::OpenPlaylist),
+                                                theme,
+                                            )
+                                            .on_click(
+                                                cx.listener(move |this, _, window, cx| {
+                                                    this.focus.focus(window);
+                                                    cx.stop_propagation();
+                                                    this.open_playlist(id, cx);
+                                                }),
+                                            ),
                                         ),
-                                    ),
-                            )
-                    })
-                    .collect()
+                                )
+                        })
+                        .collect()
+                })
             }),
         )
         .track_scroll(self.playlists.scroll.clone())

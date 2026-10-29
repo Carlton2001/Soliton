@@ -41,7 +41,7 @@ impl Soliton {
                         ),
                         None => self.page_title(crate::i18n::Text::Albums, cx),
                     })
-                    .child(self.header(cx))
+                    .child(self.measured_header(window, cx))
                     .child(self.albums_view(cx)),
             )
             .when(split, |view| {

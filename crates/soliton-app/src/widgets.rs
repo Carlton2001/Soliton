@@ -5,7 +5,7 @@ use gpui::{prelude::*, *};
 use std::path::PathBuf;
 use std::rc::Rc;
 mod adaptive;
-pub use adaptive::{Density, set_density};
+pub use adaptive::{Density, label_width, set_density, with_density};
 
 /// Type scale at the 16 px reference: body text is 13 px.
 pub const TEXT_CAPTION: Rems = Rems(0.6875);
@@ -52,6 +52,8 @@ pub fn page_toolbar(theme: Theme) -> Div {
         .border_b_1()
         .border_color(theme.border)
         .flex()
+        // Buttons keep their labels: a narrow window wraps them instead.
+        .flex_wrap()
         .items_center()
         .gap(CONTROL_GAP)
 }
