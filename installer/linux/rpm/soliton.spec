@@ -23,6 +23,8 @@ Requires:       mesa-vulkan-drivers
 # Loaded at run time, so not detected from the binary.
 Requires:       libwayland-client.so.0()(64bit)
 Requires:       hicolor-icon-theme
+# Fallback for characters missing from the embedded Inter and JetBrains Mono.
+Requires:       default-fonts-core-sans
 
 %description
 Soliton is a fast music player for large local collections. It indexes your

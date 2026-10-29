@@ -246,7 +246,10 @@ Fedora 44, glibc 2.43) : `.spec` et `rpmbuild` à partir du
 binaire release de l'archive, validé par `rpmlint`, installation et
 désinstallation.
 
-**10 bis.2 .deb** — Debian et Ubuntu.
+**10 bis.2 .deb** — Ubuntu 24.04 et suivantes, Linux Mint 22, Debian 13 :
+binaire compilé dans un conteneur Ubuntu 24.04 (glibc 2.39), dépendances
+détectées par `dpkg-shlibdeps`, validé par `lintian`, installation et
+désinstallation.
 
 **10 bis.3 Flatpak** — Flathub, Silverblue compris : permissions limitées à la
 bibliothèque, PipeWire, MPRIS et au réseau local.

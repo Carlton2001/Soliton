@@ -1,0 +1,13 @@
+Package: soliton
+Version: @VERSION@
+Architecture: amd64
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Depends: @DEPENDS@
+Section: sound
+Priority: optional
+Homepage: https://github.com/Carlton2001/Soliton
+Description: Fast music player for large local collections
+ Soliton is a fast music player for large local collections. It indexes your
+ folders in the background, groups albums and their editions, and shows
+ embedded cover art. Your music files are only ever read.

@@ -197,6 +197,30 @@ dépendances de construction et de développement exclues) et des ressources
 embarquées (Inter, Lucide). La date de `%changelog` est celle du dernier commit et
 les notes de version restent dans les métadonnées AppStream.
 
+## Construire le .deb
+
+```sh
+scripts/build-deb.sh
+```
+
+Le binaire du paquet est compilé sous Ubuntu 24.04 (glibc 2.39) : le paquet vise
+Ubuntu 24.04 et suivantes, Linux Mint 22 et Debian 13. Hors d'Ubuntu 24.04, le
+script se relance dans un conteneur `podman` construit depuis
+`installer/linux/deb/Containerfile` (Rust 1.98.1, outils Debian), avec son propre
+dossier `target/ubuntu-24.04` et un volume `soliton-ubuntu-cargo` pour le cache
+des crates. Il produit `target/distribution/output/soliton_<version>-1_amd64.deb`
+et son empreinte SHA-256, puis le vérifie avec `lintian`.
+
+Disposition et données identiques au RPM ; les licences sont dans
+`/usr/share/doc/soliton` (`copyright` au format Debian, notices des crates).
+`dpkg-shlibdeps` détecte les bibliothèques liées ; `libvulkan1`,
+`mesa-vulkan-drivers` et `libwayland-client0`, chargées à l'exécution, sont
+déclarées, ainsi que `pipewire-bin` (qui fournit `client.conf`, sans lequel le
+client PipeWire échoue) et une police système (`fonts-dejavu-core` ou
+équivalent) pour les caractères absents d'Inter et de JetBrains Mono, toutes deux
+embarquées. Le RPM déclare `default-fonts-core-sans` pour la même raison. Le champ `Maintainer` vaut l'adresse GitHub sans réponse, ou
+`SOLITON_MAINTAINER`.
+
 Après un changement de dépendances, régénérer les notices avant de construire
 (cargo-about 0.9.2 compilé une fois depuis crates.io ; Python 3 est présent sur
 Fedora) :
@@ -269,6 +293,19 @@ Le 28 octobre 2026, paquet RPM dans un conteneur `fedora:44` minimal :
 | `dnf remove` : fichiers retirés, `~/.local/share/Soliton` conservé | Réussi |
 | Paquet installé sur la machine de développement (Fedora 44, GNOME Wayland) : lanceur, icône, fenêtre associée au dock, panneau média, bibliothèque existante retrouvée | Réussi (essai manuel) ; avertissement attendu de `dnf` pour un paquet local non signé |
 | Lancement depuis la vue des applications avec `StartupNotify=false` : plus de curseur d'attente, fenêtre au premier plan | Réussi (essai manuel) |
+| Chiffres seuls en JetBrains Mono embarquée (numéros, durées, lecteur, curseurs), infobulles en Inter : aucun chiffre tronqué | Réussi (essai manuel, 29 octobre 2026) |
+
+Le 28 octobre 2026, paquet .deb dans des conteneurs `ubuntu:24.04`, `debian:13`
+et `ubuntu:26.04` minimaux :
+
+| Vérification | Résultat |
+| --- | --- |
+| Compilation release sous Ubuntu 24.04 (PipeWire 1.0) | Réussie ; binaire limité à glibc 2.39 |
+| `apt install` du paquet : dépendances résolues, aucune bibliothèque manquante (`ldd`), Vulkan et Wayland présents | Réussi sur les trois |
+| `lintian` | Aucune erreur ; absence de page de manuel et de bogue clos signalée |
+| Paquet dans une toolbox Ubuntu 24.04 vierge : `client.conf` de PipeWire et police absents, client audio en échec puis arrêt de GPUI | Corrigé : `pipewire-bin` déclaré, infobulles en Inter ; démarrage vérifié sans aucune police système (conteneur Wayland) |
+| Paquet corrigé dans la toolbox Ubuntu 24.04 (binaire Ubuntu vérifié par `/proc/<pid>/root`) : rendu, lecture audio, panneau média, bibliothèque retrouvée | Réussi (essai manuel, 29 octobre 2026) ; intégration au bureau Ubuntu (lanceur, dock) non vérifiée |
+| `apt purge` : fichiers retirés, `~/.local/share/Soliton` conservé | Réussi sur les trois |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.

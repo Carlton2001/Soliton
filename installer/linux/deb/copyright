@@ -1,0 +1,17 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Soliton
+Upstream-Contact: https://github.com/Carlton2001/Soliton/issues
+Source: https://github.com/Carlton2001/Soliton
+Comment: The binary also contains the Rust crates listed with their licenses
+ and copyright notices in /usr/share/doc/soliton/dependencies, the Inter font
+ (OFL-1.1) and Lucide icons (ISC).
+
+Files: *
+Copyright: 2026 Carlton2001
+License: GPL-3.0-only
+ This program is free software: you can redistribute it and/or modify it under
+ the terms of the GNU General Public License as published by the Free Software
+ Foundation, version 3.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in /usr/share/common-licenses/GPL-3.
