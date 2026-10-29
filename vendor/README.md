@@ -5,7 +5,7 @@ Leurs licences et leurs sources sont conservées. Les caches Cargo de la machine
 ne sont pas modifiés. `Cargo.toml` applique ces copies via `[patch.crates-io]`.
 Les crates tierces restent exclues du workspace RAP.
 
-## GPUI 0.2.2 — Apache-2.0
+## GPUI 0.2.2, Apache-2.0
 
 Source : https://crates.io/crates/gpui/0.2.2
 
@@ -37,7 +37,7 @@ Ces changements corrigent les diagnostics au démarrage et la double destruction
 observés sous Windows. Aucun filtre global des journaux, aucun désarmement des
 assertions debug et aucun changement de curseur ne sont appliqués.
 
-## proc-macro-error2 2.0.1 — MIT OR Apache-2.0
+## proc-macro-error2 2.0.1, MIT OR Apache-2.0
 
 Source : https://crates.io/crates/proc-macro-error2/2.0.1
 
@@ -48,7 +48,7 @@ des macros. Les autres sources du package sont inchangées.
 Lors d'une mise à jour upstream, réexaminer ces modifications et les retirer une
 fois les mêmes comportements corrigés et validés dans la version retenue.
 
-## xattr 0.2.3 — MIT OR Apache-2.0
+## xattr 0.2.3, MIT OR Apache-2.0
 
 Source : https://crates.io/crates/xattr/0.2.3
 

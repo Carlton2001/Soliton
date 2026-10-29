@@ -1,4 +1,4 @@
-# Soliton — Lecteur audio en Rust
+# Soliton : Lecteur audio en Rust
 ## Spécifications
 
 **Licence :** GPL-3.0-only · **Langage :** Rust · **Interface :** GPUI ·
@@ -202,7 +202,7 @@ Ces règles restent en vigueur pour toute évolution.
 Chaque phase aboutit à un état compilable et vérifiable. Présenter les choix
 d'architecture avant implémentation.
 
-## Phase 10 — Distribution Windows
+## Phase 10 : Distribution Windows
 
 **10.1 Build Release**
 - Profil `release` (optimisations, symboles séparés), sans console.
@@ -233,7 +233,7 @@ d'architecture avant implémentation.
 
 **Livrable :** archive portable et installateur Windows publiables.
 
-## Phase 10 bis — Distribution Linux
+## Phase 10 bis : Distribution Linux
 
 Dans l'ordre : RPM, puis .deb, puis Flatpak. Identifiant
 `io.github.Carlton2001.Soliton`, installation système sous `/usr`, données
@@ -245,17 +245,17 @@ Le rendu GPUI exige Vulkan (repli logiciel lavapipe accepté sur matériel
 ancien) : déclarer `vulkan-loader`/`libvulkan1` et `mesa-vulkan-drivers` dans
 les paquets, et faire avertir `install.sh` en l'absence de `libvulkan.so.1`.
 
-**10 bis.1 RPM** — Fedora Workstation 44 et suivantes (binaire construit sur
+**10 bis.1 RPM** : Fedora Workstation 44 et suivantes (binaire construit sur
 Fedora 44, glibc 2.43) : `.spec` et `rpmbuild` à partir du
 binaire release de l'archive, validé par `rpmlint`, installation et
 désinstallation.
 
-**10 bis.2 .deb** — Ubuntu 24.04 et suivantes, Linux Mint 22, Debian 13 :
+**10 bis.2 .deb** : Ubuntu 24.04 et suivantes, Linux Mint 22, Debian 13 :
 binaire compilé dans un conteneur Ubuntu 24.04 (glibc 2.39), dépendances
 détectées par `dpkg-shlibdeps`, validé par `lintian`, installation et
 désinstallation.
 
-**10 bis.3 Flatpak** — Flathub, Silverblue compris : runtime Freedesktop 26.08,
+**10 bis.3 Flatpak** : Flathub, Silverblue compris : runtime Freedesktop 26.08,
 compilation depuis les sources hors ligne, permissions minimales (affichage,
 PipeWire, réseau, MPRIS), lecture seule du dossier Musique et des points de
 montage, portail pour les autres dossiers ; données séparées des installations
@@ -263,7 +263,7 @@ natives.
 
 **Livrable :** paquets construits et vérifiés, prêts à publier.
 
-## Phase 11 — Validation matérielle
+## Phase 11 : Validation matérielle
 
 - Collection réelle de plusieurs milliers de pistes : indexation initiale,
   redémarrage, performances SSD/NAS.

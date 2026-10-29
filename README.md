@@ -1,14 +1,19 @@
 # Soliton
 
 <p align="center">
-  <img src="screenshots/hero.webp" alt="Soliton music library interface" width="100%" />
+  <img src="screenshots/hero.webp" alt="Soliton audio library interface" width="100%" />
 </p>
 
-Soliton is a native music player built in **Rust** with **GPUI**. It brings your local music collection into a responsive desktop interface, with rich metadata, album artwork, multiple editions, and playback on local or network devices.
+Soliton is a native audio library player built in **Rust** with **GPUI**. It indexes your local music collection and presents it in a responsive desktop interface, with rich metadata, album artwork, multiple editions, and playback on local or network devices.
 
-Windows is the primary build and validation target. Windows distribution is prepared, with package and hardware validation still pending. Soliton also runs on Linux (Fedora Workstation).
+Soliton plays the albums and tracks of its library: add your music folders as sources, and everything is browsed and played from there. It is not a standalone file player: files opened from a file manager or dropped onto the window are not played directly.
 
-On Linux, Soliton plays through the system sound output (PipeWire or PulseAudio), integrates with the desktop media controls and keys through MPRIS, can start at sign-in, and installs per user from a release archive. See the [Linux guide](docs/LINUX.md) for installation, building, and remaining hardware tests.
+## Platforms
+
+- **Windows** 10 (1809) and later, x64: per-user installer.
+- **Linux** x86_64: RPM for Fedora 44 and later, .deb for Ubuntu 24.04, Linux Mint 22, and Debian 13 and later, Flatpak for other distributions, and a per-user archive. See the [Linux guide](docs/LINUX.md) for installation and building.
+
+On Linux, Soliton plays through a native PipeWire stream (PulseAudio alone is not supported), follows the system default output or a chosen PipeWire output (Bluetooth headsets included), and integrates with the desktop media panel and media keys through MPRIS. Install new releases through your package manager, Flatpak, or a newer archive.
 
 ## Your Music, Kept Local
 
@@ -22,38 +27,38 @@ Background indexing and filesystem monitoring keep the library up to date. When 
 - **Multiple Editions**: Group matching album editions and put the best available edition first.
 - **Search and Filters**: Search regardless of case or accents. Filter by genre, period, artist, format, or quality, and sort by artist, title, year, or recent additions.
 - **Playback and Queue**: Use a persistent player bar, Now Playing, fullscreen mode, shuffle, repeat, manual playlists, and an editable queue.
-- **Local and Network Outputs**: Choose a local audio device, use Bluetooth through Windows, or play to DLNA / UPnP and Google Cast receivers. Cast has been validated on NVIDIA SHIELD; DLNA has only been tested with a simulated receiver.
-- **Windows Integration**: Use media keys, system media controls, taskbar thumbnail controls, and the notification area. Configure closing behavior and automatic startup.
-- **Personalization**: Choose English or French, system/light/dark appearance, accent color, artwork size, and the application icon.
+- **Local and Network Outputs**: Choose a local audio device (Bluetooth included), or play to DLNA / UPnP and Google Cast receivers.
+- **Desktop Integration**: On Windows, use media keys, system media controls, taskbar thumbnail controls, and the notification area, and configure closing behavior and automatic startup. On Linux, use media keys and the desktop media panel through MPRIS.
+- **Personalization**: Choose English or French, system/light/dark appearance, accent color, artwork size, and the application icon (on Linux, for archive installations only).
 
-Tested formats include **WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, and AIFF**. Local playback uses shared audio output; exclusive mode, bit-perfect playback, and an equalizer are not currently available. See the [development guide](docs/DEVELOPMENT.md#limites) for playback and network limitations.
+Tested formats include **WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, and AIFF**.
 
 ## Technology Stack
 
 - **Application and UI**: Rust and [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui), with native GPU-accelerated rendering.
-- **Audio**: Symphonia for decoding, CPAL for local output, and an audio engine independent of the interface.
+- **Audio**: Symphonia for decoding, an audio engine independent of the interface, and native local output: WASAPI through CPAL on Windows, PipeWire on Linux.
 - **Library**: SQLite through rusqlite, Lofty for tags and artwork, and background indexing with cancellation and bounded concurrency.
-- **System Integration**: Dedicated platform interfaces with Windows-specific implementations.
+- **System Integration**: Dedicated platform interfaces with Windows and Linux (MPRIS, XDG portals, inotify) implementations.
 - **Icons**: Official [Lucide](https://lucide.dev/) SVG assets.
 
 ## Getting Started
 
 ### Prerequisites
 
-For the current Windows build:
+The current validation baseline is Rust 1.98.1.
 
-- Rust with the MSVC x64 toolchain. The current validation baseline is Rust 1.98.1.
-- Visual Studio Build Tools with the Visual C++ build tools and Windows SDK.
+- **Windows**: Rust with the MSVC x64 toolchain, and Visual Studio Build Tools with the Visual C++ build tools and Windows SDK.
+- **Linux**: a C/C++ toolchain, CMake, pkg-config, Clang, and the PipeWire, xkbcommon, FreeType, Fontconfig, XCB, and Wayland development packages; running requires Vulkan and a Wayland or X11 session. The [Linux guide](docs/LINUX.md#préparer-fedora-pour-le-développement) gives the Fedora command.
 
 ### Build and Run
 
 From the repository root:
 
-```powershell
-cargo run -p soliton-app
+```sh
+cargo run -p soliton-app --bin Soliton
 ```
 
-For release builds, Windows packaging, and update behavior, see the [distribution guide](docs/DISTRIBUTION.md). Development checks, smoke tests, and hardware probes are documented in the [development guide](docs/DEVELOPMENT.md).
+For release builds, Windows packaging, and update behavior, see the [distribution guide](docs/DISTRIBUTION.md); Linux packages are covered in the [Linux guide](docs/LINUX.md). Development checks, smoke tests, and hardware probes are documented in the [development guide](docs/DEVELOPMENT.md).
 
 ## Keyboard Shortcuts
 

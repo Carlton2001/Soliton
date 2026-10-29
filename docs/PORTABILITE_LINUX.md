@@ -99,7 +99,7 @@ Sources principales : [manifeste plateforme](../crates/soliton-platform/Cargo.to
 
 ## 3. Blocages réels du prototype
 
-### Script de compilation — complexité faible
+### Script de compilation : complexité faible
 
 Dans [build.rs](../crates/soliton-app/build.rs), un `return` évite l'exécution sous
 Linux, mais l'appel à `embed_resource` reste soumis à la résolution Rust. Cette
@@ -110,7 +110,7 @@ Adaptation ciblée : conditionner le code Windows lui-même avec `#[cfg(...)]`, 
 incluant ses constantes pour éviter les avertissements. La branche de génération
 des ressources Windows doit conserver son comportement.
 
-### Commandes de fenêtre — complexité moyenne
+### Commandes de fenêtre : complexité moyenne
 
 La [barre de titre](../crates/soliton-app/src/title_bar.rs) utilise uniquement
 `WindowControlArea` pour déplacement, réduction, agrandissement et fermeture.
