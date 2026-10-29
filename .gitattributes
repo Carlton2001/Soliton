@@ -1,0 +1,5 @@
+# Linux scripts and packaging inputs keep LF even in a Windows checkout,
+# so they still run once copied to Linux, WSL or a container.
+*.sh text eol=lf
+*.py text eol=lf
+installer/linux/** text eol=lf
