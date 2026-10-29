@@ -56,7 +56,9 @@ scan. Coalescing: 2 s of quiet, 15 s at most, 4,096 paths at most, turned into
 folders to scan. `read_dir` probe on a dedicated thread, 5 s timeout, every 5 s;
 offline sources are probed at the same pace (1 s timeout) and become available
 again as soon as their scan starts, without manual refresh. Full scan at startup
-and every 30 minutes.
+and every 30 minutes. The writer thread never touches a source without such a
+probe: a scan checks its source before and after (5 s), a new watch is only
+registered after a 1 s answer, and a source that does not answer keeps its state.
 
 **Schema.** Sequential migrations in `schema.rs` (`user_version`), each
 transactional with `foreign_key_check`. Sources, artists, albums, editions,
@@ -93,7 +95,8 @@ coalesced. Position comes from samples actually consumed.
 
 An undecodable packet is skipped and reported once per track; eight in a row make
 the file unreadable. In automatic playback an unreadable or unavailable track is
-skipped, at most one queue round; an output or network failure stops playback.
+skipped, at most one queue round, and skipping stops after a failure that took a
+second or more (hung source); an output or network failure stops playback.
 
 The engine owns the queue: occurrences with stable ids, deduplication by path,
 playlist origin kept, immutable snapshots shared through `Arc`. Changing what

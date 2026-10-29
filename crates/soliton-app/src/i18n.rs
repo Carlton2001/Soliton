@@ -574,6 +574,10 @@ pub fn failure_text(language: Language, kind: Kind) -> Option<&'static str> {
             "Soliton is busy, try again",
         ),
         Kind::SourceInaccessible => ("Dossier source inaccessible", "Source folder unreachable"),
+        Kind::SourceNotResponding => (
+            "Le dossier source ne répond pas",
+            "Source folder not responding",
+        ),
         Kind::SourceOverlapsStorage => (
             "Ce dossier contient les données de Soliton ou se trouve dedans",
             "This folder contains or is inside Soliton’s data",

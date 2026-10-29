@@ -58,11 +58,11 @@ impl SourceWatcher {
         self.overflow.swap(false, Ordering::Relaxed)
     }
 
-    /// Watches available sources and stops watching the others. Call only with
-    /// sources just confirmed reachable: registering an offline share may block.
+    /// Watches available sources and stops watching the others. Registering a
+    /// hung share may block, so a new watch waits for `reachable` to confirm it.
     /// Returns per-source failures; scans still cover those sources, and the next
     /// call tries again.
-    pub fn sync(&mut self, sources: &[Source]) -> Vec<String> {
+    pub fn sync(&mut self, sources: &[Source], reachable: impl Fn(&Path) -> bool) -> Vec<String> {
         let mut errors = Vec::new();
         let wanted: HashMap<_, _> = sources
             .iter()
@@ -77,7 +77,7 @@ impl SourceWatcher {
             keep
         });
         for (id, path) in wanted {
-            if self.watched.contains_key(&id) {
+            if self.watched.contains_key(&id) || !reachable(path) {
                 continue;
             }
             match self.inner.watch(path, RecursiveMode::Recursive) {
@@ -182,12 +182,13 @@ pub fn scopes(sources: &[Source], paths: &[PathBuf]) -> Vec<(i64, Vec<PathBuf>)>
         else {
             continue;
         };
-        // Files are rescanned through their folder; vanished entries through their
-        // parent. Scanning resolves missing directories to existing ancestors.
-        let dir = if path.is_dir() {
-            path.clone()
-        } else {
+        // Audio files are rescanned through their folder. Other paths are
+        // folders or vanished entries: the scan resolves them to an existing
+        // ancestor once the source answers, so nothing is read here.
+        let dir = if audio_path(path) {
             path.parent().unwrap_or(&source.path).to_path_buf()
+        } else {
+            path.clone()
         };
         scopes.entry(source.id).or_default().insert(dir);
     }

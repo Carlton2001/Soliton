@@ -80,7 +80,11 @@ fn native_watcher_observes_files_before_and_after_source_reactivation() {
     };
     let (sender, events) = crossbeam_channel::bounded(256);
     let mut watcher = SourceWatcher::new(sender).unwrap();
-    assert!(watcher.sync(std::slice::from_ref(&source)).is_empty());
+    assert!(
+        watcher
+            .sync(std::slice::from_ref(&source), |_| true)
+            .is_empty()
+    );
     let await_path = |path: &Path| {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -99,9 +103,17 @@ fn native_watcher_observes_files_before_and_after_source_reactivation() {
     await_path(&first);
 
     source.available = false;
-    assert!(watcher.sync(std::slice::from_ref(&source)).is_empty());
+    assert!(
+        watcher
+            .sync(std::slice::from_ref(&source), |_| true)
+            .is_empty()
+    );
     source.available = true;
-    assert!(watcher.sync(std::slice::from_ref(&source)).is_empty());
+    assert!(
+        watcher
+            .sync(std::slice::from_ref(&source), |_| true)
+            .is_empty()
+    );
     let second = source.path.join("after-reactivation.wav");
     std::fs::write(&second, b"synthetic watcher fixture").unwrap();
     await_path(&second);
@@ -143,7 +155,7 @@ fn watch_limit_releases_partial_watches() {
     let (_small_dir, small) = source(2, 3);
     let (sender, events) = crossbeam_channel::bounded(256);
     let mut watcher = SourceWatcher::new(sender).unwrap();
-    let errors = watcher.sync(std::slice::from_ref(&large));
+    let errors = watcher.sync(std::slice::from_ref(&large), |_| true);
     assert_eq!(errors.len(), 1, "{errors:?}");
     // The large source is left to scans: none of its folders is still watched.
     std::fs::write(large.path.join("00/large.wav"), b"x").unwrap();
@@ -151,7 +163,7 @@ fn watch_limit_releases_partial_watches() {
     assert!(events.try_iter().next().is_none());
     // Its released quota covers the small source, while the large one is retried.
     let both = [large.clone(), small.clone()];
-    assert_eq!(watcher.sync(&both).len(), 1);
+    assert_eq!(watcher.sync(&both, |_| true).len(), 1);
     let file = small.path.join("02/small.wav");
     std::fs::write(&file, b"x").unwrap();
     let event = events.recv_timeout(Duration::from_secs(5)).unwrap();

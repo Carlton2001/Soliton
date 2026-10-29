@@ -18,6 +18,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// A track failing after this long sits on a source that hangs rather than refuses.
+const SLOW_FAILURE: Duration = Duration::from_secs(1);
+
 pub struct Engine {
     commands: Sender<Command>,
     _outputs: crate::backend::Outputs,
@@ -556,7 +559,8 @@ impl Worker {
 
     /// A track that cannot be read is skipped during automatic playback, as long
     /// as another one can start. Local output failures pause playback; network
-    /// failures stop it.
+    /// failures stop it. A slow failure means a hung source: the next tracks
+    /// would each block the worker as long, so skipping stops there.
     fn recover(&mut self, mut error: anyhow::Error) {
         for _ in 0..self.queue.snapshot.entries.len() {
             let failure = Failure::of(&error);
@@ -576,9 +580,13 @@ impl Worker {
                 self.playback.position_ms = 0;
                 return;
             }
+            let started = Instant::now();
             match self.start_current() {
                 Ok(()) => return,
                 Err(next) => error = next,
+            }
+            if started.elapsed() >= SLOW_FAILURE {
+                break;
             }
         }
         if !self.interrupt(&error) {

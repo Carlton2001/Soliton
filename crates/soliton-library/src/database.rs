@@ -16,6 +16,8 @@ pub struct Library {
     pub(crate) connection: Connection,
     pub(crate) storage: PathBuf,
     pub(crate) covers: PathBuf,
+    /// Checks a source before touching it from the writer thread.
+    pub(crate) prober: crate::Prober,
 }
 
 impl Library {
@@ -52,7 +54,13 @@ impl Library {
             covers: storage.join("covers"),
             storage,
             connection,
+            prober: crate::Prober::default(),
         })
+    }
+
+    /// Shared with the caller's probes, so a hung share keeps one waiting thread.
+    pub fn prober(&self) -> crate::Prober {
+        self.prober.clone()
     }
 
     /// Changes whenever another connection commits; cheap enough to poll per query.

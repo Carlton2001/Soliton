@@ -3,7 +3,10 @@
 //! edits pass between scan batches; other work waits for the scan.
 use crate::service::{Event, Work};
 use crossbeam_channel::{Receiver, Sender, bounded};
-use soliton_core::{failure::Failure, playlist::PlaylistChange};
+use soliton_core::{
+    failure::{Failure, Kind},
+    playlist::PlaylistChange,
+};
 use soliton_library::{
     Cancellation, Coalescer, Interlude, Library, Prober, ScanProgress, SourceWatcher, WatchEvent,
 };
@@ -22,6 +25,8 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 /// quickly; a share still slow to answer is simply tried again later.
 const RETURN_PROBE_INTERVAL: Duration = Duration::from_secs(5);
 const RETURN_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
+/// A source not yet watched must answer this fast before its watch is registered.
+const WATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
 /// A burst of notifications is handled once quiet, or after the longest delay.
 const QUIET: Duration = Duration::from_secs(2);
 const LONGEST: Duration = Duration::from_secs(15);
@@ -70,13 +75,13 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
     };
     let now = Instant::now();
     let mut worker = Worker {
+        prober: library.prober(),
         library,
         work,
         deferred: VecDeque::new(),
         events,
         watcher,
         changes: Coalescer::new(QUIET, LONGEST),
-        prober: Prober::default(),
         background,
         next_probe: now + PROBE_INTERVAL,
         next_return_probe: now + RETURN_PROBE_INTERVAL,
@@ -254,6 +259,8 @@ impl Worker {
                     Some(source) if was_available && !source.available => {
                         self.send(Event::SourceUnavailable(source.path));
                     }
+                    // A slow source is left to the availability probes.
+                    _ if Failure::of(&error).kind == Kind::SourceNotResponding => {}
                     Some(_) if was_available => self.error(&error),
                     _ => {}
                 }
@@ -360,8 +367,10 @@ impl Worker {
 
     fn sync_watcher(&mut self) {
         let sources = self.sources();
+        let prober = &self.prober;
         if let Some(watcher) = &mut self.watcher {
-            for error in watcher.sync(&sources) {
+            let reachable = |path: &Path| prober.reachable(path, WATCH_PROBE_TIMEOUT) == Some(true);
+            for error in watcher.sync(&sources, reachable) {
                 tracing::warn!("Folder notifications unavailable: {error}");
             }
         }

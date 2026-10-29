@@ -14,6 +14,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    time::Duration,
 };
 
 #[derive(Clone, Default)]
@@ -54,6 +55,10 @@ impl ScanReport {
         }
     }
 }
+
+/// Longest wait for a source to answer before and after a scan; a hung share
+/// would otherwise hold the writer thread for the system's network timeout.
+const SOURCE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Number of stored files between commits; each commit makes progress visible.
 const BATCH: usize = 64;
@@ -101,10 +106,17 @@ impl Library {
             .into_iter()
             .find(|s| s.id == source_id)
             .ok_or_else(|| anyhow::anyhow!("Unknown source"))?;
-        if let Err(error) = std::fs::read_dir(&source.path) {
-            self.set_source_available(source_id, false)?;
-            let failure = Failure::with(Kind::SourceInaccessible, error.to_string());
-            return Err(failure.about(source.path.display()).into());
+        match self.prober.reachable(&source.path, SOURCE_TIMEOUT) {
+            Some(true) => {}
+            Some(false) => {
+                self.set_source_available(source_id, false)?;
+                let failure = Failure::new(Kind::SourceInaccessible);
+                return Err(failure.about(source.path.display()).into());
+            }
+            None => {
+                let failure = Failure::new(Kind::SourceNotResponding);
+                return Err(failure.about(source.path.display()).into());
+            }
         }
         let dirs = resolve_scope(&source.path, dirs);
         self.connection.execute(
@@ -275,8 +287,9 @@ impl Library {
         })?;
         report.cancelled = cancel.is_cancelled();
         // A partial traversal or a source lost meanwhile never establishes disappearance.
-        report.complete =
-            !report.cancelled && !traversal_failed && std::fs::read_dir(&source.path).is_ok();
+        report.complete = !report.cancelled
+            && !traversal_failed
+            && self.prober.reachable(&source.path, SOURCE_TIMEOUT) == Some(true);
         if report.complete {
             let scope = Scope {
                 source: source_id,

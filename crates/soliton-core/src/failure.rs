@@ -25,6 +25,8 @@ pub enum Kind {
     /// A command queue between Soliton's own threads is full or closed.
     Busy,
     SourceInaccessible,
+    /// The source did not answer in time; it may only be slow, so its state is kept.
+    SourceNotResponding,
     SourceOverlapsStorage,
     SourceOverlapsSource,
     SourceNotDirectory,
