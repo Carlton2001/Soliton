@@ -14,7 +14,12 @@ impl Soliton {
         let theme = self.theme();
         let track = self.playback.track.as_ref();
         let compact = f32::from(window.viewport_size().width) / f32::from(window.rem_size()) < 44.;
-        div()
+        let bottom = Corners {
+            bottom_left: true,
+            bottom_right: true,
+            ..Default::default()
+        };
+        crate::window_chrome::round(div(), crate::window_chrome::inner_corners(window), bottom)
             .flex_none()
             .flex()
             .flex_col()
@@ -105,6 +110,7 @@ impl Soliton {
                                         .justify_end()
                                         .gap(rems(0.5))
                                         .child(self.compact_volume(cx))
+                                        .child(self.output_control(cx))
                                         .child(self.now_playing_button(cx)),
                                 )
                             })
@@ -117,12 +123,7 @@ impl Soliton {
                                         .justify_end()
                                         .gap(rems(0.5))
                                         .child(self.volume_control(120., cx).max_w_full())
-                                        .when(
-                                            f32::from(window.viewport_size().width)
-                                                / f32::from(window.rem_size())
-                                                >= 90.,
-                                            |side| side.child(self.output_control(cx)),
-                                        )
+                                        .child(self.output_control(cx))
                                         .child(self.now_playing_button(cx)),
                                 )
                             }),
@@ -130,7 +131,6 @@ impl Soliton {
             )
     }
     fn output_control(&self, cx: &mut Context<Self>) -> Stateful<Div> {
-        let theme = self.theme();
         let name = self
             .playback
             .network_output
@@ -143,43 +143,12 @@ impl Soliton {
                     .map(|output| self.output_label(output))
             })
             .unwrap_or_else(|| self.t(Text::AudioOutput).into());
-        crate::widgets::with_tooltip(
-            div()
-                .id("player-output")
-                .tab_index(0)
-                .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
-                .h(CONTROL_HEIGHT)
-                .max_w(rems(10.))
-                .min_w_0()
-                .px(rems(0.625))
-                .flex()
-                .items_center()
-                .gap(rems(0.5))
-                .rounded(crate::widgets::RADIUS)
-                .border_1()
-                .border_color(theme.control_border)
-                .bg(theme.control)
-                .text_color(theme.text)
-                .text_size(TEXT_SMALL)
-                .focus(move |style| style.border_color(theme.accent))
-                .hover(move |style| style.bg(theme.control_hover))
-                .active(move |style| style.bg(theme.control_pressed))
-                .child(crate::widgets::tinted_icon("volume-2", theme.text))
-                .child(
-                    div()
-                        .min_w_0()
-                        .w_full()
-                        .truncate()
-                        .whitespace_normal()
-                        .line_clamp(1)
-                        .child(name.clone()),
-                )
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.focus.focus(window);
-                    this.navigate(crate::app::Section::Settings, cx);
-                })),
-            name.into(),
-            theme,
+        crate::widgets::icon_button("player-output", "speaker", name, false, self.theme()).on_click(
+            cx.listener(|this, _, window, cx| {
+                this.focus.focus(window);
+                this.navigate(crate::app::Section::Settings, cx);
+                this.reveal_audio_output.set(true);
+            }),
         )
     }
     fn compact_volume(&self, cx: &mut Context<Self>) -> Div {

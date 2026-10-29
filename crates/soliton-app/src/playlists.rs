@@ -177,7 +177,7 @@ impl Soliton {
         }
     }
 
-    pub fn playlist_dialog(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub fn playlist_dialog(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let dialog = self.playlists.dialog.as_ref()?;
         let theme = self.theme();
         let title = match dialog {
@@ -340,18 +340,22 @@ impl Soliton {
                 }),
         );
         Some(
-            div()
-                .absolute()
-                .inset_0()
-                .occlude()
-                .p(rems(0.75))
-                .flex()
-                .items_center()
-                .justify_center()
-                .bg(theme.scrim)
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(panel)
-                .into_any_element(),
+            crate::window_chrome::round(
+                div(),
+                crate::window_chrome::inner_corners(window),
+                Corners::all(true),
+            )
+            .absolute()
+            .inset_0()
+            .occlude()
+            .p(rems(0.75))
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(theme.scrim)
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(panel)
+            .into_any_element(),
         )
     }
 

@@ -43,12 +43,17 @@ impl Soliton {
                 })
                 .child(svg().path(icon).size(px(12.)).text_color(theme.text))
         };
+        let top_right = Corners {
+            top_right: true,
+            ..Default::default()
+        };
+        let corners = crate::window_chrome::inner_corners(window);
         let maximize_icon = if window.is_maximized() {
             "window-controls/restore.svg"
         } else {
             "window-controls/maximize.svg"
         };
-        div()
+        crate::window_chrome::round(div(), corners, top_right)
             .id("title-bar")
             .w_full()
             .h(px(TITLE_BAR_HEIGHT))
@@ -71,10 +76,14 @@ impl Soliton {
                     .hover(move |style| style.bg(hover)),
             )
             .child(
-                caption(
-                    "title-close",
-                    WindowControlArea::Close,
-                    "window-controls/close.svg",
+                crate::window_chrome::round(
+                    caption(
+                        "title-close",
+                        WindowControlArea::Close,
+                        "window-controls/close.svg",
+                    ),
+                    corners,
+                    top_right,
                 )
                 .hover(|style| style.bg(rgb(CLOSE_HOVER))),
             )

@@ -130,7 +130,12 @@ impl Soliton {
                     .pb(crate::widgets::PAGE_SECTION_GAP)
                     .child(self.general_section(theme, cx))
                     .child(self.display_section(theme, cx))
-                    .child(self.audio_preferences(cx))
+                    .child(
+                        div()
+                            .relative()
+                            .child(self.audio_preferences(cx))
+                            .child(self.audio_output_anchor()),
+                    )
                     .children(self.bluetooth_preferences(cx))
                     .child(self.network_preferences(cx))
                     .children(self.system_preferences(cx))
@@ -138,6 +143,30 @@ impl Soliton {
                     .child(self.update_preferences(cx)),
             );
         scroll_area(content, &self.settings_bar, theme)
+    }
+
+    /// Scrolls the settings so the Audio output section starts at the top once
+    /// its position is known, within the scrollable range.
+    fn audio_output_anchor(&self) -> impl IntoElement {
+        let reveal = self.reveal_audio_output.clone();
+        let handle = self.settings_bar.handle.clone();
+        canvas(
+            move |bounds, window, _| {
+                if !reveal.take() {
+                    return;
+                }
+                let offset = handle.offset();
+                let top = bounds.top() - offset.y - handle.bounds().top();
+                let y = (-top).clamp(-handle.max_offset().height, px(0.));
+                handle.set_offset(point(offset.x, y));
+                window.refresh();
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
     }
 
     fn general_section(&self, theme: Theme, cx: &mut Context<Self>) -> AnyElement {

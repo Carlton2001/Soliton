@@ -112,7 +112,8 @@ impl AssetSource for Assets {
             "circle-alert",
             "triangle-alert",
             "minus",
-            "plus"
+            "plus",
+            "speaker"
         ))
     }
     fn list(&self, _: &str) -> anyhow::Result<Vec<SharedString>> {

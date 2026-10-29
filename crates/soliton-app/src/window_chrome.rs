@@ -4,6 +4,8 @@ use gpui::{prelude::*, *};
 
 /// Transparent margin holding the shadow and the resize zones.
 const RESIZE_BORDER: Pixels = px(10.);
+/// Radius of the window outline; content inside the 1px border uses one less.
+const CORNER_RADIUS: Pixels = px(10.);
 
 pub fn options(bounds: WindowBounds) -> WindowOptions {
     WindowOptions {
@@ -73,23 +75,61 @@ pub fn horizontal_inset(window: &Window) -> Pixels {
     side(tiling.left) + side(tiling.right)
 }
 
+/// Tiling of the client frame, `None` when no frame is drawn.
+fn frame_tiling(window: &Window) -> Option<Tiling> {
+    if !cfg!(target_os = "linux") || window.is_fullscreen() {
+        return None;
+    }
+    let Decorations::Client { tiling } = window.window_decorations() else {
+        return None;
+    };
+    Some(if window.is_maximized() {
+        Tiling::tiled()
+    } else {
+        tiling
+    })
+}
+
+/// A corner is rounded only when both of its sides float free.
+fn rounded_corners(tiling: Tiling, radius: Pixels) -> Corners<Pixels> {
+    let corner = |a: bool, b: bool| if a || b { px(0.) } else { radius };
+    Corners {
+        top_left: corner(tiling.top, tiling.left),
+        top_right: corner(tiling.top, tiling.right),
+        bottom_right: corner(tiling.bottom, tiling.right),
+        bottom_left: corner(tiling.bottom, tiling.left),
+    }
+}
+
+/// Radii for content touching the window corners. GPUI clips rectangles only,
+/// so backgrounds reaching a corner must round it themselves.
+pub fn inner_corners(window: &Window) -> Corners<Pixels> {
+    frame_tiling(window)
+        .map(|tiling| rounded_corners(tiling, CORNER_RADIUS - px(1.)))
+        .unwrap_or_default()
+}
+
+/// Applies the `corners` radii that are selected by `mask` to `element`.
+pub fn round<E: Styled>(mut element: E, corners: Corners<Pixels>, mask: Corners<bool>) -> E {
+    let pick = |radius: Pixels, keep: bool| keep.then_some(radius.into());
+    let style = &mut element.style().corner_radii;
+    style.top_left = pick(corners.top_left, mask.top_left).or(style.top_left);
+    style.top_right = pick(corners.top_right, mask.top_right).or(style.top_right);
+    style.bottom_right = pick(corners.bottom_right, mask.bottom_right).or(style.bottom_right);
+    style.bottom_left = pick(corners.bottom_left, mask.bottom_left).or(style.bottom_left);
+    element
+}
+
 /// No wrapper or new handlers on Windows. On Linux, a transparent margin carries
 /// the window shadow and the compositor-driven resize zones with their cursors.
 pub fn frame(content: Div, window: &mut Window, theme: Theme) -> Div {
     if !cfg!(target_os = "linux") {
         return content;
     }
-    let Decorations::Client { mut tiling } = window.window_decorations() else {
+    let Some(tiling) = frame_tiling(window) else {
         window.set_client_inset(px(0.));
         return content;
     };
-    if window.is_fullscreen() {
-        window.set_client_inset(px(0.));
-        return content;
-    }
-    if window.is_maximized() {
-        tiling = Tiling::tiled();
-    }
     window.set_client_inset(RESIZE_BORDER);
     div()
         .relative()
@@ -128,20 +168,24 @@ pub fn frame(content: Div, window: &mut Window, theme: Theme) -> Div {
             }
         })
         .child(
-            content
-                .border_color(theme.border)
-                .when(!tiling.top, |content| content.border_t_1())
-                .when(!tiling.right, |content| content.border_r_1())
-                .when(!tiling.bottom, |content| content.border_b_1())
-                .when(!tiling.left, |content| content.border_l_1())
-                .when(!tiling.is_tiled(), |content| {
-                    content.shadow(vec![BoxShadow {
-                        color: hsla(0., 0., 0., 0.4),
-                        offset: point(px(0.), px(0.)),
-                        blur_radius: RESIZE_BORDER / 2.,
-                        spread_radius: px(0.),
-                    }])
-                }),
+            round(
+                content,
+                rounded_corners(tiling, CORNER_RADIUS),
+                Corners::all(true),
+            )
+            .border_color(theme.border)
+            .when(!tiling.top, |content| content.border_t_1())
+            .when(!tiling.right, |content| content.border_r_1())
+            .when(!tiling.bottom, |content| content.border_b_1())
+            .when(!tiling.left, |content| content.border_l_1())
+            .when(!tiling.is_tiled(), |content| {
+                content.shadow(vec![BoxShadow {
+                    color: hsla(0., 0., 0., 0.4),
+                    offset: point(px(0.), px(0.)),
+                    blur_radius: RESIZE_BORDER / 2.,
+                    spread_radius: px(0.),
+                }])
+            }),
         )
 }
 

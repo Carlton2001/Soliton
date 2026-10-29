@@ -69,6 +69,8 @@ pub struct Soliton {
     pub track_scroll: UniformListScrollHandle,
     pub track_bar: Scrollbar,
     pub settings_bar: Scrollbar,
+    /// Set to bring the Audio output section to the top of the settings page.
+    pub reveal_audio_output: std::rc::Rc<std::cell::Cell<bool>>,
     pub menu_scroll: UniformListScrollHandle,
     pub menu_bar: Scrollbar,
     pub pending_removal: Option<i64>,
@@ -223,6 +225,7 @@ impl Soliton {
             facet_bar: bar(&lists[1]),
             track_bar: bar(&lists[2]),
             settings_bar: Scrollbar::default(),
+            reveal_audio_output: Default::default(),
             menu_scroll: lists[3].clone(),
             menu_bar: bar(&lists[3]),
             pending_removal: None,
@@ -671,9 +674,9 @@ impl Render for Soliton {
                     .child(self.footer(window, cx))
                     .children(self.menu_view(cx))
             })
-            .children(self.close_dialog(cx))
+            .children(self.close_dialog(window, cx))
             .when(!fullscreen, |content| {
-                content.children(self.playlist_dialog(cx))
+                content.children(self.playlist_dialog(window, cx))
             });
         crate::window_chrome::frame(content, window, theme)
     }

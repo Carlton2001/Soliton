@@ -38,7 +38,12 @@ impl Soliton {
                 this.navigate(section, cx);
             }))
         };
-        div()
+        let corners = crate::window_chrome::inner_corners(window);
+        let top_left = Corners {
+            top_left: true,
+            ..Default::default()
+        };
+        crate::window_chrome::round(div(), corners, top_left)
             .w(rems(RAIL_WIDTH))
             .h_full()
             .flex_none()

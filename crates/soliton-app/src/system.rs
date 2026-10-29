@@ -269,81 +269,78 @@ impl Soliton {
         ))
     }
 
-    pub fn close_dialog(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub fn close_dialog(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         if !self.confirm_close {
             return None;
         }
         let theme = self.theme();
         Some(
-            div()
-                .absolute()
-                .inset_0()
-                .occlude()
-                .flex()
-                .items_center()
-                .justify_center()
-                .bg(theme.scrim)
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(
-                    div()
-                        .track_focus(&self.modal_focus)
-                        .max_w_full()
-                        .p(rems(0.75))
-                        .rounded(RADIUS_LARGE)
-                        .border_1()
-                        .border_color(theme.control_border)
-                        .bg(theme.panel)
-                        .flex()
-                        .flex_col()
-                        .gap(rems(0.75))
-                        .child(
-                            div()
-                                .text_size(TEXT_SUBTITLE)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(self.t(Text::CloseQuestion)),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_wrap()
-                                .gap(rems(0.5))
-                                .child(
-                                    button("close-quit", "x", self.t(Text::QuitApp), theme)
-                                        .on_click(cx.listener(|this, _, _, cx| this.quit_app(cx))),
-                                )
-                                .when(
-                                    self.desktop.as_ref().is_some_and(Desktop::can_hide),
-                                    |view| {
-                                        view.child(
-                                            button(
-                                                "close-hide",
-                                                "minimize-2",
-                                                self.t(Text::HideToTray),
-                                                theme,
-                                            )
-                                            .on_click(
-                                                cx.listener(|this, _, _, cx| this.hide_to_tray(cx)),
-                                            ),
+            crate::window_chrome::round(
+                div(),
+                crate::window_chrome::inner_corners(window),
+                Corners::all(true),
+            )
+            .absolute()
+            .inset_0()
+            .occlude()
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(theme.scrim)
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(
+                div()
+                    .track_focus(&self.modal_focus)
+                    .max_w_full()
+                    .p(rems(0.75))
+                    .rounded(RADIUS_LARGE)
+                    .border_1()
+                    .border_color(theme.control_border)
+                    .bg(theme.panel)
+                    .flex()
+                    .flex_col()
+                    .gap(rems(0.75))
+                    .child(
+                        div()
+                            .text_size(TEXT_SUBTITLE)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(self.t(Text::CloseQuestion)),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .gap(rems(0.5))
+                            .child(
+                                button("close-quit", "x", self.t(Text::QuitApp), theme)
+                                    .on_click(cx.listener(|this, _, _, cx| this.quit_app(cx))),
+                            )
+                            .when(
+                                self.desktop.as_ref().is_some_and(Desktop::can_hide),
+                                |view| {
+                                    view.child(
+                                        button(
+                                            "close-hide",
+                                            "minimize-2",
+                                            self.t(Text::HideToTray),
+                                            theme,
                                         )
-                                    },
-                                )
-                                .child(
-                                    button(
-                                        "close-cancel",
-                                        "arrow-left",
-                                        self.t(Text::Cancel),
-                                        theme,
+                                        .on_click(
+                                            cx.listener(|this, _, _, cx| this.hide_to_tray(cx)),
+                                        ),
                                     )
-                                    .on_click(cx.listener(
-                                        |this, _, _, cx| {
-                                            this.confirm_close = false;
-                                            cx.notify();
-                                        },
-                                    )),
-                                ),
-                        ),
-                )
-                .into_any_element(),
+                                },
+                            )
+                            .child(
+                                button("close-cancel", "arrow-left", self.t(Text::Cancel), theme)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.confirm_close = false;
+                                        cx.notify();
+                                    })),
+                            ),
+                    ),
+            )
+            .into_any_element(),
         )
     }
 }

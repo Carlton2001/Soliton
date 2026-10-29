@@ -1,4 +1,4 @@
-use super::resize_edge;
+use super::{resize_edge, rounded_corners};
 use gpui::{ResizeEdge, Tiling, point, px, size};
 
 #[test]
@@ -55,4 +55,31 @@ fn tiled_edges_cannot_start_a_resize_but_free_edges_still_can() {
             None
         );
     }
+}
+
+#[test]
+fn corners_stay_square_beside_tiled_sides() {
+    let radius = px(10.);
+    let free = rounded_corners(Tiling::default(), radius);
+    assert_eq!(free, gpui::Corners::all(radius));
+    assert_eq!(
+        rounded_corners(Tiling::tiled(), radius),
+        gpui::Corners::all(px(0.))
+    );
+    let left = rounded_corners(
+        Tiling {
+            left: true,
+            ..Default::default()
+        },
+        radius,
+    );
+    assert_eq!(
+        (
+            left.top_left,
+            left.top_right,
+            left.bottom_right,
+            left.bottom_left
+        ),
+        (px(0.), radius, radius, px(0.))
+    );
 }
