@@ -15,6 +15,8 @@ jobs:
           persist-credentials: false
       - name: Install Rust
         run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy --no-self-update
+      - name: Install the minimum supported Rust (workspace rust-version)
+        run: rustup toolchain install 1.89 --profile minimal --no-self-update
       - name: Select Rust
         run: rustup override set 1.98.1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
@@ -28,6 +30,8 @@ jobs:
         run: cargo check --workspace --all-targets --locked
       - name: Lints
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Check with the minimum supported Rust
+        run: cargo +1.89 check --workspace --all-targets --locked --target-dir target/msrv
       - name: Unit and integration tests
         run: cargo test --workspace --locked
       - name: Script tests
