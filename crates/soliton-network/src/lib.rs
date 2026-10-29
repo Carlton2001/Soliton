@@ -7,6 +7,10 @@ mod dlna;
 mod http;
 mod media;
 mod service;
+/// A simulated UPnP renderer shared by the session and controller tests.
+#[cfg(test)]
+#[path = "tests/renderer.rs"]
+mod test_renderer;
 
 pub use service::Network;
 use soliton_core::model::Track;

@@ -1,136 +1,18 @@
 use super::*;
-use axum::{Router, body::Bytes, extract::State as HttpState, http::HeaderMap, routing::post};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-#[derive(Default)]
-struct Renderer {
-    state: String,
-    uri: String,
-    position: String,
-    volume: u32,
-    seen: Vec<String>,
-}
-
-async fn soap(
-    HttpState(shared): HttpState<Arc<Mutex<Renderer>>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> String {
-    let action = headers["SOAPAction"]
-        .to_str()
-        .unwrap()
-        .trim_matches('"')
-        .rsplit('#')
-        .next()
-        .unwrap();
-    let text = std::str::from_utf8(&body).unwrap();
-    let doc = roxmltree::Document::parse(text).unwrap();
-    let value = |tag: &str| {
-        doc.descendants()
-            .find(|n| n.has_tag_name(tag))
-            .and_then(|n| n.text())
-            .unwrap_or_default()
-            .to_string()
-    };
-    let mut renderer = shared.lock().await;
-    renderer.seen.push(action.into());
-    let response = match action {
-        "GetProtocolInfo" => "<Sink>http-get:*:audio/wav:*</Sink>".into(),
-        "SetAVTransportURI" => {
-            renderer.uri = value("CurrentURI");
-            renderer.state = "STOPPED".into();
-            String::new()
-        }
-        "Play" => {
-            renderer.state = "PLAYING".into();
-            String::new()
-        }
-        "Pause" => {
-            renderer.state = "PAUSED_PLAYBACK".into();
-            String::new()
-        }
-        "Stop" => {
-            renderer.state = "STOPPED".into();
-            String::new()
-        }
-        "Seek" => {
-            renderer.position = value("Target");
-            String::new()
-        }
-        "SetVolume" => {
-            renderer.volume = value("DesiredVolume").parse().unwrap();
-            String::new()
-        }
-        "GetVolume" => format!("<CurrentVolume>{}</CurrentVolume>", renderer.volume),
-        "GetTransportInfo" => format!(
-            "<CurrentTransportState>{}</CurrentTransportState><CurrentTransportStatus>OK</CurrentTransportStatus>",
-            if renderer.state.is_empty() {
-                "STOPPED"
-            } else {
-                &renderer.state
-            }
-        ),
-        "GetPositionInfo" => format!(
-            "<TrackURI>{}</TrackURI><RelTime>{}</RelTime><TrackDuration>0:00:10</TrackDuration>",
-            media::xml(&renderer.uri),
-            if renderer.position.is_empty() {
-                "0:00:00"
-            } else {
-                &renderer.position
-            }
-        ),
-        other => panic!("Unexpected SOAP command: {other}"),
-    };
-    format!(
-        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:{action}Response xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\">{response}</u:{action}Response></s:Body></s:Envelope>"
-    )
-}
+use crate::test_renderer::{Mock, track};
 
 #[tokio::test]
 async fn upnp_session_controls_media_and_serves_only_the_current_track() {
-    use crate::dlna::{Service, Services};
-    let renderer = Arc::new(Mutex::new(Renderer::default()));
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let app = Router::new()
-        .route("/control", post(soap))
-        .with_state(renderer.clone());
-    let mock = tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
-    });
-    let service = |name| Service {
-        kind: format!("urn:schemas-upnp-org:service:{name}:1"),
-        url: format!("http://{address}/control"),
-    };
-    let device = Device {
-        id: "upnp:fixture".into(),
-        name: "Fixture renderer".into(),
-        protocol: Protocol::Upnp,
-        address,
-        services: Some(Services {
-            transport: service("AVTransport"),
-            rendering: Some(service("RenderingControl")),
-            connection: Some(service("ConnectionManager")),
-        }),
-    };
+    let mock = Mock::start().await;
+    let renderer = mock.renderer.clone();
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("fixture.wav");
-    std::fs::write(&path, b"synthetic WAV bytes").unwrap();
-    let track = soliton_core::model::Track {
-        id: 1,
-        source_id: 1,
-        path: path.clone(),
-        cover: None,
-        available: true,
-        metadata: soliton_core::model::Metadata {
-            title: "Été & <live>".into(),
-            duration_ms: 10_000,
-            ..Default::default()
-        },
-    };
+    let track = track(dir.path());
+    let path = track.path.clone();
     let mut controller = Controller::default();
-    controller.command(Command::Connect(device)).await.unwrap();
+    controller
+        .command(Command::Connect(mock.device(true)))
+        .await
+        .unwrap();
     let status = controller
         .command(Command::Load {
             track: track.clone(),
@@ -204,5 +86,130 @@ async fn upnp_session_controls_media_and_serves_only_the_current_track() {
     assert_eq!(controller.status.as_ref().unwrap().state, State::Stopped);
     controller.disconnect().await;
     assert_eq!(std::fs::read(path).unwrap(), b"synthetic WAV bytes");
-    mock.abort();
+}
+
+#[tokio::test]
+async fn commands_need_a_selected_and_connected_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut controller = Controller::default();
+    for command in [
+        Command::Play,
+        Command::Pause,
+        Command::Seek(0),
+        Command::Stop,
+    ] {
+        let error = controller.command(command).await.unwrap_err();
+        assert!(error.to_string().contains("disconnected"), "{error}");
+    }
+    let load = controller
+        .command(Command::Load {
+            track: track(dir.path()),
+            position_ms: 0,
+            autoplay: true,
+            volume: 0.,
+        })
+        .await
+        .unwrap_err();
+    assert!(load.to_string().contains("No network output selected"));
+    // Polling without a loaded track asks nothing of anyone.
+    controller.poll().await.unwrap();
+    assert!(controller.status.is_none());
+}
+
+#[tokio::test]
+async fn selecting_the_connected_output_again_keeps_its_session() {
+    let mock = Mock::start().await;
+    let mut controller = Controller::default();
+    controller
+        .command(Command::Connect(mock.device(true)))
+        .await
+        .unwrap();
+    controller
+        .command(Command::Connect(mock.device(true)))
+        .await
+        .unwrap();
+    // Connecting checks the transport once; the second selection reused it.
+    assert_eq!(mock.seen("GetTransportInfo").await, 1);
+    controller.command(Command::Disconnect).await.unwrap();
+    let error = controller.command(Command::Play).await.unwrap_err();
+    assert!(error.to_string().contains("disconnected"));
+}
+
+#[tokio::test]
+async fn a_failure_revokes_the_media_and_the_next_load_reconnects() {
+    let mock = Mock::start().await;
+    let dir = tempfile::tempdir().unwrap();
+    let track = track(dir.path());
+    let mut controller = Controller::default();
+    controller
+        .command(Command::Connect(mock.device(true)))
+        .await
+        .unwrap();
+    let loaded = controller
+        .command(Command::Load {
+            track: track.clone(),
+            position_ms: 0,
+            autoplay: true,
+            volume: 0.5,
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    let uri = mock.renderer.lock().await.uri.clone();
+    controller.fail(anyhow::anyhow!("receiver lost")).await;
+    let failed = controller.status.clone().unwrap();
+    assert_eq!(failed.state, State::Failed);
+    assert_eq!(failed.generation, loaded.generation);
+    assert!(failed.error.unwrap().contains("receiver lost"));
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    assert_eq!(
+        client.get(&uri).send().await.unwrap().status(),
+        reqwest::StatusCode::NOT_FOUND
+    );
+    // A failed output is never polled, and reconnects only to load again.
+    controller.poll().await.unwrap();
+    assert_eq!(controller.status.as_ref().unwrap().state, State::Failed);
+    let connections = mock.seen("GetTransportInfo").await;
+    let reloaded = controller
+        .command(Command::Load {
+            track,
+            position_ms: 0,
+            autoplay: true,
+            volume: 0.5,
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(reloaded.state, State::Playing);
+    assert!(reloaded.generation > loaded.generation);
+    assert_eq!(mock.seen("GetTransportInfo").await, connections + 1);
+}
+
+#[tokio::test]
+async fn statuses_without_a_duration_keep_the_known_one() {
+    let mock = Mock::start().await;
+    let dir = tempfile::tempdir().unwrap();
+    let mut controller = Controller::default();
+    controller
+        .command(Command::Connect(mock.device(true)))
+        .await
+        .unwrap();
+    controller
+        .command(Command::Load {
+            track: track(dir.path()),
+            position_ms: 0,
+            autoplay: true,
+            volume: 0.,
+        })
+        .await
+        .unwrap();
+    {
+        let mut renderer = mock.renderer.lock().await;
+        renderer.duration = "0:00:00".into();
+        renderer.position = "0:00:03".into();
+    }
+    controller.poll().await.unwrap();
+    let status = controller.status.clone().unwrap();
+    assert_eq!(status.position_ms, 3000);
+    assert_eq!(status.duration_ms, 10_000);
 }
