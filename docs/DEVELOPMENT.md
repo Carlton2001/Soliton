@@ -40,7 +40,7 @@ cargo test -p soliton-platform -- --include-ignored
 window and fails on an exit code or a log error. Options:
 `-Language English -Light -List`, `-CloseScenario Early|Minimized|Hidden|Ask`,
 `-Taskbar`, `-Collections`, `-AudioOutputs [-AudioOutputRow n]`,
-`-NetworkOutputs -LocalOutputCount n`. Linux native tests:
+`-NetworkOutputs`. Each run starts from a fresh library. Linux native tests:
 [LINUX.md](LINUX.md#build-test-run).
 
 Explicit hardware examples (zero or low volume, idle Cast receiver):
