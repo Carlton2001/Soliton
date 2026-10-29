@@ -354,5 +354,13 @@ permission de fichiers (sources accordées par le portail) :
 | Ajout de fichiers pendant l'exécution | Non détecté avant le redémarrage : pas de notification inotify sur le portail de documents |
 | Disque de la source débranché | Entrées conservées, mais source non signalée indisponible : erreur à la lecture |
 
+Le 29 octobre 2026, Flatpak reconstruit avec les permissions actuelles (Musique,
+`/run/media`, `/media`, `/mnt` en lecture seule) :
+
+| Vérification | Résultat |
+| --- | --- |
+| Ajout par le portail d'un dossier d'un disque monté (`/run/media/…/_FLAC`) | Réussi (essai manuel) : source enregistrée sous son chemin réel, plus sous `/run/flatpak/doc` |
+| Casque Bluetooth : choix dans Soliton et lecture | Réussi (essai manuel) |
+
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
