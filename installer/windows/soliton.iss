@@ -77,3 +77,17 @@ function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := IsUpdate;
 end;
+
+const
+  RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Command: String;
+begin
+  // Soliton writes its own autostart value: remove it only when it starts this copy.
+  if (CurUninstallStep = usUninstall)
+    and RegQueryStringValue(HKCU, RunKey, 'Soliton', Command)
+    and (CompareText(Command, '"' + ExpandConstant('{app}\Soliton.exe') + '"') = 0) then
+    RegDeleteValue(HKCU, RunKey, 'Soliton');
+end;
