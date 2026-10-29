@@ -54,7 +54,8 @@ deleted. Without a volume id (non-Unix), doubt remains and entries are kept.
 **Watching.** `notify`, queue bounded to 256 events; an overflow triggers a full
 scan. Coalescing: 2 s of quiet, 15 s at most, 4,096 paths at most, turned into
 folders to scan. `read_dir` probe on a dedicated thread, 5 s timeout, every 5 s;
-offline sources are probed at the same pace (1 s timeout) and become available
+a refusal makes a source offline at once, unanswered probes only after 30 s, so
+that a NAS spinning up its disks does not disappear. Offline sources are probed at the same pace (1 s timeout) and become available
 again as soon as their scan starts, without manual refresh. Full scan at startup
 and every 30 minutes. The writer thread never touches a source without such a
 probe: a scan checks its source before and after (5 s), a new watch is only

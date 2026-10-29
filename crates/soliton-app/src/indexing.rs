@@ -11,7 +11,7 @@ use soliton_library::{
     Cancellation, Coalescer, Interlude, Library, Prober, ScanProgress, SourceWatcher, WatchEvent,
 };
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -25,6 +25,10 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 /// quickly; a share still slow to answer is simply tried again later.
 const RETURN_PROBE_INTERVAL: Duration = Duration::from_secs(5);
 const RETURN_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
+/// A share that stops answering is offline only once silent this long: disks
+/// of a sleeping NAS may take that long to spin up, and a definite refusal
+/// still counts at once.
+const SILENCE_LIMIT: Duration = Duration::from_secs(30);
 /// A source not yet watched must answer this fast before its watch is registered.
 const WATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
 /// A burst of notifications is handled once quiet, or after the longest delay.
@@ -40,6 +44,7 @@ struct Worker {
     watcher: Option<SourceWatcher>,
     changes: Coalescer,
     prober: Prober,
+    silence: Silence,
     /// Background work stops when the application closes.
     background: Cancellation,
     next_probe: Instant,
@@ -82,6 +87,7 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
         events,
         watcher,
         changes: Coalescer::new(QUIET, LONGEST),
+        silence: Silence::default(),
         background,
         next_probe: now + PROBE_INTERVAL,
         next_return_probe: now + RETURN_PROBE_INTERVAL,
@@ -336,8 +342,17 @@ impl Worker {
             } else {
                 PROBE_TIMEOUT
             };
-            let reachable = self.prober.reachable(&source.path, timeout) == Some(true);
-            if source.available && !reachable {
+            let answer = self.prober.reachable(&source.path, timeout);
+            if !source.available {
+                self.silence.forget(source.id);
+                if answer == Some(true) {
+                    changed = true;
+                    self.quiet_scan(source.id, &[]);
+                }
+            } else if self
+                .silence
+                .unreachable(source.id, answer, Instant::now(), SILENCE_LIMIT)
+            {
                 match self.library.set_source_available(source.id, false) {
                     Ok(true) => {
                         changed = true;
@@ -346,9 +361,6 @@ impl Worker {
                     Ok(false) => {}
                     Err(error) => self.error(&error),
                 }
-            } else if !source.available && reachable {
-                changed = true;
-                self.quiet_scan(source.id, &[]);
             }
         }
         if changed {
@@ -381,6 +393,35 @@ impl Worker {
             self.error(&error);
             Vec::new()
         })
+    }
+}
+
+/// When each available source started leaving probes unanswered.
+#[derive(Default)]
+struct Silence(HashMap<i64, Instant>);
+
+impl Silence {
+    /// Whether an available source counts as offline after `answer`: at once
+    /// when refused, after `limit` of unanswered probes otherwise.
+    fn unreachable(
+        &mut self,
+        id: i64,
+        answer: Option<bool>,
+        now: Instant,
+        limit: Duration,
+    ) -> bool {
+        match answer {
+            Some(reachable) => {
+                self.0.remove(&id);
+                !reachable
+            }
+            None => now.duration_since(*self.0.entry(id).or_insert(now)) >= limit,
+        }
+    }
+
+    /// An offline source starts afresh once back.
+    fn forget(&mut self, id: i64) {
+        self.0.remove(&id);
     }
 }
 

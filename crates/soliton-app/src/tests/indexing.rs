@@ -1,4 +1,4 @@
-use super::run;
+use super::{Silence, run};
 use crate::service::{Event, Work};
 use crossbeam_channel::{Receiver, bounded, unbounded};
 use soliton_library::{Cancellation, Library};
@@ -84,4 +84,20 @@ fn a_remounted_source_returns_without_a_manual_scan() {
     background.cancel();
     drop(work);
     worker.join().unwrap();
+}
+
+#[test]
+fn a_silent_source_goes_offline_only_after_the_limit_and_a_refusal_at_once() {
+    let limit = Duration::from_secs(30);
+    let start = Instant::now();
+    let mut silence = Silence::default();
+    assert!(!silence.unreachable(1, None, start, limit));
+    assert!(!silence.unreachable(1, None, start + limit / 2, limit));
+    // An answer in between restarts the wait, as when sleeping disks spin up.
+    assert!(!silence.unreachable(1, Some(true), start + limit / 2, limit));
+    assert!(!silence.unreachable(1, None, start + limit, limit));
+    assert!(silence.unreachable(1, None, start + limit * 2, limit));
+    assert!(silence.unreachable(2, Some(false), start, limit));
+    silence.forget(1);
+    assert!(!silence.unreachable(1, None, start + limit * 3, limit));
 }
