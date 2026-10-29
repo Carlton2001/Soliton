@@ -29,8 +29,6 @@ jobs:
       - name: Install Rust
         run: |
           rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt,clippy --no-modify-path
-          # Minimum supported Rust: the workspace rust-version.
-          "$HOME/.cargo/bin/rustup" toolchain install 1.89 --profile minimal
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       # Dependencies are rebuilt only when Cargo.lock or the toolchains change.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
@@ -49,10 +47,36 @@ jobs:
         run: cargo +1.98.1 check --workspace --all-targets --locked
       - name: Lints
         run: cargo +1.98.1 clippy --workspace --all-targets --locked -- -D warnings
-      - name: Check with the minimum supported Rust
-        run: cargo +1.89 check --workspace --all-targets --locked --target-dir target/msrv
       - name: Unit and integration tests
         run: cargo +1.98.1 test --workspace --locked
       - name: Build the application
         run: cargo +1.98.1 build -p soliton-app --bin Soliton --locked
       # No desktop, session bus, GPU, or audio device is exercised by this job.
+  # Runs beside the build and tests, with its own cache: the workspace rust-version.
+  msrv:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    timeout-minutes: 60
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Install Fedora build dependencies
+        run: >-
+          dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config
+          pipewire-devel clang-devel libxkbcommon-devel libxkbcommon-x11-devel
+          freetype-devel fontconfig-devel libxcb-devel wayland-devel
+          git rustup tar zstd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          rustup-init -y --default-toolchain 1.89 --profile minimal --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          shared-key: soliton-linux-msrv-v1
+          cache-bin: false
+          save-if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      - name: Check with the minimum supported Rust
+        run: cargo +1.89 check --workspace --all-targets --locked
