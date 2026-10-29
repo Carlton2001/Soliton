@@ -36,6 +36,8 @@ pub struct TextInput {
     marked_range: Option<Range<usize>>,
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
+    /// Horizontal offset of the line, keeping the caret inside the field.
+    scroll_x: Pixels,
     is_selecting: bool,
     /// Caret state at the last paint; any change restarts the blink visible.
     blink_state: Option<(SharedString, Range<usize>)>,
@@ -54,6 +56,7 @@ impl TextInput {
             marked_range: None,
             last_layout: None,
             last_bounds: None,
+            scroll_x: px(0.),
             is_selecting: false,
             blink_state: None,
             blink_start: Instant::now(),
@@ -168,7 +171,7 @@ impl TextInput {
 
     fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
-            self.replace_text_in_range(None, &text.replace("\n", " "), window, cx);
+            self.replace_text_in_range(None, &single_line(&text), window, cx);
         }
     }
 
@@ -216,7 +219,7 @@ impl TextInput {
         if position.y > bounds.bottom() {
             return self.content.len();
         }
-        line.closest_index_for_x(position.x - bounds.left())
+        line.closest_index_for_x(position.x - bounds.left() + self.scroll_x)
     }
 
     fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -299,8 +302,30 @@ impl TextInput {
         self.marked_range = None;
         self.last_layout = None;
         self.last_bounds = None;
+        self.scroll_x = px(0.);
         self.is_selecting = false;
     }
+}
+
+/// Pasted text on one line: Windows (CRLF), Unix and old Mac line breaks,
+/// and tabs, each become one space.
+fn single_line(text: &str) -> String {
+    text.replace("\r\n", " ").replace(['\r', '\n', '\t'], " ")
+}
+
+/// Offset keeping `caret` within `width` while moving the line as little as
+/// possible, and never scrolling past the end of the text.
+fn scroll_for_caret(scroll: Pixels, caret: Pixels, text: Pixels, width: Pixels) -> Pixels {
+    // Room for the caret itself at the right edge.
+    let room = (width - px(2.)).max(px(0.));
+    let scroll = if caret - scroll > room {
+        caret - room
+    } else if caret < scroll {
+        caret
+    } else {
+        scroll
+    };
+    scroll.min((text - room).max(px(0.))).max(px(0.))
 }
 
 impl EntityInputHandler for TextInput {
@@ -403,15 +428,10 @@ impl EntityInputHandler for TextInput {
     ) -> Option<Bounds<Pixels>> {
         let last_layout = self.last_layout.as_ref()?;
         let range = self.range_from_utf16(&range_utf16);
+        let left = bounds.left() - self.scroll_x;
         Some(Bounds::from_corners(
-            point(
-                bounds.left() + last_layout.x_for_index(range.start),
-                bounds.top(),
-            ),
-            point(
-                bounds.left() + last_layout.x_for_index(range.end),
-                bounds.bottom(),
-            ),
+            point(left + last_layout.x_for_index(range.start), bounds.top()),
+            point(left + last_layout.x_for_index(range.end), bounds.bottom()),
         ))
     }
 
@@ -427,7 +447,7 @@ impl EntityInputHandler for TextInput {
         if last_layout.text != self.content {
             return None;
         }
-        let utf8_index = last_layout.index_for_x(point.x - line_point.x)?;
+        let utf8_index = last_layout.index_for_x(line_point.x + self.scroll_x)?;
         Some(self.offset_to_utf16(utf8_index))
     }
 }
@@ -458,6 +478,7 @@ struct TextElement {
 
 struct PrepaintState {
     line: Option<ShapedLine>,
+    scroll: Pixels,
     cursor: Option<PaintQuad>,
     selection: Option<PaintQuad>,
 }
@@ -577,6 +598,13 @@ impl Element for TextElement {
         };
         let caret_height = (font_size * 1.2).min(bounds.size.height);
         let cursor_pos = line.x_for_index(cursor);
+        let scroll = if placeholder {
+            px(0.)
+        } else {
+            scroll_for_caret(input.scroll_x, cursor_pos, line.width, bounds.size.width)
+        };
+        // The line, caret and selection move together; the field clips them.
+        let left = bounds.left() - scroll;
         let (selection, cursor) = if selected_range.is_empty() {
             (
                 None,
@@ -584,7 +612,7 @@ impl Element for TextElement {
                     // Glyph height rather than the full line, centered like system carets.
                     Bounds::new(
                         point(
-                            bounds.left() + cursor_pos,
+                            left + cursor_pos,
                             bounds.top() + (bounds.size.height - caret_height) / 2.,
                         ),
                         size(px(2.), caret_height),
@@ -597,14 +625,8 @@ impl Element for TextElement {
             (
                 Some(fill(
                     Bounds::from_corners(
-                        point(
-                            bounds.left() + line.x_for_index(selected_range.start),
-                            bounds.top(),
-                        ),
-                        point(
-                            bounds.left() + line.x_for_index(selected_range.end),
-                            bounds.bottom(),
-                        ),
+                        point(left + line.x_for_index(selected_range.start), bounds.top()),
+                        point(left + line.x_for_index(selected_range.end), bounds.bottom()),
                     ),
                     style.color.opacity(0.25),
                 )),
@@ -613,6 +635,7 @@ impl Element for TextElement {
         };
         PrepaintState {
             line: Some(line),
+            scroll,
             cursor,
             selection,
         }
@@ -638,8 +661,14 @@ impl Element for TextElement {
             window.paint_quad(selection)
         }
         let line = prepaint.line.take().unwrap();
-        line.paint(bounds.origin, window.line_height(), window, cx)
-            .unwrap();
+        let scroll = prepaint.scroll;
+        line.paint(
+            point(bounds.left() - scroll, bounds.top()),
+            window.line_height(),
+            window,
+            cx,
+        )
+        .unwrap();
 
         let focused = focus_handle.is_focused(window);
         let caret = prepaint.cursor.take().filter(|_| focused);
@@ -651,6 +680,7 @@ impl Element for TextElement {
         let next = self.input.update(cx, |input, cx| {
             input.last_layout = Some(line);
             input.last_bounds = Some(bounds);
+            input.scroll_x = scroll;
             if !blinking {
                 input.blink_state = None;
                 input.blink_timer = None;
@@ -718,3 +748,7 @@ impl Focusable for TextInput {
         self.focus_handle.clone()
     }
 }
+
+#[cfg(test)]
+#[path = "tests/input.rs"]
+mod tests;
