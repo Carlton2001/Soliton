@@ -16,7 +16,9 @@ for tool in rpmbuild desktop-file-validate appstreamcli; do
     fi
 done
 
-archive=$(sh scripts/build-linux.sh ${1:+"$1"} | tail -n 1)
+# Captured whole: set -e stops on a failed archive build, not on its last line.
+archive=$(sh scripts/build-linux.sh ${1:+"$1"})
+archive=$(printf '%s\n' "$archive" | tail -n 1)
 version=$(cargo pkgid -p soliton-app | sed 's/.*[#@]//')
 output=$root/target/distribution/output
 top=$root/target/distribution/rpm
