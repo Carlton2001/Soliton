@@ -15,10 +15,18 @@ fn byte_ranges_are_bounded_and_malformed_requests_are_rejected() {
         "bytes=+1-4",
         "bytes=1-+4",
         "bytes=0-1,4-5",
-        "items=0-1",
         "bytes=18446744073709551616-",
     ] {
         assert_eq!(parse(value, 10), None, "{value}");
     }
     assert_eq!(parse("bytes=0-", 0), None);
+}
+
+#[test]
+fn unknown_range_units_are_ignored() {
+    assert_eq!(span(None, 10), Span::Whole);
+    assert_eq!(span(Some("items=0-1"), 10), Span::Whole);
+    assert_eq!(span(Some("bytes=2-5"), 10), Span::Part(2, 5));
+    assert_eq!(span(Some("bytes=10-"), 10), Span::Unsatisfiable);
+    assert_eq!(span(Some(""), 10), Span::Unsatisfiable);
 }

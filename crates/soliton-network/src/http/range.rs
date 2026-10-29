@@ -1,6 +1,28 @@
 //! Single byte ranges, including suffix and open-ended requests. Multiple ranges
 //! are rejected rather than silently returning an unrelated portion of a file.
-pub(super) fn parse(value: &str, length: u64) -> Option<(u64, u64)> {
+
+/// What to send for a request's `Range` header.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Span {
+    /// The whole file: no range, or one in a unit other than bytes, which
+    /// RFC 9110 requires ignoring.
+    Whole,
+    /// Inclusive byte offsets.
+    Part(u64, u64),
+    Unsatisfiable,
+}
+
+pub(super) fn span(value: Option<&str>, length: u64) -> Span {
+    match value {
+        None => Span::Whole,
+        Some(value) if !value.starts_with("bytes=") && value.contains('=') => Span::Whole,
+        Some(value) => {
+            parse(value, length).map_or(Span::Unsatisfiable, |(start, end)| Span::Part(start, end))
+        }
+    }
+}
+
+fn parse(value: &str, length: u64) -> Option<(u64, u64)> {
     let (first, last) = value.strip_prefix("bytes=")?.split_once('-')?;
     if length == 0
         || value.contains(',')

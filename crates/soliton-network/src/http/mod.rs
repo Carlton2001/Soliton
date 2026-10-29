@@ -193,24 +193,26 @@ async fn serve(
         return StatusCode::NOT_FOUND.into_response();
     };
     let length = metadata.len();
-    let requested = headers.get(header::RANGE);
-    let span = match requested {
-        Some(value) => value.to_str().ok().and_then(|v| range::parse(v, length)),
-        None => Some((0, length.saturating_sub(1))),
-    };
-    let Some((start, end)) = span else {
-        return (
-            StatusCode::RANGE_NOT_SATISFIABLE,
-            cors,
-            [(header::CONTENT_RANGE, format!("bytes */{length}"))],
-        )
-            .into_response();
+    let requested = headers
+        .get(header::RANGE)
+        .map(|value| value.to_str().unwrap_or_default());
+    let (start, end, partial) = match range::span(requested, length) {
+        range::Span::Whole => (0, length.saturating_sub(1), false),
+        range::Span::Part(start, end) => (start, end, true),
+        range::Span::Unsatisfiable => {
+            return (
+                StatusCode::RANGE_NOT_SATISFIABLE,
+                cors,
+                [(header::CONTENT_RANGE, format!("bytes */{length}"))],
+            )
+                .into_response();
+        }
     };
     let bytes = if length == 0 { 0 } else { end - start + 1 };
     if file.seek(std::io::SeekFrom::Start(start)).await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
-    let status = if requested.is_some() {
+    let status = if partial {
         StatusCode::PARTIAL_CONTENT
     } else {
         StatusCode::OK
@@ -247,7 +249,7 @@ async fn serve(
         "contentFeatures.dlna.org",
         "DLNA.ORG_OP=01;DLNA.ORG_CI=0".parse().unwrap(),
     );
-    if requested.is_some() {
+    if partial {
         out.insert(
             header::CONTENT_RANGE,
             format!("bytes {start}-{end}/{length}").parse().unwrap(),
