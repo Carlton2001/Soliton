@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
       - name: Install Rust
         run: |
-          rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt --no-modify-path
+          rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt,clippy --no-modify-path
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: License inventory
         run: sh scripts/check-third-party-licenses.sh
@@ -39,6 +39,8 @@ jobs:
         run: cargo +1.98.1 fmt --check
       - name: Check all targets
         run: cargo +1.98.1 check --workspace --all-targets --locked
+      - name: Lints
+        run: cargo +1.98.1 clippy --workspace --all-targets --locked -- -D warnings
       - name: Unit and integration tests
         run: cargo +1.98.1 test --workspace --locked
       - name: Build the application

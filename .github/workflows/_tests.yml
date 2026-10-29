@@ -14,7 +14,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Rust
-        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --no-self-update
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy --no-self-update
       - name: Select Rust
         run: rustup override set 1.98.1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
@@ -26,6 +26,8 @@ jobs:
         run: cargo fmt --check
       - name: Check all targets
         run: cargo check --workspace --all-targets --locked
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Unit and integration tests
         run: cargo test --workspace --locked
       - name: Script tests
