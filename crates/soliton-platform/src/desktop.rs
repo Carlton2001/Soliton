@@ -19,7 +19,7 @@ pub enum MediaCommand {
 #[derive(Debug)]
 pub enum DesktopEvent {
     Media(MediaCommand),
-    /// Theme-aware Windows accent RGB values: light, dark.
+    /// Theme-aware desktop accent RGB values: light, dark.
     SystemAccent([u32; 2]),
     Show,
     Quit,

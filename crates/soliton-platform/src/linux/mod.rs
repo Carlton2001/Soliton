@@ -1,5 +1,6 @@
 //! Session bus and XDG files are owned by one worker; the UI only enqueues.
 //! Soliton does not register a sign-in launch on Linux.
+mod appearance;
 pub(crate) mod documents;
 mod launcher_icon;
 mod mpris;
@@ -91,7 +92,11 @@ fn run(
             None
         }
     };
+    let mut accent = appearance::AccentWatcher::new();
     while !shutdown.load(Ordering::Acquire) {
+        if let Some(accent) = &mut accent {
+            accent.poll(events);
+        }
         if let Ok((state, _, icon)) = updates.recv_timeout(Duration::from_millis(100)) {
             if let Err(error) = launcher.apply(icon) {
                 warn(format!("Launcher icon: {error:#}"));

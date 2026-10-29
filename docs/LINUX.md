@@ -47,6 +47,12 @@ développement et de validation. Les paquets RPM, .deb et Flatpak
   GNOME et son panneau média passent par ce service. Aucune URI ni fichier hors
   bibliothèque n'est accepté. Sans bus de session, la lecture continue et un
   avertissement est affiché.
+- **Accent système** : lu par le portail XDG Settings
+  (`org.freedesktop.appearance`, clé `accent-color`, GNOME 47+ et KDE Plasma,
+  Flatpak compris) sur le fil d'intégration, relu chaque seconde. Les variantes
+  claire et sombre gardent la teinte et plafonnent la luminosité OKLab à 0,5
+  (thème clair) ou la portent à 0,85 (thème sombre), pour rester lisibles sous
+  les libellés noirs ou blancs. Sans accent publié, l'accent bleu s'applique.
 - **Fermeture** : GNOME n'a pas de zone de notification ; la fermeture quitte
   toujours Soliton par le nettoyage normal, sans masquage. Pour la même raison,
   aucun démarrage automatique n'est proposé : la fenêtre s'ouvrirait à chaque
@@ -58,7 +64,7 @@ développement et de validation. Les paquets RPM, .deb et Flatpak
   Une entrée ou une icône installée autrement n'est jamais modifiée.
 - **Indisponible sous Linux** : démarrage automatique, mises à jour intégrées
   (téléchargement et installateur Windows), Bluetooth dédié, notifications
-  natives de sorties audio, accent système. Audio exclusif et Flatpak restent hors périmètre ; Google Cast
+  natives de sorties audio. Audio exclusif et Flatpak restent hors périmètre ; Google Cast
   est validé, DLNA est compilé mais non validé sous Linux.
 - **Surveillance** : inotify sur chaque dossier des sources. Si la limite du
   système (`fs.inotify.max_user_watches`) empêche de surveiller toute une
