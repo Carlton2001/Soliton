@@ -14,10 +14,13 @@ fn mount_points() -> Vec<PathBuf> {
     mounts
 }
 
-/// The document identifier and the path below it, for a path of the portal.
+/// The document identifier and the path below the document itself, for a path
+/// of the portal. A document appears as `<mount>/<id>/<its own name>`, and
+/// `GetHostPaths` returns the host path of that named entry.
 fn split<'a>(path: &'a Path, mount: &Path) -> Option<(String, &'a Path)> {
     let mut rest = path.strip_prefix(mount).ok()?.components();
-    let Some(Component::Normal(id)) = rest.next() else {
+    let (Some(Component::Normal(id)), Some(Component::Normal(_))) = (rest.next(), rest.next())
+    else {
         return None;
     };
     Some((id.to_str()?.to_owned(), rest.as_path()))
@@ -31,7 +34,11 @@ pub fn host_path(path: PathBuf) -> PathBuf {
     let Ok(host) = document_host_path(&id) else {
         return path;
     };
-    let host = host.join(rest);
+    let host = if rest.as_os_str().is_empty() {
+        host
+    } else {
+        host.join(rest)
+    };
     if std::fs::read_dir(&host).is_ok() {
         host
     } else {

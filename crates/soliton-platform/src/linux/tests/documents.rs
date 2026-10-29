@@ -5,9 +5,12 @@ fn portal_paths_split_into_document_and_subpath() {
     let mount = Path::new("/run/flatpak/doc");
     let (id, rest) = split(Path::new("/run/flatpak/doc/CiwhDJ/Musique/Jazz"), mount).unwrap();
     assert_eq!(id, "CiwhDJ");
-    assert_eq!(rest, Path::new("Musique/Jazz"));
+    assert_eq!(rest, Path::new("Jazz"));
+    let (_, rest) = split(Path::new("/run/flatpak/doc/DZWoSy/_FLAC"), mount).unwrap();
+    assert_eq!(rest, Path::new(""));
     assert!(split(Path::new("/home/user/Musique"), mount).is_none());
     assert!(split(mount, mount).is_none());
+    assert!(split(&mount.join("CiwhDJ"), mount).is_none());
 }
 
 #[test]
