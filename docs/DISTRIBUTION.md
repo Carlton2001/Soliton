@@ -133,11 +133,12 @@ Le remote `origin` vise `https://github.com/Carlton2001/Soliton.git`. Autoriser
 Actions et configurer les clés et éventuellement l'environnement `release` dans
 ce dépôt. Préparer une version sur un arbre propre :
 
-```powershell
-./scripts/bump-version.ps1 -Version 0.2.0
+```sh
+./scripts/bump-version.ps1 -Version 0.2.0   # Windows
+sh scripts/bump-version.sh 0.2.0              # Linux
 ```
 
-Ce script modifie la version du workspace et Cargo.lock, crée un commit anglais et
+Ce script modifie la version du workspace, Cargo.lock et la metainfo AppStream, crée un commit anglais et
 un tag local ; il ne pousse rien. Toute opération de push reste manuelle et exige
 une demande explicite de l'utilisateur dans une session Codex.
 

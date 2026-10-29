@@ -40,7 +40,15 @@ try {
     & cargo update --workspace --offline
     if ($LASTEXITCODE -ne 0) { throw 'Cargo.lock update failed.' }
 
-    Invoke-Git add Cargo.toml Cargo.lock | Out-Null
+    # The Linux packages require an AppStream release for their version.
+    $metainfo = Join-Path $projectRoot 'installer/linux/io.github.Carlton2001.Soliton.metainfo.xml'
+    $xml = [IO.File]::ReadAllText($metainfo)
+    $date = [DateTime]::UtcNow.ToString('yyyy-MM-dd')
+    $updated = [regex]::Replace($xml, '(?m)^(\s*)<releases>\r?$', { param($m) "$($m.Value)`n$($m.Groups[1].Value)  <release version=`"$Version`" date=`"$date`"/>" }, 'None')
+    if ($updated -eq $xml) { throw 'AppStream releases not found.' }
+    [IO.File]::WriteAllText($metainfo, $updated, [Text.UTF8Encoding]::new($false))
+
+    Invoke-Git add Cargo.toml Cargo.lock installer/linux/io.github.Carlton2001.Soliton.metainfo.xml | Out-Null
     Invoke-Git commit -m "Release $tag" | Out-Null
     Invoke-Git tag -a $tag -m "Soliton $tag" | Out-Null
     Write-Host "Version $current -> $Version committed and tagged $tag." -ForegroundColor Green
