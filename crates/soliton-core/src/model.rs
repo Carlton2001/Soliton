@@ -100,6 +100,11 @@ impl Album {
             .first()
             .is_some_and(|track| track.metadata.is_inferred(field))
     }
+    /// Whether the album artist comes from folder names. Copied from the
+    /// track artist tag, it is still a tag: only grouping treats it as inferred.
+    pub fn artist_inferred(&self) -> bool {
+        self.inferred("album_artist") && self.inferred("artist")
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -107,3 +112,7 @@ pub struct LibrarySnapshot {
     pub sources: Vec<Source>,
     pub albums: Vec<Album>,
 }
+
+#[cfg(test)]
+#[path = "tests/model.rs"]
+mod tests;
