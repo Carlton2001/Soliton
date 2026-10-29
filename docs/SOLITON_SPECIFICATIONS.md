@@ -283,7 +283,10 @@ défauts trouvés.
 
 1. Format de l'installateur Windows.
 2. Fournisseur des mises à jour (GitHub Releases envisagé) et format de version.
-3. Signature de l'exécutable Windows et des paquets Linux (clé GPG du RPM).
+3. ~~Signature de l'exécutable Windows et des paquets Linux.~~ Tranché le
+   2026-10-29 : solutions gratuites uniquement (Minisign pour les mises à jour,
+   GPG pour les paquets Linux), sans certificat Authenticode. Voir
+   `docs/DISTRIBUTION.md`.
 4. Périmètre multi-appareils réseau au-delà d'une sortie active.
 
 Ne pas trancher ces points sans les présenter.

@@ -1,0 +1,98 @@
+name: Linux distribution (reusable)
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  rpm:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Install Fedora build dependencies
+        run: >-
+          dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config
+          pipewire-devel clang-devel libxkbcommon-devel libxkbcommon-x11-devel
+          freetype-devel fontconfig-devel libxcb-devel wayland-devel
+          git rustup python3 rpm-build desktop-file-utils appstream
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          rustup-init -y --default-toolchain 1.98.1 --profile minimal --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Build the archive and the RPM
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          sh scripts/build-rpm.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Soliton-linux-rpm
+          path: target/distribution/output/*
+          if-no-files-found: error
+          compression-level: 0
+  deb:
+    runs-on: ubuntu-latest
+    container: docker.io/library/ubuntu:24.04
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      # The packages of installer/linux/deb/Containerfile, used for local builds.
+      - name: Install Ubuntu build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config clang libclang-dev \
+            libpipewire-0.3-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfreetype-dev libfontconfig-dev libxcb1-dev libwayland-dev \
+            ca-certificates curl git python3 \
+            dpkg-dev lintian desktop-file-utils appstream
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --default-toolchain 1.98.1 --profile minimal --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Build the .deb
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          sh scripts/build-deb.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Soliton-linux-deb
+          path: target/distribution/output/*.deb*
+          if-no-files-found: error
+          compression-level: 0
+  flatpak:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install Flatpak tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          # Ubuntu 24.04 denies the unprivileged user namespaces of bubblewrap.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub org.flatpak.Builder
+      - name: Build the Flatpak bundle
+        run: |
+          # The manifest builds branch main; point it at the tagged commit.
+          git branch -f main HEAD
+          sh scripts/build-flatpak.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Soliton-linux-flatpak
+          path: target/distribution/output/*.flatpak*
+          if-no-files-found: error
+          compression-level: 0

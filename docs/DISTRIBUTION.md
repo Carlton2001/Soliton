@@ -27,7 +27,7 @@ dans les paramètres et la vérification peut être relancée.
 `latest.json`, joint à la dernière release stable publiée, contient une version
 numérique `major.minor.patch`. Les versions égales ou plus anciennes ne sont pas
 proposées. Le manifeste contient l'URL exacte de l'installateur Soliton de cette
-version dans le dépôt compilé et sa signature Minisign au format Tauri. Sur clic
+version dans le dépôt compilé et sa signature Minisign (fichier `.minisig` encodé en base64). Sur clic
 explicite, Soliton télécharge au maximum 512 Mio, vérifie la signature avec la clé
 publique compilée, puis lance Setup. Setup attend la fin du processus Soliton avant
 de remplacer les fichiers et relance l'application. En cas d'échec, Soliton reste
@@ -92,21 +92,42 @@ ajouter la nouvelle version aux métadonnées AppStream avant de construire.
 - `distribution.yml` : réchauffement du cache release et assemblage sur changement
   des manifestes/scripts de distribution, ou déclenchement manuel.
 - `release.yml` : sur tag `vX.Y.Z`, compare le tag au workspace, teste, audite,
-  construit une fois, puis crée une release **en brouillon** contenant ces mêmes
+  construit une fois (Windows et Linux), signe, puis crée une release **en brouillon** contenant ces mêmes
   fichiers. La publier manuellement pour la rendre visible à la vérification.
 
 Les actions tierces sont épinglées aux révisions reprises d'Oxyde. Les permissions
 sont en lecture, sauf le job final de release. Les jobs réutilisables sont partagés
-entre main, PR et tags. L'environnement GitHub `release` peut recevoir des règles
-de protection. Configurer une paire de clés propre à Soliton, sans réutiliser celles
-d'Oxyde. La variable **du dépôt** `SOLITON_UPDATE_PUBLIC_KEY` contient la clé publique
-Tauri (texte Minisign encodé en base64) et est compilée dans les distributions.
-Les secrets de l'environnement `release` `SOLITON_SIGNING_PRIVATE_KEY` et
-`SOLITON_SIGNING_PRIVATE_KEY_PASSWORD` sont transmis au signer Tauri épinglé 2.10.1.
-Le workflow refuse de publier sans clé/signature. Pour un build local, passer
-aussi `SOLITON_UPDATE_PUBLIC_KEY` à la compilation. Aucune clé privée n'est embarquée.
-La rotation de la clé doit préserver la capacité des anciennes versions à
-vérifier la signature des nouveaux installateurs.
+entre main, PR et tags. `_linux-distribution.yml` construit l'archive et le RPM
+(conteneur Fedora 44), le .deb (conteneur Ubuntu 24.04) et le bundle Flatpak.
+
+### Signatures
+
+Toutes gratuites ; aucun certificat Authenticode (décision de l'utilisateur) :
+SmartScreen avertit au premier téléchargement de l'exécutable Windows.
+
+| Clé | Publique (dépôt) | Signe |
+|---|---|---|
+| Minisign | `installer/signing/soliton-update.pub` | l'installateur Windows, vérifié par l'updater |
+| GPG ed25519 `7BFC00A65179DAEDD7CD26298EED1CC9F8CE693B` | `installer/signing/soliton-packages.asc` | le RPM (signature intégrée) et chaque autre fichier (`.asc` détaché) |
+
+Les clés privées restent hors du dépôt (`~/.soliton-keys/update.key` et le
+trousseau GPG de l'auteur), avec une sauvegarde hors de la machine. Le job final
+exécute `scripts/sign-release.sh`, qui vérifie chaque signature avec les clés
+publiques du dépôt avant de créer la release. Configuration GitHub :
+
+- variable **du dépôt** `SOLITON_UPDATE_PUBLIC_KEY` : `base64 -w0` de
+  `soliton-update.pub`, compilée dans les distributions Windows ; le script
+  refuse une valeur différente du fichier ;
+- secrets de l'environnement `release` : `SOLITON_UPDATE_PRIVATE_KEY` (contenu de
+  `update.key`), `SOLITON_UPDATE_PRIVATE_KEY_PASSWORD`, `SOLITON_GPG_PRIVATE_KEY`
+  (`gpg --armor --export-secret-keys`) et `SOLITON_GPG_PASSPHRASE`.
+
+Pour un build local, passer aussi `SOLITON_UPDATE_PUBLIC_KEY` à la compilation.
+Aucune clé privée n'est embarquée. La rotation de la clé Minisign doit préserver
+la capacité des anciennes versions à vérifier la signature des nouveaux
+installateurs. Vérifier un paquet : `gpg --import soliton-packages.asc` puis
+`gpg --verify <fichier>.asc`, ou `sudo rpm --import soliton-packages.asc` avant
+d'installer le RPM.
 
 Le remote `origin` vise `https://github.com/Carlton2001/Soliton.git`. Autoriser
 Actions et configurer les clés et éventuellement l'environnement `release` dans
@@ -131,6 +152,8 @@ the release page instead, keeping updates manual to preserve their data folder.
 The sidebar icon is visible in the accent color only when an update is available.
 Startup checks are enabled by default and respect the saved preference. Configure the repository public key
 variable and the release signing secrets described above before publishing.
+The installer is signed with Minisign for the updater, the RPM with GPG and every
+other file with a detached GPG signature; there is no Authenticode certificate.
 
 Run `scripts/build-distribution.ps1` on Windows x64 to build a per-user Inno Setup
 installer and a portable ZIP with licenses and SHA-256 checksums. The portable
