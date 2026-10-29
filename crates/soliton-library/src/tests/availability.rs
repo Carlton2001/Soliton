@@ -10,7 +10,7 @@ fn only_a_root_emptied_on_its_own_volume_counts_as_deleted() {
     assert!(!emptied_in_place(None, None));
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[test]
 fn a_folder_and_its_parent_share_a_volume() {
     let dir = tempfile::tempdir().unwrap();

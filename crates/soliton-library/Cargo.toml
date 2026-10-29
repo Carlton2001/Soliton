@@ -16,5 +16,8 @@ notify = "8.2"
 blake3 = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
 [dev-dependencies]
 tempfile = "3"

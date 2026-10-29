@@ -17,23 +17,35 @@ pub(crate) fn volume(path: &Path) -> Option<u64> {
     }
     #[cfg(windows)]
     {
-        use std::path::{Component, Prefix};
-        let canonical = std::fs::canonicalize(path).ok()?;
-        match canonical.components().next()? {
-            Component::Prefix(prefix) => match prefix.kind() {
-                Prefix::VerbatimDisk(letter) | Prefix::Disk(letter) => {
-                    Some(u64::from(letter.to_ascii_uppercase()))
-                }
-                _ => None,
-            },
-            _ => None,
-        }
+        volume_serial(path)
     }
     #[cfg(not(any(unix, windows)))]
     {
         let _ = path;
         None
     }
+}
+
+/// Serial number of the volume holding the directory, through its own handle:
+/// a volume mounted in an NTFS folder, or another disk given the same drive
+/// letter, has its own.
+#[cfg(windows)]
+fn volume_serial(path: &Path) -> Option<u64> {
+    use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS, GetFileInformationByHandle,
+    };
+    // Directories open only with backup semantics; querying needs no access right.
+    let directory = std::fs::OpenOptions::new()
+        .access_mode(0)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(path)
+        .ok()?;
+    // SAFETY: plain data, fully written by a successful call.
+    let mut information: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    // SAFETY: the handle stays open during the call and the pointer is valid.
+    let found = unsafe { GetFileInformationByHandle(directory.as_raw_handle(), &mut information) };
+    (found != 0).then(|| u64::from(information.dwVolumeSerialNumber))
 }
 
 /// An empty source root is a deliberate deletion only when it is still on the

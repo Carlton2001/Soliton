@@ -5860,6 +5860,7 @@ dependencies = [
  "serde_json",
  "soliton-core",
  "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

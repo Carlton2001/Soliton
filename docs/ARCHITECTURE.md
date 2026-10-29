@@ -49,7 +49,8 @@ entries stay, flagged unavailable, and the rest of the source is concluded.
 not traversed. A root
 with no audio file at all is treated as an unmounted volume, unless it is still on
 the volume that held its music (stored device id, schema v8): the music was then
-deleted. Without a volume id (non-Unix), doubt remains and entries are kept.
+deleted. The volume id is `st_dev` on Unix and the volume serial number on
+Windows; without one, doubt remains and entries are kept.
 
 **Watching.** `notify`, queue bounded to 256 events; an overflow triggers a full
 scan. Coalescing: 2 s of quiet, 15 s at most, 4,096 paths at most, turned into
