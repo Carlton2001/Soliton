@@ -10,7 +10,13 @@ use crate::{DesktopEvent, MediaState};
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use soliton_core::config::{AppIcon, Language};
-use std::thread::JoinHandle;
+use std::{
+    thread::JoinHandle,
+    time::{Duration, Instant},
+};
+
+/// A lost MPRIS connection is restarted on an update at most this often.
+const MEDIA_RETRY: Duration = Duration::from_secs(30);
 
 type Update = (MediaState, Language, AppIcon);
 
@@ -68,13 +74,14 @@ fn run(icon: AppIcon, events: &Sender<DesktopEvent>, updates: Receiver<Update>) 
         warn(format!("Launcher icon: {error:#}"));
     }
     // Without a session bus, playback works; only the system media controls are lost.
-    let mut media = match mpris::Mpris::start(events.clone()) {
-        Ok(media) => Some(media),
-        Err(error) => {
-            warn(format!("MPRIS: {error:#}"));
-            None
-        }
+    let mut media = Media {
+        mpris: None,
+        events: events.clone(),
+        retry_at: Instant::now(),
     };
+    if let Err(error) = media.restart() {
+        warn(format!("MPRIS: {error:#}"));
+    }
     appearance::watch_accent(events.clone());
     // The other receiver, kept to drop stale updates, never sends: the
     // channel closes once the integration drops its sender.
@@ -82,11 +89,36 @@ fn run(icon: AppIcon, events: &Sender<DesktopEvent>, updates: Receiver<Update>) 
         if let Err(error) = launcher.apply(icon) {
             warn(format!("Launcher icon: {error:#}"));
         }
-        let error = media.as_mut().and_then(|media| media.update(state).err());
-        if let Some(error) = error {
+        if let Some(error) = media.update(state) {
             warn(format!("MPRIS: {error:#}"));
-            // A broken bus must not flood the UI on every position tick.
-            media = None;
         }
+    }
+}
+
+/// System media controls that come back after a bus failure.
+struct Media {
+    mpris: Option<mpris::Mpris>,
+    events: Sender<DesktopEvent>,
+    retry_at: Instant,
+}
+
+impl Media {
+    fn restart(&mut self) -> Result<()> {
+        self.retry_at = Instant::now() + MEDIA_RETRY;
+        self.mpris = Some(mpris::Mpris::start(self.events.clone())?);
+        Ok(())
+    }
+
+    /// Publishes `state`, restarting a lost connection when due. Returns the
+    /// error that lost it; failed restarts stay silent, so a broken bus never
+    /// floods the interface on every position tick.
+    fn update(&mut self, state: MediaState) -> Option<anyhow::Error> {
+        if self.mpris.is_none() && (Instant::now() < self.retry_at || self.restart().is_err()) {
+            return None;
+        }
+        let error = self.mpris.as_mut()?.update(state).err()?;
+        self.mpris = None;
+        self.retry_at = Instant::now() + MEDIA_RETRY;
+        Some(error)
     }
 }

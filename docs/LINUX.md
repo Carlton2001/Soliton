@@ -39,7 +39,8 @@ environment: Fedora Workstation (GNOME, Wayland, PipeWire).
   cache, status, position and `Seeked`; play, pause, toggle, stop, previous,
   next, `Seek`, `SetPosition`, `Raise` and `Quit`. GNOME media keys and media
   panel go through it. No URI or file outside the library is accepted. Without
-  a session bus, playback continues and a warning is shown.
+  a session bus, playback continues and a warning is shown; a lost connection
+  is restarted with the next state change, at most every 30 s.
 - **GPU**: at launch, Vulkan drivers of cards with no connected screen
   (`/sys/class/drm/card*-*/status`) are excluded through
   `VK_LOADER_DRIVERS_DISABLE` (NVIDIA, AMD or Intel by vendor), so a sleeping
