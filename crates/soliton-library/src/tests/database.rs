@@ -225,13 +225,12 @@ fn indexes_incrementally_persists_and_preserves_disconnected_sources() {
     std::fs::rename(dir.path().join("offline"), &source).unwrap();
     scan(&mut library, id);
     assert!(library.snapshot().unwrap().albums[0].primary().tracks[0].available);
-    // A source that suddenly looks empty is more likely an unmounted volume.
+    // Emptied on the volume that held its music: a deliberate deletion.
     std::fs::remove_file(&audio).unwrap();
     let report = scan(&mut library, id);
-    assert_eq!(report.removed, 0);
-    assert_eq!(report.diagnostics.len(), 1);
-    let snapshot = library.snapshot().unwrap();
-    assert!(!snapshot.albums[0].primary().tracks[0].available);
+    assert_eq!(report.removed, 1);
+    assert!(report.diagnostics.is_empty());
+    assert!(library.snapshot().unwrap().albums.is_empty());
 }
 
 #[test]
@@ -266,8 +265,8 @@ fn removed_files_are_forgotten_but_never_after_cancellation() {
     assert!(library.snapshot().unwrap().albums[0].primary().tracks[0].available);
     std::fs::remove_file(source.join("broken.flac")).unwrap();
     std::fs::write(source.join("notes.txt"), b"keep the source non-empty").unwrap();
-    // Only non-audio files remain: indistinguishable from an emptied mount point.
-    assert_eq!(scan(&mut library, id).removed, 0);
+    // Only non-audio files remain, on the same volume: the music was deleted.
+    assert_eq!(scan(&mut library, id).removed, 1);
 }
 
 #[test]

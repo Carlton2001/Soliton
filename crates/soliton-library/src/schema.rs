@@ -9,7 +9,7 @@ use rusqlite::{Connection, TransactionBehavior, params};
 use soliton_core::model::Metadata;
 use std::{collections::BTreeSet, path::Path};
 
-pub(crate) const VERSION: i64 = 7;
+pub(crate) const VERSION: i64 = 8;
 
 pub(crate) fn version(connection: &Connection) -> Result<i64> {
     Ok(connection.query_row("PRAGMA user_version", [], |row| row.get(0))?)
@@ -73,6 +73,9 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
     if version < 7 {
         reconcile_album_artists(connection)?;
     }
+    if version < 8 {
+        source_volumes(connection)?;
+    }
     let violations: i64 =
         connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
             row.get(0)
@@ -80,6 +83,24 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
     if violations > 0 {
         bail!("Library database has {violations} inconsistent references");
     }
+    Ok(())
+}
+
+/// v8: volume of each source root when it last held music, to tell an emptied
+/// folder from an unmounted mount point. A library rewound to an older version
+/// may already have the column.
+fn source_volumes(connection: &mut Connection) -> Result<()> {
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let present: bool = transaction.query_row(
+        "SELECT count(*) FROM pragma_table_info('sources') WHERE name='volume'",
+        [],
+        |row| row.get(0),
+    )?;
+    if !present {
+        transaction.execute_batch("ALTER TABLE sources ADD COLUMN volume INTEGER;")?;
+    }
+    transaction.pragma_update(None, "user_version", 8)?;
+    transaction.commit()?;
     Ok(())
 }
 

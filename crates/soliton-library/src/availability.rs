@@ -7,6 +7,27 @@ use std::{
     time::Duration,
 };
 
+/// Identifier of the volume holding `path`, where the system exposes one. An
+/// unmounted mount point leaves its folder on the parent volume.
+pub(crate) fn volume(path: &Path) -> Option<u64> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::metadata(path).ok().map(|metadata| metadata.dev())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        None
+    }
+}
+
+/// An empty source root is a deliberate deletion only when it is still on the
+/// volume that held its music; otherwise it may be an unmounted mount point.
+pub(crate) fn emptied_in_place(recorded: Option<u64>, current: Option<u64>) -> bool {
+    recorded.is_some() && recorded == current
+}
+
 /// At most one probe thread per path: a share that hangs keeps a single thread
 /// waiting on the system, never one per check.
 #[derive(Clone, Default)]
@@ -45,3 +66,7 @@ impl Prober {
         self.in_flight.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
+
+#[cfg(test)]
+#[path = "tests/availability.rs"]
+mod tests;

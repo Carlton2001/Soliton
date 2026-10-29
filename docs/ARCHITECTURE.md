@@ -45,7 +45,10 @@ parcours ni empêcher ses conclusions.
 source vérifiée accessible avant et après, les fichiers non rencontrés sont
 retirés. Annulation, erreur de parcours ou source devenue inaccessible empêchent
 toute conclusion. Une racine sans aucun fichier audio est traitée comme un volume
-non monté.
+non monté, sauf si elle est encore sur le volume qui contenait sa musique
+(identifiant de périphérique mémorisé, schéma v8) : la musique a alors été
+supprimée. Sans identifiant de volume (hors Unix), le doute subsiste et les
+entrées sont conservées.
 
 **Surveillance.** `notify`, file bornée à 256 événements ; une perte déclenche une
 analyse complète. Regroupement : 2 s de calme, 15 s au plus, 4 096 chemins au plus,

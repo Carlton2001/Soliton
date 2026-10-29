@@ -277,14 +277,23 @@ impl Library {
                 root: &source.path,
                 dirs: &dirs,
             };
-            // An empty root more likely means an unmounted volume than a deleted library.
-            if scope.whole() && report.progress.discovered == 0 && self.has_files(source_id)? {
+            let volume = crate::availability::volume(&source.path);
+            let emptied = scope.whole() && report.progress.discovered == 0;
+            // An empty root off the volume that held its music is more likely an
+            // unmounted mount point than a deleted library.
+            if emptied
+                && self.has_files(source_id)?
+                && !crate::availability::emptied_in_place(self.source_volume(source_id)?, volume)
+            {
                 self.mark_unseen_unavailable(&scope, generation)?;
                 report
                     .diagnostics
                     .push(Failure::new(Kind::NoAudioFound).about(source.path.display()));
             } else {
                 report.removed = self.purge(&scope, generation)?;
+                if !emptied {
+                    self.set_source_volume(source_id, volume)?;
+                }
             }
         }
         progress(&report.progress);

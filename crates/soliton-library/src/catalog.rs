@@ -254,6 +254,24 @@ impl Library {
         Ok(())
     }
 
+    pub(crate) fn source_volume(&self, source: i64) -> Result<Option<u64>> {
+        let volume: Option<i64> = self.connection.query_row(
+            "SELECT volume FROM sources WHERE id=?1",
+            [source],
+            |row| row.get(0),
+        )?;
+        // Stored as SQLite's signed integer, bit for bit.
+        Ok(volume.map(|volume| volume as u64))
+    }
+
+    pub(crate) fn set_source_volume(&self, source: i64, volume: Option<u64>) -> Result<()> {
+        self.connection.execute(
+            "UPDATE sources SET volume=?1 WHERE id=?2",
+            params![volume.map(|volume| volume as i64), source],
+        )?;
+        Ok(())
+    }
+
     pub(crate) fn has_files(&self, source: i64) -> Result<bool> {
         Ok(self
             .connection
