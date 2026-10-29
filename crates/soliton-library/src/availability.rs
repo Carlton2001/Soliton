@@ -15,7 +15,21 @@ pub(crate) fn volume(path: &Path) -> Option<u64> {
         use std::os::unix::fs::MetadataExt;
         std::fs::metadata(path).ok().map(|metadata| metadata.dev())
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        let canonical = std::fs::canonicalize(path).ok()?;
+        match canonical.components().next()? {
+            Component::Prefix(prefix) => match prefix.kind() {
+                Prefix::VerbatimDisk(letter) | Prefix::Disk(letter) => {
+                    Some(u64::from(letter.to_ascii_uppercase()))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = path;
         None
