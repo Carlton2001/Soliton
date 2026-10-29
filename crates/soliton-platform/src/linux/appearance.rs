@@ -62,7 +62,7 @@ impl AccentWatcher {
 
 /// Light and dark theme variants of a desktop accent, readable as text and
 /// under the black or white labels Soliton draws on accent fills: OKLab
-/// lightness is capped at 0.5 for the light theme and raised to 0.85 for the
+/// lightness is capped at 0.55 for the light theme and raised to 0.72 for the
 /// dark theme, hue kept and chroma reduced only to stay within sRGB.
 pub(super) fn variants(srgb: [f64; 3]) -> [u32; 2] {
     let [l, a, b] = oklab(srgb.map(to_linear));
@@ -84,7 +84,7 @@ pub(super) fn variants(srgb: [f64; 3]) -> [u32; 2] {
         let [r, g, b] = at(high).map(|c| (from_linear(c) * 255.0).round() as u32);
         (r << 16) | (g << 8) | b
     };
-    [pack(l.min(0.5)), pack(l.max(0.85))]
+    [pack(l.min(0.55)), pack(l.max(0.72))]
 }
 
 fn to_linear(c: f64) -> f64 {

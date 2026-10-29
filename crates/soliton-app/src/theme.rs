@@ -118,14 +118,14 @@ pub fn accent_swatch(accent: Accent) -> Rgba {
 /// every Soliton surface, including text drawn on accent-filled controls.
 fn accent_palette(accent: Accent) -> (u32, u32, u32) {
     match accent {
-        Accent::Teal => (0x038387, 0x51a9ac, 0x037a7e),
-        Accent::Blue | Accent::System => (0x0078d4, 0x4fa2e1, 0x006ec3),
-        Accent::Indigo => (0x6b69d6, 0x9694e2, 0x6462c7),
-        Accent::Violet => (0x8764b8, 0xaa91cd, 0x7f5ead),
-        Accent::Pink => (0xe3008c, 0xef6ebd, 0xd30082),
-        Accent::Red => (0xe81123, 0xf2757f, 0xda1021),
-        Accent::Orange => (0xca5010, 0xda865a, 0xba4a0f),
-        Accent::Green => (0x10893e, 0x58ac78, 0x0f7e39),
+        Accent::Teal => (0x038387, 0x4ab0b4, 0x037a7e),
+        Accent::Blue | Accent::System => (0x0078d4, 0x45a2ff, 0x006ec3),
+        Accent::Indigo => (0x6b69d6, 0x8e90ff, 0x6462c7),
+        Accent::Violet => (0x8764b8, 0xad8ae1, 0x7f5ead),
+        Accent::Pink => (0xe3008c, 0xff5fb2, 0xd30082),
+        Accent::Red => (0xe81123, 0xff6b63, 0xda1021),
+        Accent::Orange => (0xca5010, 0xf2753f, 0xba4a0f),
+        Accent::Green => (0x10893e, 0x4fb76a, 0x0f7e39),
     }
 }
 
