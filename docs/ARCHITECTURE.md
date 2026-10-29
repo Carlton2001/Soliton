@@ -95,7 +95,9 @@ clears the buffer, then resets decoder and resampler; successive seeks are
 coalesced. Position comes from samples actually consumed.
 
 An undecodable packet is skipped and reported once per track; eight in a row make
-the file unreadable. In automatic playback an unreadable or unavailable track is
+the file unreadable. A read error during playback ends the track with the audio
+already decoded, reported the same way; a chained stream (Ogg) gets a new decoder.
+In automatic playback an unreadable or unavailable track is
 skipped, at most one queue round, and skipping stops after a failure that took a
 second or more (hung source); an output or network failure stops playback.
 

@@ -26,6 +26,60 @@ fn streaming_decoder_reads_pcm_and_seeks_without_changing_source() {
     assert_eq!(std::fs::read(&path).unwrap(), before);
 }
 
+/// Reads a file until `fail_at`, then fails as a lost network share does.
+struct Failing {
+    inner: std::io::Cursor<Vec<u8>>,
+    fail_at: u64,
+}
+
+impl std::io::Read for Failing {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let left = self.fail_at.saturating_sub(self.inner.position()) as usize;
+        if left == 0 {
+            return Err(std::io::Error::other("network name no longer available"));
+        }
+        let end = buffer.len().min(left);
+        self.inner.read(&mut buffer[..end])
+    }
+}
+
+impl std::io::Seek for Failing {
+    fn seek(&mut self, position: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.inner.seek(position)
+    }
+}
+
+impl MediaSource for Failing {
+    fn is_seekable(&self) -> bool {
+        true
+    }
+    fn byte_len(&self) -> Option<u64> {
+        Some(self.inner.get_ref().len() as u64)
+    }
+}
+
+#[test]
+fn a_read_error_during_playback_ends_the_track_with_what_was_decoded() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fixture.wav");
+    support::wav(&path, 44100, 2);
+    let bytes = std::fs::read(&path).unwrap();
+    let fail_at = bytes.len() as u64 / 2;
+    let mut decoder = Reader::from_source(&path, || {
+        Ok(Box::new(Failing {
+            inner: std::io::Cursor::new(bytes),
+            fail_at,
+        }))
+    })
+    .unwrap();
+    let mut frames = 0;
+    while let Some(samples) = decoder.next().unwrap() {
+        frames += samples.len();
+    }
+    assert!(frames > 0 && frames < 88200, "{frames}");
+    assert_eq!(decoder.skipped, 1);
+}
+
 #[test]
 fn malformed_audio_returns_an_error() {
     let dir = tempfile::tempdir().unwrap();

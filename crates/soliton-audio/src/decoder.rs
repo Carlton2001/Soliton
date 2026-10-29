@@ -9,7 +9,7 @@ use symphonia::core::{
     codecs::{Decoder, DecoderOptions},
     errors::Error,
     formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
-    io::MediaSourceStream,
+    io::{MediaSource, MediaSourceStream},
     meta::MetadataOptions,
     probe::Hint,
     units::Time,
@@ -53,11 +53,21 @@ fn unsupported(detail: String) -> anyhow::Error {
 
 impl Reader {
     pub fn open(path: &Path) -> Result<Self> {
-        Self::probe(path).map_err(|error| in_file(path, error))
+        Self::from_source(path, || Ok(Box::new(File::open(path)?)))
     }
 
-    fn probe(path: &Path) -> Result<Self> {
-        let source = MediaSourceStream::new(Box::new(File::open(path)?), Default::default());
+    /// `path` names the file and hints at its format; `source` reads it.
+    fn from_source(
+        path: &Path,
+        source: impl FnOnce() -> Result<Box<dyn MediaSource>>,
+    ) -> Result<Self> {
+        source()
+            .and_then(|source| Self::probe(path, source))
+            .map_err(|error| in_file(path, error))
+    }
+
+    fn probe(path: &Path, source: Box<dyn MediaSource>) -> Result<Self> {
+        let source = MediaSourceStream::new(source, Default::default());
         let mut hint = Hint::new();
         if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
             hint.with_extension(extension);
@@ -121,6 +131,20 @@ impl Reader {
                 Err(Error::IoError(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof => {
                     return Ok(None);
                 }
+                Err(Error::IoError(error)) if error.kind() == std::io::ErrorKind::Interrupted => {
+                    continue;
+                }
+                // A source lost during playback ends the track with what was
+                // decoded, reported as a skipped passage, rather than discarding it.
+                Err(Error::IoError(_)) if self.rate != 0 => {
+                    self.skipped += 1;
+                    return Ok(None);
+                }
+                // A chained stream (Ogg) starts a new logical stream.
+                Err(Error::ResetRequired) => {
+                    self.reset_track()?;
+                    continue;
+                }
                 Err(error) => {
                     self.skip(error)?;
                     continue;
@@ -131,6 +155,10 @@ impl Reader {
             }
             let decoded = match self.decoder.decode(&packet) {
                 Ok(decoded) => decoded,
+                Err(Error::ResetRequired) => {
+                    self.reset_track()?;
+                    continue;
+                }
                 Err(error) => {
                     self.skip(error)?;
                     continue;
@@ -179,6 +207,17 @@ impl Reader {
             }
             return Ok(Some(samples.to_vec()));
         }
+    }
+
+    /// Follows the stream's new default track with a new decoder. Format
+    /// changes are then rejected like any other, after the audio already played.
+    fn reset_track(&mut self) -> Result<()> {
+        let track = self.format.default_track().context("No audio track")?;
+        self.decoder = symphonia::default::get_codecs()
+            .make(&track.codec_params, &DecoderOptions::default())?;
+        self.track_id = track.id;
+        self.time_base = track.codec_params.time_base.or(self.time_base);
+        Ok(())
     }
 
     /// Counts a corrupted packet as skipped; other errors, and a run of corrupted
