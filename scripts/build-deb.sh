@@ -77,6 +77,7 @@ sed -e "s#@VERSION@#$version-1#" -e "s#@SIZE@#$size#" -e "s#@DEPENDS@#$depends#"
 
 SOURCE_DATE_EPOCH=$(git -c safe.directory="$root" log -1 --format=%ct) \
     dpkg-deb --root-owner-group -Zxz --build "$stage" "$output/$package.deb" >/dev/null
-lintian --tag-display-limit 0 "$output/$package.deb" || true
+# Warnings are reported; an error tag stops the build.
+lintian --fail-on error --tag-display-limit 0 "$output/$package.deb"
 (cd "$output" && sha256sum "$package.deb" > "$package.deb.sha256")
 echo "target/distribution/output/$package.deb"
