@@ -8,7 +8,7 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 APP_ID=io.github.Carlton2001.Soliton
 IMAGE=localhost/soliton-build-ubuntu:24.04
-# Debian requires a contact address; GitHub's no-reply form by default.
+# Debian requires a contact address; SOLITON_MAINTAINER overrides it.
 maintainer=${SOLITON_MAINTAINER:-Carlton2001 <carlton2001@gmail.com>}
 
 . /etc/os-release
