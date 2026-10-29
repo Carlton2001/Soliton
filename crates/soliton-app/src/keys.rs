@@ -161,15 +161,13 @@ impl Soliton {
             && matches!(key, "left" | "right" | "up" | "down" | "enter")
         {
             let query = soliton_core::text::fold(&self.search.read(cx).content);
-            let names: Vec<_> = self
-                .facets
-                .artist_cards
-                .iter()
-                .filter(|card| {
-                    query.is_empty() || soliton_core::text::fold(&card.name).contains(&query)
-                })
-                .map(|card| card.name.clone())
-                .collect();
+            let names: Vec<_> = crate::catalog::visible_artist_cards(
+                &self.facets.artist_cards,
+                &query,
+                self.settings.hide_unavailable,
+            )
+            .map(|card| card.name.clone())
+            .collect();
             if names.is_empty() {
                 return;
             }

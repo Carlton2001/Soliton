@@ -263,3 +263,36 @@ fn artist_cover_comes_from_the_latest_credited_album() {
     );
     assert_eq!(facets.artist_cards.len(), facets.artists.len());
 }
+
+#[test]
+fn artists_without_available_albums_are_hidden_with_them() {
+    let kept = album(
+        "Kept",
+        "Band",
+        vec![vec![track("A", "Band", "Rock", 1999, "FLAC")]],
+    );
+    let mut unplugged = album(
+        "Unplugged",
+        "Band",
+        vec![vec![track("B", "Band", "Rock", 2001, "FLAC")]],
+    );
+    unplugged.editions[0].tracks[0].available = false;
+    let mut away = album(
+        "Away",
+        "Solo",
+        vec![vec![track("C", "Solo", "Jazz", 2005, "FLAC")]],
+    );
+    away.editions[0].tracks[0].available = false;
+    let facets = Facets::collect(&LibrarySnapshot {
+        sources: vec![],
+        albums: vec![kept, unplugged, away],
+    });
+    let shown = |hide: bool| {
+        visible_artist_cards(&facets.artist_cards, "", hide)
+            .map(|card| (card.name.clone(), card.shown_albums(hide)))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(shown(false), vec![("Band".into(), 2), ("Solo".into(), 1)]);
+    assert_eq!(shown(true), vec![("Band".into(), 1)]);
+    assert!(visible_artist_cards(&facets.artist_cards, "solo", false).count() == 1);
+}

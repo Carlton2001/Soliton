@@ -17,8 +17,33 @@ pub struct ArtistCard {
     pub name: String,
     /// Albums by the artist, or containing at least one of their tracks.
     pub albums: usize,
+    /// Of those albums, the ones with an available edition.
+    pub available: usize,
     /// Cover of the most recent of those albums that has one.
     pub cover: Option<PathBuf>,
+}
+impl ArtistCard {
+    /// Albums counted for the artist, as the album list would show them.
+    pub fn shown_albums(&self, hide_unavailable: bool) -> usize {
+        if hide_unavailable {
+            self.available
+        } else {
+            self.albums
+        }
+    }
+}
+
+/// Artist cards matching a folded query, without the artists whose albums are
+/// all hidden as unavailable.
+pub fn visible_artist_cards<'a>(
+    cards: &'a [ArtistCard],
+    query: &'a str,
+    hide_unavailable: bool,
+) -> impl Iterator<Item = &'a ArtistCard> {
+    cards.iter().filter(move |card| {
+        card.shown_albums(hide_unavailable) > 0
+            && (query.is_empty() || fold(&card.name).contains(query))
+    })
 }
 
 #[derive(Clone, Default)]
@@ -61,6 +86,7 @@ fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCar
     #[derive(Default)]
     struct Found<'a> {
         albums: usize,
+        available: usize,
         best: Option<(Rank, &'a PathBuf)>,
     }
     let mut found: HashMap<String, Found> = HashMap::new();
@@ -78,9 +104,11 @@ fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCar
             .collect();
         names.insert(credited.clone());
         names.remove("");
+        let available = album.editions.iter().any(|edition| edition.available());
         for name in names {
             let entry = found.entry(name.clone()).or_default();
             entry.albums += 1;
+            entry.available += usize::from(available);
             if let Some(cover) = album.cover() {
                 let rank = (
                     name != credited,
@@ -101,6 +129,7 @@ fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCar
             ArtistCard {
                 name: name.clone(),
                 albums: entry.map_or(0, |entry| entry.albums),
+                available: entry.map_or(0, |entry| entry.available),
                 cover: entry
                     .and_then(|entry| entry.best.as_ref().map(|(_, cover)| (*cover).clone())),
             }

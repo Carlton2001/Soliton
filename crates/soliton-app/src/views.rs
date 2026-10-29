@@ -389,13 +389,11 @@ impl Soliton {
     /// Artists as tiles sharing the album grid's size and columns.
     pub fn artists_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let query = self.facet_query(cx);
-        let cards: Vec<_> = self
-            .facets
-            .artist_cards
-            .iter()
-            .filter(|card| query.is_empty() || fold(&card.name).contains(&query))
-            .cloned()
-            .collect();
+        let hide = self.settings.hide_unavailable;
+        let cards: Vec<_> =
+            crate::catalog::visible_artist_cards(&self.facets.artist_cards, &query, hide)
+                .cloned()
+                .collect();
         if cards.is_empty() {
             if self.snapshot.albums.is_empty() {
                 let add = button(
@@ -472,11 +470,9 @@ impl Soliton {
                                                     .font_weight(FontWeight::MEDIUM)
                                                     .child(card.name.clone()),
                                             )
-                                            .child(
-                                                div()
-                                                    .text_color(theme.muted)
-                                                    .child(crate::i18n::album_count(card.albums)),
-                                            )
+                                            .child(div().text_color(theme.muted).child(
+                                                crate::i18n::album_count(card.shown_albums(hide)),
+                                            ))
                                             .on_click(cx.listener(move |this, _, window, cx| {
                                                 this.focus.focus(window);
                                                 this.show_artist(name.clone(), cx)
@@ -517,7 +513,9 @@ impl Soliton {
                                             div()
                                                 .text_size(TEXT_SMALL)
                                                 .text_color(theme.muted)
-                                                .child(crate::i18n::album_count(card.albums)),
+                                                .child(crate::i18n::album_count(
+                                                    card.shown_albums(hide),
+                                                )),
                                         )
                                         .on_click(cx.listener(move |this, _, window, cx| {
                                             this.focus.focus(window);
