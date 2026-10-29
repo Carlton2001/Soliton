@@ -21,11 +21,12 @@ impl Icon {
             resvg::tiny_skia::Transform::from_scale(32. / 24., 32. / 24.),
             &mut image.as_mut(),
         );
+        // CreateIcon takes top-down rows of straight-alpha BGRA, unlike icon
+        // file DIBs; tiny-skia stores premultiplied RGBA.
         let mut pixels = Vec::with_capacity(32 * 32 * 4);
-        for row in image.data().as_chunks::<{ 32 * 4 }>().0.iter().rev() {
-            for rgba in row.as_chunks::<4>().0 {
-                pixels.extend_from_slice(&[rgba[2], rgba[1], rgba[0], rgba[3]]);
-            }
+        for pixel in image.pixels() {
+            let color = pixel.demultiply();
+            pixels.extend_from_slice(&[color.blue(), color.green(), color.red(), color.alpha()]);
         }
         let mask = [0u8; 128];
         Ok(Self(unsafe {
@@ -41,6 +42,10 @@ impl Drop for Icon {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/taskbar_icons.rs"]
+mod tests;
 
 pub(super) fn toolbar(accent: u32) -> Result<[Icon; 5]> {
     Ok([

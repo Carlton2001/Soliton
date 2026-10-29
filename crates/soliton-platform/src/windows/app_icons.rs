@@ -53,17 +53,11 @@ impl Icon {
             ),
             &mut image.as_mut(),
         );
+        // CreateIcon takes top-down rows, unlike the bottom-up DIBs of icon files.
         let mut pixels = Vec::with_capacity((size * size * 4) as usize);
-        for row in image.pixels().chunks_exact(size as usize).rev() {
-            for pixel in row {
-                let color = pixel.demultiply();
-                pixels.extend_from_slice(&[
-                    color.blue(),
-                    color.green(),
-                    color.red(),
-                    color.alpha(),
-                ]);
-            }
+        for pixel in image.pixels() {
+            let color = pixel.demultiply();
+            pixels.extend_from_slice(&[color.blue(), color.green(), color.red(), color.alpha()]);
         }
         let mask = vec![0u8; (size.div_ceil(32) * 4 * size) as usize];
         Ok(Self(unsafe {
