@@ -33,6 +33,33 @@
     <category>Player</category>
   </categories>
   <content_rating type="oars-1.1"/>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Albums with the selected album and its tracks</caption>
+      <caption xml:lang="fr">Les albums, avec l’album sélectionné et ses pistes</caption>
+      <image>https://raw.githubusercontent.com/Carlton2001/Soliton/v1.0.0/screenshots/flathub/soliton-albums.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Artists grid with a letter index</caption>
+      <caption xml:lang="fr">La grille des artistes et son index alphabétique</caption>
+      <image>https://raw.githubusercontent.com/Carlton2001/Soliton/v1.0.0/screenshots/flathub/soliton-artists.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Now playing in full window</caption>
+      <caption xml:lang="fr">La lecture en cours en plein écran</caption>
+      <image>https://raw.githubusercontent.com/Carlton2001/Soliton/v1.0.0/screenshots/flathub/soliton-card.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Play queue</caption>
+      <caption xml:lang="fr">La file de lecture</caption>
+      <image>https://raw.githubusercontent.com/Carlton2001/Soliton/v1.0.0/screenshots/flathub/soliton-playqueue.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Playlists</caption>
+      <caption xml:lang="fr">Les listes de lecture</caption>
+      <image>https://raw.githubusercontent.com/Carlton2001/Soliton/v1.0.0/screenshots/flathub/soliton-playlists.png</image>
+    </screenshot>
+  </screenshots>
   <releases>
   </releases>
 </component>
