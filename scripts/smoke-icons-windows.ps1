@@ -10,7 +10,7 @@ $data=Join-Path $project 'target\icon-qa-data'
 $output=Join-Path $project ('target\icon-qa-' + $Language + $(if($Light){'-light'}else{'-dark'}))
 New-Item -ItemType Directory -Force -Path $data,$output | Out-Null
 $settings=Join-Path $data 'settings.json'
-@{language=$Language;appearance=$(if($Light){'Light'}else{'Dark'});volume=0;close_behavior='Hide';check_updates=$false;last_view=@{view='Settings'};window=@{x=100;y=100;width=1180;height=880;maximized=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
+@{language=$Language;appearance=$(if($Light){'Light'}else{'Dark'});volume=0;close_behavior='Hide';check_updates=$false;window=@{x=100;y=100;width=1180;height=880;maximized=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
 $previousData=$env:SOLITON_DATA_DIR
 $previousLog=$env:RUST_LOG
 $env:SOLITON_DATA_DIR=$data
@@ -31,6 +31,7 @@ public class SolitonIconsSmoke {
  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out Rect r);
  [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h,ref Point p);
+ [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h,out Rect r);
  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint f);
  [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c);
  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
@@ -72,6 +73,21 @@ function Save-IconFrame([string]$name) {
             $bitmap.Save((Join-Path $output ($name+'.png')))
         } finally {$graphics.Dispose();$bitmap.Dispose()}
     } finally {[SolitonIconsSmoke]::SetThreadDpiAwarenessContext($oldDpi) | Out-Null}
+}
+function Open-Settings {
+    # Settings are never restored at startup: their rail entry sits 132 logical
+    # pixels above the bottom of the client area.
+    $scale=[SolitonIconsSmoke]::GetDpiForWindow($handle)/96.0
+    $oldDpi=[SolitonIconsSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
+    try {
+        $client=New-Object SolitonIconsSmoke+Rect
+        [SolitonIconsSmoke]::GetClientRect($handle,[ref]$client) | Out-Null
+        $point=([int]($client.Bottom-132*$scale) -shl 16) -bor [int](28*$scale)
+        [SolitonIconsSmoke]::PostMessage($handle,0x200,[IntPtr]0,[IntPtr]$point) | Out-Null
+        [SolitonIconsSmoke]::PostMessage($handle,0x201,[IntPtr]1,[IntPtr]$point) | Out-Null
+        [SolitonIconsSmoke]::PostMessage($handle,0x202,[IntPtr]0,[IntPtr]$point) | Out-Null
+    } finally {[SolitonIconsSmoke]::SetThreadDpiAwarenessContext($oldDpi) | Out-Null}
+    Start-Sleep -Milliseconds 600
 }
 function Click-Icon([int]$index) {
     # Centers of the six icon cards, measured at the fixed QA window/rem size.
@@ -120,6 +136,7 @@ function Quit-IconTest {
 try {
     Start-IconTest 'first'
     Assert-IconColor '#23272F'
+    Open-Settings
     Save-IconFrame 'default-graphite-mint'
     $palettes=@('Blue','Teal','Violet','Copper','GraphiteMint','IvoryInk')
     $colors=@('#315EF4','#086E75','#7544D8','#B65A32','#23272F','#EEE6D7')
@@ -132,8 +149,11 @@ try {
             if($saved){break}
         }
         if(-not $saved){throw ('Icon choice was not saved: '+$palettes[$index])}
-        Start-Sleep -Milliseconds 250
-        Assert-IconColor $colors[$index]
+        # Native icons are rendered off the UI thread after the choice is saved.
+        for($attempt=0;;$attempt++) {
+            Start-Sleep -Milliseconds 250
+            try {Assert-IconColor $colors[$index];break} catch {if($attempt -ge 11){throw}}
+        }
         Save-IconFrame $palettes[$index]
     }
     # A successful tray update must keep close-to-tray and restoration available.
