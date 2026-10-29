@@ -127,6 +127,8 @@ off the UI thread; matched to outputs by container id, never by name.
 
 Started only when searching for devices. Tokio runtime with two threads, eight
 blocking threads at most; commands limited to 12 s (16 s on the caller side).
+While switching to a receiver, the audio worker keeps feeding the local stream
+until the receiver accepts the media.
 Progress follows receiver acknowledgements; one generation per load discards
 states from a previous track.
 

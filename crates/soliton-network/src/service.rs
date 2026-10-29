@@ -1,9 +1,12 @@
 use crate::{Command, Snapshot, Status, controller::Controller, discovery};
-use anyhow::{Context, Result};
-use std::time::Duration;
+use anyhow::{Result, bail};
+use crossbeam_channel::RecvTimeoutError;
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, watch};
 
 const OPERATION_TIMEOUT: Duration = Duration::from_secs(12);
+/// Longest wait of the audio worker for one command, operation included.
+const CALL_TIMEOUT: Duration = Duration::from_secs(16);
 
 struct Request {
     command: Command,
@@ -77,13 +80,34 @@ impl Network {
     }
 
     pub fn call(&self, command: Command) -> Result<Option<Status>> {
+        self.call_while(command, || false)
+    }
+
+    /// Like [`Self::call`], running `idle` while the receiver has not answered;
+    /// `idle` returns whether it has more work at once, else it runs every 5 ms.
+    pub fn call_while(
+        &self,
+        command: Command,
+        mut idle: impl FnMut() -> bool,
+    ) -> Result<Option<Status>> {
         let (reply, result) = crossbeam_channel::bounded(1);
         self.commands
             .try_send(Request { command, reply })
             .map_err(|_| anyhow::anyhow!("Network command queue unavailable"))?;
-        result
-            .recv_timeout(Duration::from_secs(16))
-            .context("Network command timed out")?
+        let deadline = Instant::now() + CALL_TIMEOUT;
+        loop {
+            let pause = if idle() {
+                Duration::ZERO
+            } else {
+                Duration::from_millis(5)
+            };
+            let wait = pause.min(deadline.saturating_duration_since(Instant::now()));
+            match result.recv_timeout(wait) {
+                Ok(reply) => return reply,
+                Err(RecvTimeoutError::Timeout) if Instant::now() < deadline => {}
+                Err(_) => bail!("Network command timed out"),
+            }
+        }
     }
 
     pub fn shutdown(self) {

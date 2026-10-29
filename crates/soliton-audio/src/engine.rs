@@ -223,6 +223,60 @@ impl Session {
             base_ms,
         })
     }
+
+    /// Decodes at most one packet, so command latency stays bounded by one
+    /// source read/decode rather than a complete track, and moves pending
+    /// frames to the device buffer. Returns whether more audio is wanted now.
+    fn fill(&mut self) -> Result<bool> {
+        let half = self.output.samples.capacity() / 2;
+        if self.pending.is_empty() && !self.eof && self.output.samples.len() < half {
+            match self.reader.next()? {
+                Some(samples) => self
+                    .pending
+                    .extend(self.converter.process(&samples, false)?),
+                None => {
+                    self.eof = true;
+                    self.pending.extend(self.converter.process(&[], true)?);
+                }
+            }
+        }
+        let channels = self.output.frame_channels;
+        while self.pending.len() >= channels {
+            let left = self.pending.pop_front().unwrap();
+            let right = if channels == 2 {
+                self.pending.pop_front().unwrap()
+            } else {
+                0.
+            };
+            if self.output.samples.push([left, right]).is_err() {
+                if channels == 2 {
+                    self.pending.push_front(right);
+                }
+                self.pending.push_front(left);
+                break;
+            }
+        }
+        // Prebuffer a short segment before enabling the callback, including after seek.
+        if self.output.samples.len() >= self.output.rate as usize / 20 || self.eof {
+            self.output.playing.store(true, Ordering::Relaxed);
+        }
+        Ok(!self.pending.is_empty() || (!self.eof && self.output.samples.len() < half))
+    }
+
+    /// Keeps a playing stream fed while the worker waits on something else;
+    /// a failure stops feeding and is met again by the next regular turn.
+    fn feeder(session: &mut Option<Self>, playing: bool) -> impl FnMut() -> bool + '_ {
+        let mut failed = !playing;
+        move || {
+            let Some(session) = session.as_mut().filter(|_| !failed) else {
+                return false;
+            };
+            session.fill().unwrap_or_else(|_| {
+                failed = true;
+                false
+            })
+        }
+    }
 }
 
 #[derive(Default)]
@@ -621,51 +675,14 @@ impl Worker {
         if self.playback.state != PlaybackState::Playing {
             return Ok(());
         }
-        // At most one packet is decoded per turn, so command latency stays bounded
-        // by one source read/decode, rather than a complete track.
-        if session.pending.is_empty()
-            && !session.eof
-            && session.output.samples.len() < session.output.samples.capacity() / 2
-        {
-            match session.reader.next()? {
-                Some(samples) => session
-                    .pending
-                    .extend(session.converter.process(&samples, false)?),
-                None => {
-                    session.eof = true;
-                    session
-                        .pending
-                        .extend(session.converter.process(&[], true)?);
-                }
+        session.fill()?;
+        if session.reader.skipped > 0 && !session.warned {
+            session.warned = true;
+            let mut warning = Failure::new(Kind::SkippedAudio);
+            if let Some(track) = &self.playback.track {
+                warning = warning.about(track.path.display());
             }
-            if session.reader.skipped > 0 && !session.warned {
-                session.warned = true;
-                let mut warning = Failure::new(Kind::SkippedAudio);
-                if let Some(track) = &self.playback.track {
-                    warning = warning.about(track.path.display());
-                }
-                self.playback.warning = Some(warning);
-            }
-        }
-        let channels = session.output.frame_channels;
-        while session.pending.len() >= channels {
-            let left = session.pending.pop_front().unwrap();
-            let right = if channels == 2 {
-                session.pending.pop_front().unwrap()
-            } else {
-                0.
-            };
-            if session.output.samples.push([left, right]).is_err() {
-                if channels == 2 {
-                    session.pending.push_front(right);
-                }
-                session.pending.push_front(left);
-                break;
-            }
-        }
-        // Prebuffer a short segment before enabling the callback, including after seek.
-        if session.output.samples.len() >= session.output.rate as usize / 20 || session.eof {
-            session.output.playing.store(true, Ordering::Relaxed);
+            self.playback.warning = Some(warning);
         }
         self.playback.position_ms = session.base_ms + session.output.position_ms();
         if session.eof && session.pending.is_empty() && session.output.samples.is_empty() {

@@ -26,7 +26,13 @@ impl Worker {
             .network
             .as_ref()
             .ok_or(Failure::new(Kind::NetworkUnavailable))?;
-        network.call(RemoteCommand::Connect(device.clone()))?;
+        // The local stream keeps playing until the receiver accepts the media:
+        // a receiver may take seconds to answer, more than the local buffer holds.
+        let playing = self.playback.state == PlaybackState::Playing;
+        network.call_while(
+            RemoteCommand::Connect(device.clone()),
+            Session::feeder(&mut self.session, playing),
+        )?;
         let active = matches!(
             self.playback.state,
             PlaybackState::Playing | PlaybackState::Paused
@@ -38,16 +44,18 @@ impl Worker {
                 .map_or(self.playback.position_ms, |s| {
                     s.base_ms + s.output.position_ms()
                 });
-            network.call(RemoteCommand::Load {
-                track: track.clone(),
-                position_ms: position,
-                autoplay: self.playback.state == PlaybackState::Playing,
-                volume: self.playback.volume,
-            })?
+            network.call_while(
+                RemoteCommand::Load {
+                    track: track.clone(),
+                    position_ms: position,
+                    autoplay: playing,
+                    volume: self.playback.volume,
+                },
+                Session::feeder(&mut self.session, playing),
+            )?
         } else {
             None
         };
-        // The old local stream remains usable until the receiver accepts the media.
         self.session = None;
         self.playback.output = None;
         self.playback.network_output = Some(device);
