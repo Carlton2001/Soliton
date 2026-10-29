@@ -26,6 +26,19 @@ impl Soliton {
         }
     }
 
+    /// Background results are polled often only while someone may watch them
+    /// or work is under way, to spare the processor and battery otherwise.
+    pub fn poll_interval(&self, window: &Window) -> Duration {
+        let millis = if window.is_window_active() {
+            60
+        } else if self.scanning || self.playback.state == PlaybackState::Playing {
+            200
+        } else {
+            500
+        };
+        Duration::from_millis(millis)
+    }
+
     pub fn poll_desktop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let events: Vec<_> = self
             .desktop

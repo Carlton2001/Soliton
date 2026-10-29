@@ -266,18 +266,16 @@ impl Soliton {
         }
         cx.spawn_in(window, async move |this, cx| {
             let mut last_refresh = Instant::now();
+            let mut interval = Duration::from_millis(60);
             loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(60))
-                    .await;
-                if this
-                    .update_in(cx, |this, window, cx| {
-                        this.poll(&mut last_refresh, cx);
-                        this.poll_desktop(window, cx);
-                    })
-                    .is_err()
-                {
-                    break;
+                cx.background_executor().timer(interval).await;
+                match this.update_in(cx, |this, window, cx| {
+                    this.poll(&mut last_refresh, cx);
+                    this.poll_desktop(window, cx);
+                    this.poll_interval(window)
+                }) {
+                    Ok(next) => interval = next,
+                    Err(_) => break,
                 }
             }
         })

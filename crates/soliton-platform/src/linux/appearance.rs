@@ -1,63 +1,84 @@
-//! Read the desktop accent color from the XDG Settings portal on the desktop
-//! worker, never on the UI thread. GNOME 47+ and KDE Plasma publish it; the
-//! portal is also the only source reachable from the Flatpak sandbox.
+//! Read the desktop accent color from the XDG Settings portal, never on the UI
+//! thread: once at start, then on each `SettingChanged` signal for it. GNOME
+//! 47+ and KDE Plasma publish it; the portal is also the only source reachable
+//! from the Flatpak sandbox.
 use crate::DesktopEvent;
 use crossbeam_channel::Sender;
-use std::time::{Duration, Instant};
-use zbus::{blocking::Connection, zvariant::OwnedValue};
+use zbus::{
+    blocking::{Connection, Proxy},
+    zvariant::OwnedValue,
+};
 
-pub(super) struct AccentWatcher {
-    connection: Connection,
-    last: Option<[u32; 2]>,
-    next_poll: Instant,
+const PORTAL: &str = "org.freedesktop.portal.Desktop";
+const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
+const SETTINGS: &str = "org.freedesktop.portal.Settings";
+const NAMESPACE: &str = "org.freedesktop.appearance";
+const KEY: &str = "accent-color";
+
+/// Sends the current accent, then each change, from a thread of its own that
+/// sleeps on the bus. It ends with the application, or once nobody listens.
+pub(super) fn watch_accent(events: Sender<DesktopEvent>) {
+    let Ok(connection) = Connection::session() else {
+        return;
+    };
+    let warnings = events.clone();
+    let spawned = std::thread::Builder::new()
+        .name("soliton-accent".into())
+        .spawn(move || {
+            let mut last = None;
+            let mut send = |connection: &Connection| {
+                let Ok(Some(color)) = read(connection) else {
+                    return true;
+                };
+                let colors = variants(color);
+                if last == Some(colors) {
+                    return true;
+                }
+                last = Some(colors);
+                !matches!(
+                    events.try_send(DesktopEvent::SystemAccent(colors)),
+                    Err(crossbeam_channel::TrySendError::Disconnected(_))
+                )
+            };
+            if !send(&connection) {
+                return;
+            }
+            let Ok(proxy) = Proxy::new(&connection, PORTAL, PORTAL_PATH, SETTINGS) else {
+                return;
+            };
+            let Ok(changes) =
+                proxy.receive_signal_with_args("SettingChanged", &[(0, NAMESPACE), (1, KEY)])
+            else {
+                return;
+            };
+            for _ in changes {
+                if !send(&connection) {
+                    return;
+                }
+            }
+        });
+    if let Err(error) = spawned {
+        let _ = warnings.try_send(DesktopEvent::Warning(format!("Accent color: {error}")));
+    }
 }
 
-impl AccentWatcher {
-    pub fn new() -> Option<Self> {
-        Some(Self {
-            connection: Connection::session().ok()?,
-            last: None,
-            next_poll: Instant::now(),
-        })
-    }
-
-    pub fn poll(&mut self, events: &Sender<DesktopEvent>) {
-        if Instant::now() < self.next_poll {
-            return;
-        }
-        // Bounded polling, like on Windows; a missing portal is retried rarely.
-        let Ok(color) = self.read() else {
-            self.next_poll = Instant::now() + Duration::from_secs(30);
-            return;
-        };
-        self.next_poll = Instant::now() + Duration::from_secs(1);
-        let Some(colors) = color.map(variants) else {
-            return;
-        };
-        if self.last != Some(colors) && events.try_send(DesktopEvent::SystemAccent(colors)).is_ok()
-        {
-            self.last = Some(colors);
-        }
-    }
-
-    /// `None` when the desktop sets no accent: the portal then reports
-    /// components outside 0–1.
-    fn read(&self) -> zbus::Result<Option<[f64; 3]>> {
-        let reply = self.connection.call_method(
-            Some("org.freedesktop.portal.Desktop"),
-            "/org/freedesktop/portal/desktop",
-            Some("org.freedesktop.portal.Settings"),
-            "ReadOne",
-            &("org.freedesktop.appearance", "accent-color"),
-        )?;
-        let value: OwnedValue = reply.body().deserialize()?;
-        let (r, g, b) = <(f64, f64, f64)>::try_from(value)?;
-        let color = [r, g, b];
-        Ok(color
-            .iter()
-            .all(|c| (0.0..=1.0).contains(c))
-            .then_some(color))
-    }
+/// `None` when the desktop sets no accent: the portal then reports
+/// components outside 0–1.
+fn read(connection: &Connection) -> zbus::Result<Option<[f64; 3]>> {
+    let reply = connection.call_method(
+        Some(PORTAL),
+        PORTAL_PATH,
+        Some(SETTINGS),
+        "ReadOne",
+        &(NAMESPACE, KEY),
+    )?;
+    let value: OwnedValue = reply.body().deserialize()?;
+    let (r, g, b) = <(f64, f64, f64)>::try_from(value)?;
+    let color = [r, g, b];
+    Ok(color
+        .iter()
+        .all(|c| (0.0..=1.0).contains(c))
+        .then_some(color))
 }
 
 /// Light and dark theme variants of a desktop accent, readable as text and

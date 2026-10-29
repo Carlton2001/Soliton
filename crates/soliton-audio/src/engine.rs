@@ -18,6 +18,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Longest wait for a command while no local stream plays: device lists,
+/// network states and shutdown are still noticed this fast.
+const IDLE_WAIT: Duration = Duration::from_millis(100);
+
 /// Completed callbacks after the last queued frame before a finished track's
 /// stream may close: the device's own buffer still holds what they took.
 const DRAIN_CALLBACKS: u64 = 3;
@@ -86,13 +90,17 @@ impl Engine {
                                 || (!s.eof
                                     && s.output.samples.len() < s.output.samples.capacity() / 2))
                     });
+                    let streaming =
+                        worker.session.is_some() && worker.playback.state == PlaybackState::Playing;
                     let received = if let Some(command) = deferred.take() {
                         Ok(command)
                     } else {
                         receiver.recv_timeout(if hungry {
                             Duration::ZERO
-                        } else {
+                        } else if streaming {
                             Duration::from_millis(5)
+                        } else {
+                            IDLE_WAIT
                         })
                     };
                     match received {

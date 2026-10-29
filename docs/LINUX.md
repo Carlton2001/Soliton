@@ -51,7 +51,8 @@ environment: Fedora Workstation (GNOME, Wayland, PipeWire).
   Discrete Graphics Card").
 - **System accent**: read from the XDG Settings portal
   (`org.freedesktop.appearance`, `accent-color`, GNOME 47+ and KDE Plasma,
-  Flatpak included) on the integration thread, every second. Light and dark
+  Flatpak included) at start, then on each `SettingChanged` signal, on a thread
+  that sleeps on the bus in between. Light and dark
   variants keep the hue and cap OKLab lightness at 0.55 (light theme) or raise
   it to 0.72 (dark theme) to stay legible under black or white labels. Without
   a published accent, blue applies.
