@@ -19,7 +19,9 @@ cargo run -p soliton-app
   be retried.
 - `latest.json`, attached to the latest published stable release: `major.minor.patch`
   version (only newer ones are offered), exact installer URL and its Minisign
-  signature (base64 `.minisig`). Without a published release, nothing is offered.
+  signature (base64 `.minisig`), whose trusted comment must be
+  `soliton-version:<version>` so that an older signed installer cannot be
+  replayed. Without a published release, nothing is offered.
 - The sidebar `info.svg` icon appears, in the accent color, only when an update
   exists. On click: download (512 MiB max), check with the compiled public key,
   launch Setup, which waits for Soliton to exit, replaces the files and relaunches

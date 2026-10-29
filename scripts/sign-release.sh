@@ -42,10 +42,12 @@ printf '%s\n' "$SOLITON_GPG_PRIVATE_KEY" | gpg --batch --quiet --import
 fingerprint=$(gpg --batch --with-colons --show-keys "$keys/soliton-packages.asc" | awk -F: '$1 == "fpr" { print $10; exit }')
 gpg() { command gpg --batch --pinentry-mode loopback --passphrase-file "$work/passphrase" "$@"; }
 
-# The updater reads the Minisign signature as base64 text from latest.json.
+# The updater reads the Minisign signature as base64 text from latest.json, and
+# only accepts a trusted comment naming the version it offers.
 setup=$dir/Soliton_${version}_x64-setup.exe
 printf '%s\n' "$SOLITON_UPDATE_PRIVATE_KEY_PASSWORD" |
-    minisign -S -s "$work/update.key" -m "$setup" -x "$work/setup.minisig" >/dev/null
+    minisign -S -s "$work/update.key" -m "$setup" -x "$work/setup.minisig" \
+        -t "soliton-version:$version" >/dev/null
 minisign -Vq -p "$keys/soliton-update.pub" -m "$setup" -x "$work/setup.minisig"
 base64 -w0 "$work/setup.minisig" > "$setup.sig"
 

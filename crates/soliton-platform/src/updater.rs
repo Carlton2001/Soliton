@@ -30,11 +30,16 @@ pub fn prepare(release: &Release, public_key: &str) -> Result<PreparedUpdate, St
         return Err("Missing Soliton update signing key".into());
     }
     let bytes = crate::download_https(&release.setup, SETUP_LIMIT).map_err(|e| e.to_string())?;
-    stage(&bytes, &release.signature, public_key)
+    stage(&bytes, &release.signature, public_key, &release.version)
 }
 
-fn stage(bytes: &[u8], signature: &str, public_key: &str) -> Result<PreparedUpdate, String> {
-    verify(bytes, signature, public_key)?;
+fn stage(
+    bytes: &[u8],
+    signature: &str,
+    public_key: &str,
+    version: &str,
+) -> Result<PreparedUpdate, String> {
+    verify(bytes, signature, public_key, version)?;
     let directory = tempfile::Builder::new()
         .prefix("soliton-update-")
         .tempdir()
@@ -44,7 +49,9 @@ fn stage(bytes: &[u8], signature: &str, public_key: &str) -> Result<PreparedUpda
     Ok(PreparedUpdate { directory, setup })
 }
 
-fn verify(bytes: &[u8], signature: &str, public_key: &str) -> Result<(), String> {
+/// The trusted comment, covered by the signature, names the version, so that an
+/// older signed installer cannot be offered again as a newer release.
+fn verify(bytes: &[u8], signature: &str, public_key: &str, version: &str) -> Result<(), String> {
     let text = |encoded: &str| -> Result<String, String> {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(encoded.trim())
@@ -55,7 +62,16 @@ fn verify(bytes: &[u8], signature: &str, public_key: &str) -> Result<(), String>
     let signature =
         minisign_verify::Signature::decode(&text(signature)?).map_err(|e| e.to_string())?;
     key.verify(bytes, &signature, false)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let expected = format!("soliton-version:{version}");
+    if !signature
+        .trusted_comment()
+        .split(['\t', ' '])
+        .any(|field| field == expected)
+    {
+        return Err(format!("Installer signature is not for version {version}"));
+    }
+    Ok(())
 }
 
 impl PreparedUpdate {
