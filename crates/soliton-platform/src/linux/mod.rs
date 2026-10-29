@@ -2,6 +2,7 @@
 //! Soliton does not register a sign-in launch on Linux.
 mod appearance;
 pub(crate) mod documents;
+pub(crate) mod gpu;
 mod launcher_icon;
 mod mpris;
 

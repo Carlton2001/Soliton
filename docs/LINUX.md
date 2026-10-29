@@ -47,11 +47,20 @@ développement et de validation. Les paquets RPM, .deb et Flatpak
   GNOME et son panneau média passent par ce service. Aucune URI ni fichier hors
   bibliothèque n'est accepté. Sans bus de session, la lecture continue et un
   avertissement est affiché.
+- **GPU** : au lancement, les pilotes Vulkan des cartes sans écran connecté
+  (`/sys/class/drm/card*-*/status`) sont écartés par `VK_LOADER_DRIVERS_DISABLE`
+  (NVIDIA, AMD ou Intel selon le fabricant). Une carte en veille n'est ainsi ni
+  réveillée au démarrage, ni maintenue active, ni réveillée à la fermeture
+  (environ 2 s observées). Rien n'est changé si aucun écran n'est détecté ou si
+  l'utilisateur ou le bureau choisit déjà un GPU (`VK_LOADER_DRIVERS_SELECT`,
+  `VK_LOADER_DRIVERS_DISABLE`, `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`,
+  `MESA_VK_DEVICE_SELECT`, `DRI_PRIME`, `__NV_PRIME_RENDER_OFFLOAD`, ce dernier
+  posé par « Lancer avec la carte graphique dédiée » de GNOME).
 - **Accent système** : lu par le portail XDG Settings
   (`org.freedesktop.appearance`, clé `accent-color`, GNOME 47+ et KDE Plasma,
   Flatpak compris) sur le fil d'intégration, relu chaque seconde. Les variantes
-  claire et sombre gardent la teinte et plafonnent la luminosité OKLab à 0,5
-  (thème clair) ou la portent à 0,85 (thème sombre), pour rester lisibles sous
+  claire et sombre gardent la teinte et plafonnent la luminosité OKLab à 0,55
+  (thème clair) ou la portent à 0,72 (thème sombre), pour rester lisibles sous
   les libellés noirs ou blancs. Sans accent publié, l'accent bleu s'applique.
 - **Fermeture** : GNOME n'a pas de zone de notification ; la fermeture quitte
   toujours Soliton par le nettoyage normal, sans masquage. Pour la même raison,

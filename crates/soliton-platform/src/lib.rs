@@ -52,6 +52,20 @@ pub fn host_path(path: std::path::PathBuf) -> std::path::PathBuf {
     }
 }
 
+/// Linux: keeps Vulkan off GPUs that drive no screen, unless the user or the
+/// desktop chose a GPU. Call first in `main`, before any thread starts; returns
+/// the disabled Vulkan drivers.
+pub fn prefer_display_gpu() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        linux::gpu::prefer_display_gpu()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
 mod paths;
 pub use paths::AppPaths;
 pub mod updater;

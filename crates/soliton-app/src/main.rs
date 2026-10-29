@@ -51,9 +51,13 @@ use soliton_core::config::Settings;
 use soliton_platform::AppPaths;
 
 fn main() -> anyhow::Result<()> {
+    let idle_gpus = soliton_platform::prefer_display_gpu();
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+    if let Some(drivers) = idle_gpus {
+        tracing::info!("Vulkan drivers of GPUs without a screen disabled: {drivers}");
+    }
     let paths = match std::env::var_os("SOLITON_DATA_DIR") {
         Some(root) => AppPaths::at(root.into()),
         None => AppPaths::discover()?,
