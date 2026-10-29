@@ -15,7 +15,8 @@ use std::{
 
 /// Safety net for shares whose notifications are unreliable.
 const PERIODIC_SCAN: Duration = Duration::from_secs(30 * 60);
-const PROBE_INTERVAL: Duration = Duration::from_secs(60);
+/// One directory read per source: cheap enough to notice an unmounted disk soon.
+const PROBE_INTERVAL: Duration = Duration::from_secs(5);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Offline sources are probed more often, so that a remounted volume returns
 /// quickly; a share still slow to answer is simply tried again later.

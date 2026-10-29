@@ -50,7 +50,7 @@ non monté.
 **Surveillance.** `notify`, file bornée à 256 événements ; une perte déclenche une
 analyse complète. Regroupement : 2 s de calme, 15 s au plus, 4 096 chemins au plus,
 convertis en dossiers à analyser. Sonde `read_dir` sur thread dédié, délai 5 s,
-chaque minute ; les sources hors ligne sont sondées en plus toutes les 5 s
+toutes les 5 s ; les sources hors ligne sont sondées au même rythme
 (délai 1 s) et redeviennent disponibles dès le début de leur analyse, sans
 rafraîchissement manuel ; analyse complète au démarrage et toutes les 30 minutes.
 
