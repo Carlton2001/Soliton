@@ -46,6 +46,8 @@ try {
     $date = [DateTime]::UtcNow.ToString('yyyy-MM-dd')
     $updated = [regex]::Replace($xml, '(?m)^(\s*)<releases>\r?$', { param($m) "$($m.Value)`n$($m.Groups[1].Value)  <release version=`"$Version`" date=`"$date`"/>" }, 'None')
     if ($updated -eq $xml) { throw 'AppStream releases not found.' }
+    # Screenshot URLs follow the tag, which Flathub reads when it builds.
+    $updated = $updated -replace '/Soliton/v[0-9.]*/screenshots/', "/Soliton/$tag/screenshots/"
     [IO.File]::WriteAllText($metainfo, $updated, [Text.UTF8Encoding]::new($false))
 
     Invoke-Git add Cargo.toml Cargo.lock installer/linux/io.github.Carlton2001.Soliton.metainfo.xml | Out-Null

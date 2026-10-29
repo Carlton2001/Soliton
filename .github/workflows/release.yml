@@ -72,6 +72,8 @@ jobs:
         run: |
           $setup = "target/distribution/output/Soliton_$($env:RELEASE_VERSION)_x64-setup.exe"
           ./scripts/write-update-manifest.ps1 -Version $env:RELEASE_VERSION -Setup $setup -Repository $env:GITHUB_REPOSITORY -Destination target/distribution/output/latest.json
+      - name: Write the Flathub manifest
+        run: sh scripts/flathub-manifest.sh "$GITHUB_REF_NAME" target/flathub
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -79,4 +81,5 @@ jobs:
         run: |
           gh release create "v$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
             --title "Soliton v$RELEASE_VERSION" --generate-notes \
-            target/distribution/output/* installer/signing/soliton-packages.asc
+            target/distribution/output/* installer/signing/soliton-packages.asc \
+            target/flathub/*

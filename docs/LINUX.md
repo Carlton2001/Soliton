@@ -236,8 +236,14 @@ commit de `main` et hors ligne : `scripts/flatpak-cargo-sources.py` régénère
 `cargo-sources.json` depuis `Cargo.lock` (archives crates.io vérifiées par leur
 empreinte, format de `flatpak-cargo-generator`). Le script produit
 `target/distribution/output/Soliton-<version>-x86_64.flatpak` et passe
-`flatpak-builder-lint`. Restent attendues jusqu'à la publication : la source Git
-locale sans URL, et les captures d'écran absentes des métadonnées.
+`flatpak-builder-lint`.
+
+Pour Flathub, `scripts/flathub-manifest.sh vX.Y.Z` écrit dans `target/flathub`
+une copie du manifeste dont la source est le dépôt GitHub à ce tag et son commit,
+avec `cargo-sources.json` ; la release les joint aussi. La soumission (pull request
+sur `flathub/flathub`) est faite par l'auteur lui-même : Flathub refuse les
+soumissions produites par une IA. Les URL des captures d'écran de la metainfo
+pointent vers le tag ; les scripts de montée de version les mettent à jour.
 
 Permissions minimales : Wayland (X11 en secours), `dri` pour Vulkan, socket
 PipeWire seule pour l'audio, réseau pour Cast et DLNA, nom MPRIS. Fichiers en

@@ -44,6 +44,8 @@ fi
 sed -i "0,/^version = \"$current\"\$/s//version = \"$version\"/" Cargo.toml
 cargo update --workspace --offline
 sed -i "s#^\(\s*\)<releases>\$#&\n\1  <release version=\"$version\" date=\"$(date -u +%F)\"/>#" "$METAINFO"
+# Screenshot URLs follow the tag, which Flathub reads when it builds.
+sed -i "s#/Soliton/v[0-9.]*/screenshots/#/Soliton/$tag/screenshots/#g" "$METAINFO"
 git add Cargo.toml Cargo.lock "$METAINFO"
 git commit -q -m "Release $tag"
 git tag -a "$tag" -m "Soliton $tag"
