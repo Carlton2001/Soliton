@@ -341,6 +341,12 @@ impl Soliton {
             let _ = entity.update(cx, |this, cx| this.seek_fraction(fraction, released, cx));
         });
         let enabled = p.track.is_some() && p.duration_ms > 0;
+        // Both clocks widen together for h:mm:ss, so the slider never shifts mid-track.
+        let clock = rems(if p.duration_ms >= 3_600_000 {
+            3.25
+        } else {
+            2.5
+        });
         div()
             .flex()
             .items_center()
@@ -350,7 +356,7 @@ impl Soliton {
             .child(
                 div()
                     .font(crate::widgets::numeric_font())
-                    .w(rems(2.5))
+                    .w(clock)
                     .flex()
                     .justify_end()
                     .child(time(shown)),
@@ -391,7 +397,7 @@ impl Soliton {
             .child(
                 div()
                     .font(crate::widgets::numeric_font())
-                    .w(rems(2.5))
+                    .w(clock)
                     .child(time(p.duration_ms)),
             )
     }

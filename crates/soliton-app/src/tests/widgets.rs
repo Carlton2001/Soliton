@@ -28,3 +28,12 @@ fn shared_controls_build_without_duplicate_interaction_styles() {
         }
     }
 }
+
+#[test]
+fn durations_show_hours_from_one_hour() {
+    assert_eq!(super::time(0), "0:00");
+    assert_eq!(super::time(59_999), "0:59");
+    assert_eq!(super::time(3_599_000), "59:59");
+    assert_eq!(super::time(3_600_000), "1:00:00");
+    assert_eq!(super::time(4_501_000), "1:15:01");
+}

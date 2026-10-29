@@ -719,9 +719,19 @@ pub fn plain_paths(text: &str) -> String {
     text.replace(r"\\?\UNC\", r"\\").replace(r"\\?\", "")
 }
 
+/// m:ss, or h:mm:ss from one hour, like the taskbar preview.
 pub fn time(milliseconds: u64) -> String {
     let seconds = milliseconds / 1000;
-    format!("{}:{:02}", seconds / 60, seconds % 60)
+    if seconds >= 3600 {
+        format!(
+            "{}:{:02}:{:02}",
+            seconds / 3600,
+            seconds / 60 % 60,
+            seconds % 60
+        )
+    } else {
+        format!("{}:{:02}", seconds / 60, seconds % 60)
+    }
 }
 
 pub fn quality(metadata: &soliton_core::model::Metadata) -> String {

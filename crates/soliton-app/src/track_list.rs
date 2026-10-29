@@ -232,7 +232,8 @@ impl Soliton {
             )
             .child(
                 div()
-                    .w(rems(if compact { 2.5 } else { 3.5 }))
+                    // A minimum: a track of an hour or more widens its own h:mm:ss.
+                    .min_w(rems(if compact { 2.5 } else { 3.5 }))
                     .flex_none()
                     .text_right()
                     .font(crate::widgets::numeric_font())
