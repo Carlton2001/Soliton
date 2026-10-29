@@ -218,7 +218,7 @@ Disposition et données identiques au RPM ; les licences sont dans
 déclarées, ainsi que `pipewire-bin` (qui fournit `client.conf`, sans lequel le
 client PipeWire échoue) et une police système (`fonts-dejavu-core` ou
 équivalent) pour les caractères absents d'Inter et de JetBrains Mono, toutes deux
-embarquées. Le RPM déclare `default-fonts-core-sans` pour la même raison. Le champ `Maintainer` vaut l'adresse GitHub sans réponse, ou
+embarquées. Le RPM déclare `default-fonts-core-sans` pour la même raison. Le champ `Maintainer` vaut `carlton2001@gmail.com`, ou
 `SOLITON_MAINTAINER`.
 
 ## Construire le Flatpak

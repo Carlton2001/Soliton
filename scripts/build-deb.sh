@@ -9,7 +9,7 @@ cd "$root"
 APP_ID=io.github.Carlton2001.Soliton
 IMAGE=localhost/soliton-build-ubuntu:24.04
 # Debian requires a contact address; GitHub's no-reply form by default.
-maintainer=${SOLITON_MAINTAINER:-Carlton2001 <Carlton2001@users.noreply.github.com>}
+maintainer=${SOLITON_MAINTAINER:-Carlton2001 <carlton2001@gmail.com>}
 
 . /etc/os-release
 if [ "$ID:$VERSION_ID" != "ubuntu:24.04" ]; then
