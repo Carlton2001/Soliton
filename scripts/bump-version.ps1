@@ -39,6 +39,8 @@ try {
 
     & cargo update --workspace --offline
     if ($LASTEXITCODE -ne 0) { throw 'Cargo.lock update failed.' }
+    # The notices record the Cargo.lock hash, which the version change alters.
+    & (Join-Path $PSScriptRoot 'update-third-party-licenses.ps1') -Offline
 
     # The Linux packages require an AppStream release for their version.
     $metainfo = Join-Path $projectRoot 'installer/linux/io.github.Carlton2001.Soliton.metainfo.xml'
@@ -50,7 +52,7 @@ try {
     $updated = $updated -replace '/Soliton/v[0-9.]*/screenshots/', "/Soliton/$tag/screenshots/"
     [IO.File]::WriteAllText($metainfo, $updated, [Text.UTF8Encoding]::new($false))
 
-    Invoke-Git add Cargo.toml Cargo.lock installer/linux/io.github.Carlton2001.Soliton.metainfo.xml | Out-Null
+    Invoke-Git add Cargo.toml Cargo.lock installer/linux/io.github.Carlton2001.Soliton.metainfo.xml licenses/dependencies | Out-Null
     Invoke-Git commit -m "Release $tag" | Out-Null
     Invoke-Git tag -a $tag -m "Soliton $tag" | Out-Null
     Write-Host "Version $current -> $Version committed and tagged $tag." -ForegroundColor Green
