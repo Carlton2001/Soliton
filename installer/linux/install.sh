@@ -22,6 +22,19 @@ for file in bin/soliton "share/applications/$APP_ID.desktop" \
     fi
 done
 
+# GPUI renders through Vulkan; the loader is a system package.
+vulkan=
+for dir in /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu /lib64 /lib/x86_64-linux-gnu; do
+    [ -e "$dir/libvulkan.so.1" ] && vulkan=1
+done
+if [ -z "$vulkan" ] && command -v ldconfig >/dev/null 2>&1; then
+    case $(ldconfig -p 2>/dev/null) in *libvulkan.so.1*) vulkan=1 ;; esac
+fi
+if [ -z "$vulkan" ]; then
+    echo "Warning: libvulkan.so.1 was not found; Soliton needs Vulkan to start." >&2
+    echo "Install vulkan-loader and mesa-vulkan-drivers (Fedora) or libvulkan1 and mesa-vulkan-drivers (Debian, Ubuntu)." >&2
+fi
+
 install -Dm755 "$here/bin/soliton" "$bin/soliton"
 # Exec takes one quoted argument: escape " ` $ \ for the quoting, then \ again
 # for the string value, and double % (Desktop Entry specification).

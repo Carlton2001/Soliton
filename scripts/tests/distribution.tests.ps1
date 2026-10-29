@@ -41,7 +41,7 @@ foreach ($name in @('Soliton-1.2.3-x64-portable.zip', 'Soliton_1.2.3_x64-setup.e
 }
 $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $output 'Soliton-1.2.3-x64-portable.zip'))
 try {
-    foreach ($name in @('Soliton.exe', 'LICENSE', 'data/README.txt', 'licenses/dependencies/THIRD-PARTY-NOTICES.md', 'licenses/dependencies/assets/LUCIDE-LICENSE.txt')) {
+    foreach ($name in @('Soliton.exe', 'LICENSE', 'README.txt', 'data/README.txt', 'licenses/dependencies/THIRD-PARTY-NOTICES.md', 'licenses/dependencies/assets/LUCIDE-LICENSE.txt')) {
         if (-not $zip.GetEntry("Soliton/$name")) { throw "Missing ZIP entry: $name" }
     }
 } finally { $zip.Dispose() }

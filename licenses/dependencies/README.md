@@ -1,7 +1,7 @@
-# Licences des dépendances / Dependency licenses
+# Dependency licenses
 
-Le mécanisme est adapté des scripts d'Oxyde-GPUI, Copyright (C) 2026
-Carlton2001, sous GPL-3.0 (voir le fichier LICENSE à la racine).
+Mechanism adapted from Oxyde-GPUI scripts, Copyright (C) 2026 Carlton2001,
+GPL-3.0 (see LICENSE at the root).
 
 ```powershell
 ./scripts/install-cargo-about.ps1
@@ -10,47 +10,27 @@ Carlton2001, sous GPL-3.0 (voir le fichier LICENSE à la racine).
 ```
 
 ```sh
-cargo install cargo-about --version 0.9.2 --locked --features cli
-scripts/update-third-party-licenses.sh
+cargo +1.98.1 install cargo-about --version 0.9.2 --locked --features cli
+RUSTUP_TOOLCHAIN=1.98.1 scripts/update-third-party-licenses.sh
 scripts/check-third-party-licenses.sh
 ```
 
-Le générateur Windows x64 officiel cargo-about 0.9.2 est épinglé et vérifié par
-SHA-256. S'il est déjà installé, seule la commande de mise à jour est nécessaire.
-Sous Linux, cargo-about 0.9.2 est compilé depuis crates.io avec son verrou ;
-`update-third-party-licenses.sh` (sh et Python 3) produit les mêmes notices et le
-même inventaire que la version PowerShell : chaque système peut régénérer.
-La génération utilise Cargo.lock sans le modifier et échoue si une licence ne
-peut pas être résolue. `about.toml` définit les licences admises pour cet inventaire.
+- **Generator**: cargo-about 0.9.2, official Windows x64 binary pinned by SHA-256,
+  or built from crates.io on Linux (sh and Python 3). Both produce identical
+  notices and inventory. Generation reads Cargo.lock without changing it and fails
+  on an unresolved license; `about.toml` lists the accepted licenses.
+- **`THIRD-PARTY-NOTICES.md`**: texts, copyrights, names and versions of the crates
+  of the whole workspace (all targets, build and dev dependencies, `vendor/`
+  copies), hence more than the binaries contain; an extra section keeps upstream
+  NOTICE, COPYRIGHT and AUTHORS files.
+- **`assets/`**: Lucide (`LUCIDE-LICENSE.txt`), Inter, JetBrains Mono and GPUI
+  licenses and Soliton's attributions (paths relative to the source `assets/`).
+- **`inputs.json`**: hashes (UTF-8 text, LF line endings) of the lock, workspace
+  and vendored manifests, configuration, generator, template, attributions and
+  outputs. The check rejects changed or deleted inputs and new manifests, but does
+  not rescan local sources: regenerate after any change to dependencies,
+  attributions or vendored notices.
+- **`-Offline` / `--offline`**: generation from the cache, which can lose the
+  copyrights of badly packaged crates; generate online for releases.
 
-`THIRD-PARTY-NOTICES.md` regroupe les textes et copyrights avec les noms et
-versions des crates, pour tout le workspace, toutes les cibles, les dépendances
-de construction et de développement. L'inventaire dépasse donc le contenu du
-binaire Windows. Les copies locales de `vendor/` sont incluses. Une section
-complémentaire conserve les fichiers NOTICE, COPYRIGHT et AUTHORS amont.
-
-`assets/` conserve les licences Lucide, Inter, JetBrains Mono et GPUI ainsi que
-les attributions de Soliton. Les chemins du NOTICE copié sont relatifs au dossier
-`assets/` du projet source ; la licence Lucide est ici `LUCIDE-LICENSE.txt`.
-JetBrains Mono est incluse par prudence même si elle n'est pas embarquée.
-
-`inputs.json` enregistre les empreintes du verrou, des manifestes du workspace
-et des crates vendoriées, de la configuration, du générateur, du template, des
-attributions et des résultats. La vérification refuse les entrées modifiées,
-supprimées et les nouveaux manifestes. Régénérer après une mise à jour des
-dépendances ou des attributions. Cette vérification ne refait pas l'analyse des
-sources locales : régénérer aussi après toute modification de leurs notices.
-Les empreintes portent sur le texte UTF-8 avec fins de ligne LF, afin que la
-conversion CRLF de Git sous Windows ne rende pas les notices périmées.
-
-`-Offline` (`--offline` sous Linux) permet une génération avec les sources déjà en cache, mais certaines
-crates mal empaquetées nécessitent des licences récupérées sur leurs dépôts
-amont ; ce mode peut perdre leurs copyrights spécifiques. Préférer le mode en
-ligne pour une livraison. La future distribution devra exécuter la génération
-et la vérification, puis inclure ce dossier et le LICENSE de Soliton.
-
-The commands above generate and verify dependency notices for the entire Soliton
-workspace, on Windows (PowerShell) or Linux (sh and Python 3) with identical results. The report preserves upstream license texts and supplemental notices;
-`assets/` contains resource licenses and attributions. Regenerate after dependency
-or attribution changes. Prefer online generation for releases. Future packages
-must include this directory and Soliton's root LICENSE.
+Every shipped package includes this folder and Soliton's LICENSE.

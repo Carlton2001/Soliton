@@ -1,63 +1,52 @@
-# Correctifs de dépendances
+# Dependency patches
 
-Copies des packages publiés sur crates.io, sans changement de version ni d'API.
-Leurs licences et leurs sources sont conservées. Les caches Cargo de la machine
-ne sont pas modifiés. `Cargo.toml` applique ces copies via `[patch.crates-io]`.
-Les crates tierces restent exclues du workspace RAP.
+Copies of packages published on crates.io, with no version or API change, applied
+through `[patch.crates-io]` in `Cargo.toml` and excluded from the workspace. Their
+licenses and sources are kept; local Cargo caches are not modified. On an upstream
+update, review these changes and drop them once the same behavior is fixed and
+validated in the chosen version.
 
 ## GPUI 0.2.2, Apache-2.0
 
-Source : https://crates.io/crates/gpui/0.2.2
+Source: https://crates.io/crates/gpui/0.2.2
 
-- `src/platform/windows/directx_devices.rs` : l'échec de la sonde facultative
-  DXGI Debug est un diagnostic debug. La création réelle du périphérique garde
-  son traitement d'erreur et le repli sans Graphics Tools reste actif.
-- `src/platform/windows/events.rs` (barre de titre personnalisée) : comme dans
-  les versions ultérieures de GPUI, un clic non client n'est consommé que si un
-  gestionnaire arrête sa propagation, et non plus dès que le focus appelle
-  `prevent_default` ; le déplacement et les boutons natifs restent ainsi actifs.
-  Le bord supérieur de redimensionnement est testé avant les zones de contrôle.
-- `src/platform/windows/events.rs` : `WM_DESTROY` marque la fenêtre détruite,
-  retire ses callbacks et révoque le glisser-déposer avant la perte du HWND.
-- `src/platform/windows/window.rs` : le destructeur retire les callbacks vers
-  l'entité GPUI supprimée et ne redétruit pas un HWND déjà détruit. Une seconde
-  vérification est effectuée à l'exécution de la tâche de destruction différée.
-- `src/taffy.rs` : préciser les deux littéraux `f32` pour éviter le repli de types
-  que Rust 1.98 signale comme incompatibilité future (rust-lang/rust#154024).
-- `src/elements/text.rs` et `src/text_system/line_wrapper.rs` : chaque mesure de
-  texte tronqué utilise ses propres runs. Une première mesure étroite ne doit pas
-  laisser des longueurs périmées lors d'une seconde mesure plus large, au risque
-  de découper un caractère UTF-8 et de provoquer un panic DirectWrite.
-- `src/platform/linux/wayland/client.rs` : accepter `xdg_wm_base` à partir de la
-  version 1 annoncée par WSLg, tout en négociant jusqu'à la version 5. Les requêtes
-  utilisées existent en version 1 ; les états de tuilage ajoutés en version 2
-  restent facultatifs. Aucun changement dans le backend Windows.
+- `src/platform/windows/directx_devices.rs`: a failure of the optional DXGI Debug
+  probe is a debug diagnostic. Real device creation keeps its error handling and
+  the fallback without Graphics Tools stays active.
+- `src/platform/windows/events.rs` (custom title bar): as in later GPUI versions,
+  a non-client click is consumed only if a handler stops its propagation, no longer
+  as soon as focus calls `prevent_default`, so dragging and native buttons keep
+  working. The top resize edge is tested before control areas.
+- `src/platform/windows/events.rs`: `WM_DESTROY` marks the window destroyed,
+  removes its callbacks and revokes drag and drop before the HWND is lost.
+- `src/platform/windows/window.rs`: the destructor removes callbacks to the dropped
+  GPUI entity and does not destroy an already destroyed HWND again, checked once
+  more when the deferred destroy task runs.
+- `src/taffy.rs`: annotate two `f32` literals to avoid the type fallback Rust 1.98
+  reports as a future incompatibility (rust-lang/rust#154024).
+- `src/elements/text.rs` and `src/text_system/line_wrapper.rs`: each truncated text
+  measurement uses its own runs, so a first narrow measurement cannot leave stale
+  lengths for a wider one, split a UTF-8 character and panic in DirectWrite.
+- `src/platform/linux/wayland/client.rs`: accept `xdg_wm_base` from version 1 (as
+  announced by WSLg) while negotiating up to version 5. The requests used exist in
+  version 1; tiling states added in version 2 stay optional.
 
-Ces changements corrigent les diagnostics au démarrage et la double destruction
-observés sous Windows. Aucun filtre global des journaux, aucun désarmement des
-assertions debug et aucun changement de curseur ne sont appliqués.
+No global log filter, no disabled debug assertions and no cursor change are applied.
 
 ## proc-macro-error2 2.0.1, MIT OR Apache-2.0
 
-Source : https://crates.io/crates/proc-macro-error2/2.0.1
+Source: https://crates.io/crates/proc-macro-error2/2.0.1
 
-`src/lib.rs` : rendre `extern crate proc_macro` public afin que sa réexportation
-publique soit valide (E0365, rust-lang/rust#127909). Pas de changement de logique
-des macros. Les autres sources du package sont inchangées.
-
-Lors d'une mise à jour upstream, réexaminer ces modifications et les retirer une
-fois les mêmes comportements corrigés et validés dans la version retenue.
+`src/lib.rs`: make `extern crate proc_macro` public so its public re-export is
+valid (E0365, rust-lang/rust#127909). No macro logic change.
 
 ## xattr 0.2.3, MIT OR Apache-2.0
 
-Source : https://crates.io/crates/xattr/0.2.3
+Source: https://crates.io/crates/xattr/0.2.3
 
-Dépendance Unix indirecte de GPUI via `gpui_http_client` et `zed-async-tar`.
-`src/sys/mod.rs` : utiliser `libc::ENODATA` pour l'attribut absent sous Linux ;
-`libc` 0.2.191 n'expose plus l'ancien alias `ENOATTR` pour cette cible.
-Le nom interne `ENOATTR` et l'API de la crate sont conservés. Les autres cibles
-gardent leur comportement. Référence :
-[getxattr(2)](https://man7.org/linux/man-pages/man2/getxattr.2.html).
-
-Copie des sources et tests publiés avec leurs licences. Aucun appel d'écriture
-d'attributs n'est ajouté au parcours de la bibliothèque musicale Soliton.
+Indirect Unix dependency of GPUI through `gpui_http_client` and `zed-async-tar`.
+`src/sys/mod.rs`: use `libc::ENODATA` for a missing attribute on Linux; `libc`
+0.2.191 no longer exposes the old `ENOATTR` alias for this target. The internal
+`ENOATTR` name and the crate API are kept; other targets are unchanged
+([getxattr(2)](https://man7.org/linux/man-pages/man2/getxattr.2.html)). No
+attribute write is added to Soliton's library scan.

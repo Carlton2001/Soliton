@@ -1,42 +1,40 @@
-# Soliton - Audio Player
+# Soliton: agent instructions
 
-## Présentation
-Soliton est un lecteur de musique haute performance écrit en **Rust**, conçu pour gérer de grandes collections de fichiers audio (FLAC, MP3, WAV, etc) avec une interface fluide et réactive. Le projet met l'accent sur la richesse des métadonnées et la rapidité de navigation via une base de données locale.
+Soliton is a high-performance Rust/GPUI audio library player for large local collections (FLAC, MP3, WAV, etc.), focused on rich metadata and fast navigation backed by a local database.
 
-## Références
+## References
 
-- [Spécifications de Soliton](docs/SOLITON_SPECIFICATIONS.md) : périmètre fonctionnel, contraintes et phases de développement. Ce fichier `AGENTS.md` porte les consignes de travail ; éviter de dupliquer les spécifications. Signaler les contradictions avant d'implémenter le comportement concerné.
-- Lire intégralement les spécifications avant l'initialisation du projet, puis consulter les sections pertinentes pour chaque changement. Présenter les choix ayant un impact important sur l'architecture avant implémentation.
-- **Référence GPUI :** examiner le projet voisin `../Oxyde-GPUI` pour les composants, conventions visuelles et usages GPUI pertinents, notamment les closures `cx.listener`. Vérifier leur compatibilité avec la version retenue dans Soliton. Réutiliser sélectivement après examen du code, en respectant licences et attributions, sans dépendance directe à l'application Oxyde.
+- [Specifications](docs/SOLITON_SPECIFICATIONS.md): scope, product rules, phases. Read the relevant sections before each change; do not duplicate them here. Report contradictions before implementing the affected behavior, and present high-impact architecture choices before implementing them.
+- GPUI reference: the sibling project `../Oxyde-GPUI` (components, visual conventions, `cx.listener` closures). Check compatibility with Soliton's GPUI version, reuse selectively after review, respect licenses and attributions, never depend on the Oxyde app.
 
-## Règles permanentes
+## Standing rules
 
-- Garder `cargo check` sans avertissement du projet. Utiliser `rg`, jamais `grep`.
-- Garder les calculs coûteux et les opérations de fichiers hors du thread UI.
-- Isoler les intégrations propres au système derrière des interfaces dédiées, avec implémentations et dépendances conditionnées par cible. Ne pas exposer de types Windows dans le code commun.
-- Privilégier les interactions natives et le clic gauche pour les actions principales.
-- Utiliser les SVG Lucide officiels de `lucide-icons/lucide/icons/<nom>.svg`, sans modifier leur tracé. Si la source est inaccessible, signaler le blocage.
-- Ne créer ni modifier un changement de curseur sans demande explicite de l’utilisateur. Les nouvelles interactions gardent le curseur par défaut.
-- Écrire les messages de commit en anglais. **Chaque push vers GitHub exige une demande explicite pour cette opération**, y compris branches et tags, quel que soit l’outil. Une demande de modification, commit ou fusion ne l’autorise pas ; une autorisation antérieure ne vaut pas pour le push suivant.
-- Prévoir les textes d'interface en français et en anglais dès leur introduction.
+- No project warnings from `cargo check`. Search with `rg`, never `grep`.
+- Keep expensive work and file I/O off the UI thread.
+- Put OS integrations behind dedicated interfaces with target-gated implementations and dependencies; no Windows types in common code.
+- Prefer native interactions and left click for primary actions.
+- Icons: official Lucide SVGs from `lucide-icons/lucide/icons/<name>.svg`, paths unmodified. If the source is unreachable, report it.
+- Never add or change a cursor without an explicit user request; new interactions keep the default cursor.
+- Commit messages in English. **Every push to GitHub (branches and tags, any tool) needs an explicit request for that push.** A request to edit, commit or merge does not grant it, and a past approval does not cover the next push.
+- Every UI string ships in French and English from the start.
 
-## Invariants de Soliton
+## Invariants
 
-- Ne jamais modifier, déplacer, renommer ou supprimer les fichiers de la bibliothèque musicale, leurs tags ou leurs pochettes intégrées. Stocker bases, caches et fichiers temporaires hors des dossiers sources.
-- Une source inaccessible ne constitue pas une preuve de suppression de ses fichiers : conserver ses entrées et signaler leur indisponibilité.
-- Garder le moteur audio indépendant de GPUI. Dans le callback audio, éviter allocations, entrées/sorties, journalisation et attentes sur des verrous bloquants.
-- Prévoir l'annulation des indexations et une concurrence bornée pour les lectures et traitements coûteux.
+- Never modify, move, rename or delete library files, their tags or embedded artwork. Databases, caches and temporary files live outside source folders.
+- An unreachable source is not proof of deletion: keep its entries and mark them unavailable.
+- The audio engine stays independent of GPUI. The audio callback does no allocation, I/O, logging or blocking lock waits.
+- Indexing is cancellable; expensive reads and processing use bounded concurrency.
 
-## Organisation du code
+## Code organization
 
-- Définir les chemins et les frontières des crates lors de l'initialisation. Séparer le domaine, le moteur audio, la persistance, l'indexation et l'interface ; garder les règles métier indépendantes des composants GPUI.
-- Une responsabilité identifiable par module. Les façades déclarent et assemblent ; elles n’accumulent pas les parcours et rendus.
-- Utiliser 200–600 lignes de production comme repère, sans minimum à atteindre ; au-delà de 800, examiner le découpage avant une extension significative et justifier le maintien. Ne pas découper artificiellement ni compter les tests comme production.
-- Extraire les sections cohérentes ; partager un composant seulement si plusieurs usages partagent présentation ou comportement. Préserver visibilité minimale, identifiants GPUI et cycles de vie. Limiter la refactorisation au changement.
-- Ranger les nouveaux tests unitaires dans le `tests/` du module, sans changer leur parent logique Rust ni élargir les visibilités. Préserver scénarios, attributs et découverte lors d’un déplacement.
+- Separate domain, audio engine, persistence, indexing and UI; business rules stay independent of GPUI components.
+- One identifiable responsibility per module. Facades declare and assemble; they do not accumulate traversal or rendering.
+- Guideline: 200 to 600 production lines per file, no minimum. Above 800, consider splitting before any significant extension and justify keeping it. No artificial splits; tests do not count.
+- Extract coherent sections; share a component only when several uses share presentation or behavior. Preserve minimal visibility, GPUI identifiers and lifecycles. Keep refactoring within the change.
+- New unit tests go in the module's `tests/` folder, without changing their logical Rust parent or widening visibility. When moving tests, keep scenarios, attributes and discovery.
 
 ## Validation
 
-- Après modification de Rust, exécuter `cargo fmt --check`, `cargo check` et les tests pertinents. Indiquer les vérifications non exécutées et pourquoi.
-- Tester en priorité les comportements critiques : métadonnées, regroupement des albums et éditions, indexation incrémentale, disponibilité des sources et états du moteur audio.
-- Windows est la cible de validation initiale. Préserver l'isolation du code spécifique aux plateformes ; ne pas présenter Linux comme validé sans vérification.
+- After Rust changes: `cargo fmt --check`, `cargo check` and the relevant tests. State which checks were not run and why.
+- Prioritize critical behavior: metadata, album and edition grouping, incremental indexing, source availability, audio engine states.
+- Keep platform-specific code isolated.

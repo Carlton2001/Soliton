@@ -1,46 +1,38 @@
-# Dépendances retenues
+# Dependencies
 
-Les versions résolues de toutes les dépendances sont dans Cargo.lock. L'examen
-initial porte sur les manifestes publiés et les sources locales, complété par
-les documentations officielles. Pas de dépendance directe à Oxyde.
+Resolved versions are in Cargo.lock. No direct dependency on Oxyde.
 
-| Composant | Choix | Licence | Points de validation |
+| Area | Choice | License | Notes |
 | --- | --- | --- | --- |
-| GUI | gpui 0.2.2 crates.io | Apache-2.0 | Backend Windows D3D, Linux X11/Wayland ; pré-1.0, API instable |
-| Tags | lofty 0.25.4 | MIT / Apache-2.0 | Rust pur, tags et images intégrées, propriétés audio activées |
-| Base | rusqlite 0.36, bundled | MIT | SQLite C compilé et embarqué, sans DLL SQLite à installer |
-| Parcours | dua-core 5.0.0 | MIT | Successeur recommandé de jwalk ; workers et résultats bornés, liens non suivis |
-| Texte | unicode-normalization 0.1 | MIT / Apache-2.0 | Rust pur, déjà présent dans l'arbre ; clé de comparaison sans accents |
-| Canaux | crossbeam-channel 0.5 | MIT / Apache-2.0 | Files bornées entre services |
-| Surveillance | notify 8.2 | CC0-1.0 | ReadDirectoryChangesW sous Windows, inotify sous Linux ; 9.0 encore en RC. Regroupement des événements propre à Soliton, sans crate debouncer |
-| Décodage | symphonia 0.5.5 | MPL-2.0 | Rust pur, MP3/FLAC/AAC-LC/ALAC/Vorbis/PCM/AIFF ; pas Opus/WMA/APE |
-| Sortie | cpal 0.16 | Apache-2.0 | WASAPI Windows ; non compilé sous Linux |
-| Sortie Linux | pipewire 0.10.1 | MIT | Flux et registre PipeWire natifs ; `pipewire-devel` et `clang-devel` (bindgen) à la compilation, `libpipewire-0.3` à l'exécution |
-| Conversion | rubato 0.16.2 | MIT | Conversion sinc hors callback, compensation du délai et de la longueur finale |
-| Tampon PCM | crossbeam-queue 0.3 | MIT / Apache-2.0 | File préallouée de trames mono/stéréo complètes, pas de décalage des canaux après sous-alimentation |
-| Intégration Windows | windows 0.61.3 | MIT / Apache-2.0 | Déjà résolu par GPUI ; SMTC via interop HWND, Shell_NotifyIcon, menu natif ; uniquement sur cible Windows |
-| Démarrage utilisateur | windows-registry 0.5.3 | MIT / Apache-2.0 | Déjà résolu ; clé Run de l'utilisateur courant, sans élévation à l'exécution |
-| Identifiant de fenêtre | raw-window-handle 0.6 | MIT / Apache-2.0 | Contrat portable déjà employé par GPUI ; aucun HWND dans le code commun |
-| Icône de notification | resvg 0.45.1 | MIT / Apache-2.0 | Déjà résolu par GPUI ; rastérisation du SVG Lucide officiel `play.svg`, sans changement du tracé |
-| Aperçu de barre des tâches | image 0.25.10, windows 0.61.3 | MIT / Apache-2.0 | Versions déjà résolues ; décodage PNG du cache sur le worker, DIB/GDI, DWM et ITaskbarList3 ; glyphes Lucide existants via resvg |
-| Réseau asynchrone | tokio 1.54, axum 0.8.9 | MIT | Deux threads de runtime, huit threads bloquants maximum ; serveur HTTP sur l'interface du récepteur choisi, aucun endpoint de contrôle |
-| Client UPnP HTTP | reqwest 0.13.5, roxmltree 0.20 | MIT / Apache-2.0 | HTTP local uniquement, proxy et redirections désactivés, réponses plafonnées à 1 MiB ; XML sans DTD |
-| Découverte Cast | mdns-sd 0.20.3 | MIT / Apache-2.0 | Windows dans la CI amont ; découverte mDNS IPv4 indépendante du décodage et de GPUI |
-| Google Cast | oxicast 0.0.3 | MIT / Apache-2.0 | Adaptateur isolé, requêtes bornées, reconnexion automatique désactivée, récepteur média standard testé sur SHIELD ; pas de SDK officiel Rust |
-| Capacités HTTP | uuid 1.28, futures-util 0.3 | MIT / Apache-2.0 | UUID aléatoires par média, révocation au remplacement/arrêt, huit corps HTTP simultanés maximum |
-| Interfaces SSDP | if-addrs 0.15, socket2 0.6 | MIT / Apache-2.0 | Huit interfaces IPv4 au maximum, quatre lectures de descriptions simultanées ; aucun type système dans les contrats communs |
+| GUI | gpui 0.2.2 (crates.io) | Apache-2.0 | Windows D3D, Linux X11/Wayland backends; pre-1.0, unstable API |
+| Tags | lofty 0.25.4 | MIT / Apache-2.0 | Pure Rust, tags and embedded images, audio properties enabled |
+| Database | rusqlite 0.36, bundled | MIT | SQLite compiled in, no SQLite DLL to install |
+| Scanning | dua-core 5.0.0 | MIT | Bounded workers and results, links not followed |
+| Text | unicode-normalization 0.1 | MIT / Apache-2.0 | Pure Rust, already in the tree; accent-free comparison key |
+| Channels | crossbeam-channel 0.5 | MIT / Apache-2.0 | Bounded queues between services |
+| Watching | notify 8.2 | CC0-1.0 | ReadDirectoryChangesW on Windows, inotify on Linux; Soliton's own coalescing, no debouncer crate |
+| Decoding | symphonia 0.5.5 | MPL-2.0 | Pure Rust, MP3/FLAC/AAC-LC/ALAC/Vorbis/PCM/AIFF; no Opus/WMA/APE |
+| Output | cpal 0.16 | Apache-2.0 | WASAPI on Windows; not built on Linux |
+| Linux output | pipewire 0.10.1 | MIT | Native PipeWire stream and registry; `pipewire-devel` and `clang-devel` (bindgen) at build time, `libpipewire-0.3` at runtime |
+| Resampling | rubato 0.16.2 | MIT | Sinc resampling outside the callback, delay and final length compensated |
+| PCM buffer | crossbeam-queue 0.3 | MIT / Apache-2.0 | Preallocated queue of complete mono/stereo frames, no channel shift after underrun |
+| Windows integration | windows 0.61.3 | MIT / Apache-2.0 | Already resolved by GPUI; SMTC through HWND interop, Shell_NotifyIcon, native menu; Windows target only |
+| Autostart | windows-registry 0.5.3 | MIT / Apache-2.0 | Already resolved; current-user Run key, no elevation |
+| Window handle | raw-window-handle 0.6 | MIT / Apache-2.0 | Portable contract used by GPUI; no HWND in common code |
+| Notification icon | resvg 0.45.1 | MIT / Apache-2.0 | Already resolved by GPUI; rasterizes the official Lucide `play.svg`, path unchanged |
+| Taskbar thumbnail | image 0.25.10, windows 0.61.3 | MIT / Apache-2.0 | Already resolved; PNG decoding from the cache on the worker, DIB/GDI, DWM and ITaskbarList3; Lucide glyphs through resvg |
+| Async network | tokio 1.54, axum 0.8.9 | MIT | Two runtime threads, eight blocking threads at most; HTTP server on the chosen receiver's interface, no control endpoint |
+| UPnP HTTP client | reqwest 0.13.5, roxmltree 0.20 | MIT / Apache-2.0 | Local HTTP only, proxy and redirects off, responses capped at 1 MiB; XML without DTD |
+| Cast discovery | mdns-sd 0.20.3 | MIT / Apache-2.0 | IPv4 mDNS discovery, independent of decoding and GPUI |
+| Google Cast | oxicast 0.0.3 | MIT / Apache-2.0 | Isolated adapter, bounded requests, automatic reconnection off, default media receiver tested on SHIELD; no official Rust SDK |
+| HTTP capabilities | uuid 1.28, futures-util 0.3 | MIT / Apache-2.0 | Random UUID per media, revoked on replacement/stop, eight HTTP bodies at most |
+| SSDP interfaces | if-addrs 0.15, socket2 0.6 | MIT / Apache-2.0 | Eight IPv4 interfaces at most, four concurrent description reads; no system type in common contracts |
+| Bluetooth (Windows) | windows 0.61.3, windows-collections 0.2.0, windows-future 0.2.1 | MIT / Apache-2.0 | Devices Enumeration, Bluetooth and Media Devices APIs; Windows target only |
 
-GPUI 0.2.2, proc-macro-error2 2.0.1 et la dépendance Unix xattr 0.2.3 sont
-conservés localement avec des correctifs ciblés via `[patch.crates-io]` :
+GPUI 0.2.2, proc-macro-error2 2.0.1 and the Unix dependency xattr 0.2.3 are
+vendored with targeted patches through `[patch.crates-io]`:
 [vendor/README.md](../vendor/README.md).
 
-La compilation Windows nécessite Rust MSVC, les Build Tools C++ et le SDK Windows.
-Cast utilise rustls avec ring et AWS-LC, liés statiquement (aucune DLL à installer).
-Les certificats auto-signés des récepteurs Cast ne sont acceptés que par ce client,
-sur les destinations découvertes ; pas d'authentification DeviceAuth.
-
-Bluetooth : API Windows Devices Enumeration, Bluetooth et Media Devices via
-`windows` 0.61.3, `windows-collections` 0.2.0 et `windows-future` 0.2.1, déclarés
-uniquement pour Windows.
-
-jwalk 0.9 (archivé) a été écarté au profit de dua-core.
+Cast uses rustls with ring and AWS-LC, statically linked (no DLL to install).
+Self-signed Cast receiver certificates are accepted only by this client, for
+discovered destinations; no DeviceAuth authentication.

@@ -39,6 +39,7 @@ try {
     $imports = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes((Join-Path $stage 'Soliton.exe')))
     if ($imports -match '(?i)(vcruntime|msvcp)140[_a-z0-9]*\.dll') { throw 'Release still imports an MSVC runtime DLL.' }
     Copy-Item -LiteralPath LICENSE -Destination $stage
+    Copy-Item -LiteralPath installer/windows/README.txt -Destination $stage
     New-Item -ItemType Directory -Path (Join-Path $stage 'licenses') -Force | Out-Null
     Copy-Item -LiteralPath licenses/dependencies -Destination (Join-Path $stage 'licenses') -Recurse
     if (-not $PortableOnly) {

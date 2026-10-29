@@ -1,47 +1,38 @@
-# Vérifications Windows après le support Linux
+# Windows checks after Linux support
 
-Commits concernés : `76ea35f Make Soliton functional on Linux`, puis la sortie
-PipeWire native sous Linux.
+Linux work (`76ea35f Make Soliton functional on Linux`, then native PipeWire
+output) is validated on Linux. On Windows only `soliton-platform` and
+`soliton-audio` were cross-checked (`cargo check` / `cargo xwin check`, tests
+included); the app cannot be cross-built from Linux (GPUI shaders, `aws-lc-sys`).
 
-Sous Linux, tout a été validé. Côté Windows, seul `soliton-platform` a été
-vérifié par `cargo check` croisé, tests compris. L'application n'a pas pu être
-compilée pour Windows depuis Linux (shaders GPUI, `aws-lc-sys`).
+## What touches Windows
 
-## Ce qui touche Windows
+- **Integration startup**: `Desktop::start` now takes the GPUI window
+  (`&impl HasWindowHandle`) instead of a `RawWindowHandle` and reads the handle
+  itself. This path starts SMTC, the taskbar thumbnail, the notification icon and
+  the icons.
+- **`Desktop` capabilities**: `Desktop::SUPPORTED` is complemented by
+  `Desktop::HIDES` and `Desktop::AUTOSTART`. Windows must behave as before:
+  configurable closing, hiding, autostart.
+- **License inventory**: hashes of `Cargo.lock`, `crates/soliton-app/Cargo.toml`
+  and `crates/soliton-platform/Cargo.toml` changed; regenerated notices are identical.
+- **Audio output**: CPAL code moved to `cpal_backend.rs`, built outside Linux only,
+  with no intended behavior change. The callback renderer takes the sample
+  conversion as a parameter. Outputs carry a label (equal to the name on Windows)
+  and a Bluetooth flag (always false on Windows).
+- **Output loss** (shared): playback pauses instead of failing; resume uses the
+  default output, then Soliton returns to the chosen output when enumeration
+  shows it again.
+- **Default output loss** (shared): with "System default device", a lost output
+  no longer pauses; the engine reopens the session on the new Windows default at
+  the same position. Pause only if none opens or if the lost stream never ran.
+- **Window restore**: without a known screen at open, the saved position is
+  restored unchecked. Windows knows its screens at open, so the check still applies.
+- **Distribution**: `scripts/build-distribution.ps1` now builds the `Soliton`
+  binary (not `soliton`), which made the "Windows distribution" workflow fail.
+- **No effect on Windows**: restoring the maximized state at startup is Linux only.
 
-- **Démarrage des intégrations** : `Desktop::start` reçoit maintenant la fenêtre
-  GPUI (`&impl HasWindowHandle`) au lieu d'un `RawWindowHandle`. La plateforme
-  lit elle-même le handle sous Windows. Ce chemin démarre le panneau média
-  (SMTC), la vignette de barre des tâches, la zone de notification et les icônes.
-- **Capacités `Desktop`** : `Desktop::SUPPORTED` est complété par
-  `Desktop::HIDES` et `Desktop::AUTOSTART`. Sous Windows, le comportement doit
-  rester identique : fermeture configurable, masquage, démarrage automatique.
-- **Inventaire des licences** : les empreintes de `Cargo.lock`,
-  `crates/soliton-app/Cargo.toml` et `crates/soliton-platform/Cargo.toml` ont
-  changé. Les notices régénérées sont identiques.
-- **Sortie audio** : le code CPAL a été déplacé dans `cpal_backend.rs`, désormais
-  compilé hors Linux seulement, sans changement de comportement voulu. Le rendu
-  du callback reçoit la conversion d'échantillon en paramètre. Les sorties
-  portent un libellé (égal au nom sous Windows) et un indicateur Bluetooth
-  (toujours faux sous Windows). `soliton-audio` a été vérifié par
-  `cargo xwin check` pour `x86_64-pc-windows-msvc`, tests compris.
-- **Perte de sortie** (commun à Windows) : la lecture passe en pause au lieu de
-  l'état d'échec ; la reprise utilise la sortie par défaut, puis Soliton revient
-  sur la sortie choisie quand l'énumération la montre de nouveau.
-- **Perte de la sortie par défaut** (commun à Windows) : avec « Périphérique
-  système par défaut », une sortie perdue ne met plus en pause ; le moteur
-  rouvre aussitôt la session sur la nouvelle sortie par défaut de Windows, à la
-  même position. Pause seulement si aucune ne s'ouvre ou si le flux perdu
-  n'avait jamais tourné.
-- **Restauration de la fenêtre** : sans écran connu à l'ouverture, la position
-  enregistrée est reprise sans contrôle. Windows connaît ses écrans dès
-  l'ouverture : le contrôle s'applique toujours.
-- **Sans effet sous Windows** : la restauration de l'état agrandi au démarrage
-  reste limitée à Linux.
-
-## 1. Compilation et tests
-
-Après récupération du commit :
+## 1. Build and tests
 
 ```powershell
 cargo +1.98.1 fmt --check
@@ -50,91 +41,80 @@ cargo +1.98.1 test --workspace --locked
 ./scripts/check-third-party-licenses.ps1
 ```
 
-- [ ] `fmt --check` réussi
-- [ ] `check` réussi, sans avertissement du projet
-- [ ] Tests du workspace réussis
-- [ ] Inventaire des licences à jour
+- [ ] `fmt --check` passes
+- [ ] `check` passes without project warnings
+- [ ] Workspace tests pass
+- [ ] License inventory up to date
 
-## 2. Test natif de l'intégration Windows
+## 2. Native Windows integration test
 
-Ce test passe par le nouveau chemin du handle de fenêtre, qui a été adapté :
+Goes through the adapted window handle path:
 
 ```powershell
 cargo +1.98.1 test -p soliton-platform native_tray_smtc_artwork_commands_and_cleanup -- --ignored
 ```
 
-- [ ] Réussi
+- [ ] Passes
 
-Tests audio natifs, à volume nul, inchangés mais utiles en contrôle :
+Native audio tests, at zero volume:
 
 ```powershell
 cargo +1.98.1 test -p soliton-audio native_output -- --ignored
 cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
+cargo +1.98.1 test -p soliton-audio default_output_loss -- --ignored
 ```
 
-- [ ] Réussis
+- [ ] Pass
 
-## 3. Essai manuel de l'application
+## 3. Manual app check
 
 ```powershell
 cargo +1.98.1 run -p soliton-app --bin Soliton --locked
 ```
 
-Fenêtre et icônes :
+Window and icons:
 
-- [ ] L'icône de la fenêtre et de la barre des tâches s'affiche au démarrage.
-- [ ] Changer la palette dans Paramètres → Icône de l'application met à jour la
-  fenêtre, la barre des tâches et la zone de notification.
+- [ ] Window and taskbar icon shown at startup.
+- [ ] Changing the palette in Settings → Application icon updates the window,
+  taskbar and notification icon.
 
-Panneau média et barre des tâches :
+Media panel and taskbar:
 
-- [ ] Pendant une lecture, le panneau média Windows affiche titre, artiste et
-  pochette.
-- [ ] Lecture/Pause, Précédent et Suivant fonctionnent depuis le panneau et les
-  touches multimédias.
-- [ ] Les boutons de la vignette de barre des tâches fonctionnent.
+- [ ] During playback the Windows media panel shows title, artist and artwork.
+- [ ] Play/Pause, Previous and Next work from the panel and media keys.
+- [ ] Taskbar thumbnail buttons work.
 
-Paramètres :
+Settings:
 
-- [ ] La section s'appelle toujours « Intégration Windows ».
-- [ ] Elle contient « À la fermeture » (Quitter / Masquer / Demander) et la case
-  « Lancer Soliton à l'ouverture de session ».
-- [ ] La case de démarrage automatique s'active et se désactive (valeur
-  `Soliton` sous `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
-- [ ] La section « Sortie audio » liste toujours les périphériques, pas seulement
-  la sortie système, sans la mention « choisir dans les paramètres Son ».
-- [ ] Choisir un périphérique pendant la lecture garde piste et position ; le
-  format affiché et l'infobulle de sortie du lecteur nomment ce périphérique.
-- [ ] Le texte sous la liste reste « Le choix système par défaut s'applique au
-  démarrage d'une piste… ».
-- [ ] Avec « Périphérique système par défaut », débrancher ou éteindre la sortie
-  par défaut (casque USB ou Bluetooth) pendant la lecture la fait continuer sans
-  pause sur la nouvelle sortie par défaut de Windows, sans avertissement.
-  `cargo test -p soliton-audio default_output_loss -- --ignored` réussit.
-- [ ] Une sortie choisie puis débranchée met la lecture en pause, avec
-  l'avertissement « Lecture en pause » au-dessus de la barre de lecture. La
-  reprise joue sur la sortie par défaut ; rebrancher la sortie y ramène la
-  lecture dès que Windows signale le périphérique.
+- [ ] The "Windows integration" section is still present, with "On close"
+  (Quit / Hide / Ask) and "Launch Soliton at login".
+- [ ] The autostart box toggles the `Soliton` value under
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+- [ ] "Audio output" still lists devices, not just the system output, without the
+  "choose in Sound settings" note.
+- [ ] Choosing a device during playback keeps track and position; the displayed
+  format and the player's output tooltip name that device.
+- [ ] The note under the list still says the system default applies when a track
+  starts.
+- [ ] With "System default device", unplugging or switching off the default
+  output (USB or Bluetooth headset) during playback continues without pause on the
+  new Windows default, without warning.
+- [ ] A chosen output unplugged pauses playback with the "Playback paused" warning
+  above the player bar. Resume plays on the default output; plugging the output
+  back returns playback to it once Windows reports the device.
 
-Fermeture :
+Closing:
 
-- [ ] « Masquer » cache la fenêtre ; l'icône de notification la restaure.
-- [ ] « Demander » affiche la boîte de confirmation avec l'option Masquer.
-- [ ] « Quitter », depuis la fenêtre ou depuis la notification, ferme proprement.
+- [ ] "Hide" hides the window; the notification icon restores it.
+- [ ] "Ask" shows the confirmation dialog with the Hide option.
+- [ ] "Quit", from the window or the notification icon, exits cleanly.
 
-## 4. Distribution Windows
-
-`scripts/build-distribution.ps1` construisait `--bin soliton` depuis le renommage
-RAP → Soliton, alors que la cible Cargo s'appelle `Soliton`. Le workflow
-« Windows distribution » échouait pour cette raison ; le nom est corrigé.
+## 4. Windows distribution
 
 ```powershell
 ./scripts/build-distribution.ps1 -PortableOnly
 ```
 
-- [ ] La distribution portable se construit (ou le workflow « Windows
-  distribution » réussit).
+- [ ] The portable distribution builds (or the "Windows distribution" workflow passes).
 
-## Résultat
-
-En cas d'échec, noter la commande, la sortie ou le comportement observé.
+On failure, note the command, output or observed behavior.

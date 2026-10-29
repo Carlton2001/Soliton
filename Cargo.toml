@@ -25,6 +25,12 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 2
 
+[profile.release]
+# Line tables in a separate file (PDB on Windows, .dwp on Linux); shipped
+# binaries stay free of debug information.
+debug = "line-tables-only"
+split-debuginfo = "packed"
+
 [patch.crates-io]
 gpui = { path = "vendor/gpui-0.2.2" }
 proc-macro-error2 = { path = "vendor/proc-macro-error2-2.0.1" }
