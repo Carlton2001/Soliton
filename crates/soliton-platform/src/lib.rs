@@ -39,6 +39,19 @@ pub fn download_https(url: &str, limit: usize) -> std::io::Result<Vec<u8>> {
     }
 }
 
+/// The host path of a folder chosen through a sandbox portal, when readable.
+/// Blocks on the session bus under Linux: call from a worker.
+pub fn host_path(path: std::path::PathBuf) -> std::path::PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        linux::documents::host_path(path)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        path
+    }
+}
+
 mod paths;
 pub use paths::AppPaths;
 pub mod updater;

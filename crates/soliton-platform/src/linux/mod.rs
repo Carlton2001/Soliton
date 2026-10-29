@@ -1,5 +1,6 @@
 //! Session bus and XDG files are owned by one worker; the UI only enqueues.
 //! Soliton does not register a sign-in launch on Linux.
+pub(crate) mod documents;
 mod launcher_icon;
 mod mpris;
 

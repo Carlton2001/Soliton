@@ -499,6 +499,12 @@ impl Soliton {
         });
         cx.spawn(async move |this, cx| match prompt.await {
             Ok(Ok(Some(paths))) => {
+                let paths = cx
+                    .background_executor()
+                    .spawn(
+                        async move { paths.into_iter().map(soliton_platform::host_path).collect() },
+                    )
+                    .await;
                 let _ = this.update(cx, |this, cx| this.scan(paths, cx));
             }
             Ok(Ok(None)) => {}

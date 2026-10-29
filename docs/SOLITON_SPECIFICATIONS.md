@@ -251,8 +251,11 @@ binaire compilé dans un conteneur Ubuntu 24.04 (glibc 2.39), dépendances
 détectées par `dpkg-shlibdeps`, validé par `lintian`, installation et
 désinstallation.
 
-**10 bis.3 Flatpak** — Flathub, Silverblue compris : permissions limitées à la
-bibliothèque, PipeWire, MPRIS et au réseau local.
+**10 bis.3 Flatpak** — Flathub, Silverblue compris : runtime Freedesktop 26.08,
+compilation depuis les sources hors ligne, permissions minimales (affichage,
+PipeWire, réseau, MPRIS), lecture seule du dossier Musique et des points de
+montage, portail pour les autres dossiers ; données séparées des installations
+natives.
 
 **Livrable :** paquets construits et vérifiés, prêts à publier.
 

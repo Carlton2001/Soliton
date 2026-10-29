@@ -221,6 +221,37 @@ client PipeWire échoue) et une police système (`fonts-dejavu-core` ou
 embarquées. Le RPM déclare `default-fonts-core-sans` pour la même raison. Le champ `Maintainer` vaut l'adresse GitHub sans réponse, ou
 `SOLITON_MAINTAINER`.
 
+## Construire le Flatpak
+
+```sh
+scripts/build-flatpak.sh
+```
+
+Prérequis : `flatpak-builder` (paquet Fedora) et, pour `flatpak-builder-lint`,
+`flatpak install --user flathub org.flatpak.Builder` ; le script installe le SDK
+Freedesktop 26.08 et ses extensions `rust-stable` et `llvm22` (libclang pour les
+liaisons PipeWire). La compilation suit le manifeste
+`installer/linux/flatpak/io.github.Carlton2001.Soliton.yml`, depuis le dernier
+commit de `main` et hors ligne : `scripts/flatpak-cargo-sources.py` régénère
+`cargo-sources.json` depuis `Cargo.lock` (archives crates.io vérifiées par leur
+empreinte, format de `flatpak-cargo-generator`). Le script produit
+`target/distribution/output/Soliton-<version>-x86_64.flatpak` et passe
+`flatpak-builder-lint`. Restent attendues jusqu'à la publication : la source Git
+locale sans URL, et les captures d'écran absentes des métadonnées.
+
+Permissions minimales : Wayland (X11 en secours), `dri` pour Vulkan, socket
+PipeWire seule pour l'audio, réseau pour Cast et DLNA, nom MPRIS. Fichiers en
+lecture seule : dossier Musique, `/run/media`, `/media` et `/mnt`. Le portail
+renvoie toujours un chemin du portail de documents ; quand le dossier est lisible
+directement, Soliton le remplace par son chemin réel (`GetHostPaths`), ce qui
+rétablit notifications et disponibilité des sources. Un autre dossier passe
+par le portail de documents : indexé et lu, mais ses ajouts ne sont vus qu'à
+l'analyse périodique (30 min) ou au redémarrage, et son indisponibilité n'est pas
+détectée. Pour l'éviter, l'utilisateur peut élargir l'accès :
+`flatpak override --user --filesystem=home:ro io.github.Carlton2001.Soliton`.
+Les données sont dans `~/.var/app/io.github.Carlton2001.Soliton/data/Soliton`,
+séparées des installations natives.
+
 Après un changement de dépendances, régénérer les notices avant de construire
 (cargo-about 0.9.2 compilé une fois depuis crates.io ; Python 3 est présent sur
 Fedora) :
@@ -306,6 +337,16 @@ et `ubuntu:26.04` minimaux :
 | Paquet dans une toolbox Ubuntu 24.04 vierge : `client.conf` de PipeWire et police absents, client audio en échec puis arrêt de GPUI | Corrigé : `pipewire-bin` déclaré, infobulles en Inter ; démarrage vérifié sans aucune police système (conteneur Wayland) |
 | Paquet corrigé dans la toolbox Ubuntu 24.04 (binaire Ubuntu vérifié par `/proc/<pid>/root`) : rendu, lecture audio, panneau média, bibliothèque retrouvée | Réussi (essai manuel, 29 octobre 2026) ; intégration au bureau Ubuntu (lanceur, dock) non vérifiée |
 | `apt purge` : fichiers retirés, `~/.local/share/Soliton` conservé | Réussi sur les trois |
+
+Le 29 octobre 2026, Flatpak installé sur la machine de développement, sans
+permission de fichiers (sources accordées par le portail) :
+
+| Vérification | Résultat |
+| --- | --- |
+| Rendu, polices, lecture audio, panneau média et pochette, lanceur | Réussis (essai manuel) ; icône fixe, comme pour le RPM |
+| Ajout d'une source par le portail et indexation | Réussi (essai manuel) |
+| Ajout de fichiers pendant l'exécution | Non détecté avant le redémarrage : pas de notification inotify sur le portail de documents |
+| Disque de la source débranché | Entrées conservées, mais source non signalée indisponible : erreur à la lecture |
 
 Les essais WSL précédents (Windows MSVC et Fedora 44 WSL, mêmes tests et
 lancements temporisés) restent valables pour Windows.
