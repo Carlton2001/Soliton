@@ -109,6 +109,9 @@ pub enum Command {
         tracks: Vec<Track>,
         next: bool,
     },
+    /// Library availability of queued tracks, by track id, sent when the
+    /// catalog changes: the queue holds copies taken when tracks were added.
+    Availability(Vec<(i64, bool)>),
     RemoveQueued(u64),
     MoveQueued {
         id: u64,

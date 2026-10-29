@@ -545,6 +545,30 @@ fn missing(id: i64, name: &str) -> soliton_core::model::Track {
 }
 
 #[test]
+fn availability_updates_reach_queued_copies_and_the_current_track() {
+    let mut offline = missing(1, "a.wav");
+    offline.available = false;
+    let mut worker = Worker::default();
+    worker
+        .command(Command::Load {
+            tracks: vec![offline, missing(2, "b.wav")],
+            start: 0,
+            position_ms: 0,
+        })
+        .unwrap();
+    worker
+        .command(Command::Availability(vec![(1, true), (2, false)]))
+        .unwrap();
+    let queue = worker.snapshot().queue;
+    assert!(queue.entries[0].track.available);
+    assert!(!queue.entries[1].track.available);
+    assert!(worker.playback.track.as_ref().unwrap().available);
+    // The file is now opened rather than refused as unavailable.
+    let error = worker.start_current().unwrap_err();
+    assert_ne!(Failure::of(&error).kind, Kind::TrackUnavailable);
+}
+
+#[test]
 fn automatic_playback_skips_unreadable_tracks_until_the_end_of_the_queue() {
     let mut worker = Worker::default();
     worker

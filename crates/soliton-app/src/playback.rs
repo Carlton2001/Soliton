@@ -1,9 +1,16 @@
 //! Playback commands from the interface. The engine runs on its own threads.
 use crate::{app::Soliton, i18n::Text, notices::Level};
 use gpui::*;
-use soliton_audio::{Command, PlaybackState};
-use soliton_core::{failure::Failure, model::Album};
-use std::time::{Duration, Instant};
+use soliton_audio::{Command, PlaybackState, QueueSnapshot};
+use soliton_core::{
+    failure::Failure,
+    model::{Album, Track},
+};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 /// A reported position this close to a sent seek shows that the engine applied it.
 const SEEK_SETTLED_MS: u64 = 1_000;
@@ -13,6 +20,20 @@ const SEEK_TIMEOUT: Duration = Duration::from_secs(2);
 /// Whether a sent seek no longer needs to stand in for the reported position.
 fn seek_settled(position_ms: u64, target_ms: u64, elapsed: Duration, track_changed: bool) -> bool {
     track_changed || elapsed >= SEEK_TIMEOUT || position_ms.abs_diff(target_ms) < SEEK_SETTLED_MS
+}
+
+/// Library tracks whose queued copy disagrees with the catalog; a track gone
+/// from the library is unavailable.
+fn stale_availability(queue: &QueueSnapshot, tracks: &HashMap<i64, Track>) -> Vec<(i64, bool)> {
+    queue
+        .entries
+        .iter()
+        .filter(|e| e.track.id > 0)
+        .filter_map(|e| {
+            let available = tracks.get(&e.track.id).is_some_and(|t| t.available);
+            (available != e.track.available).then_some((e.track.id, available))
+        })
+        .collect()
 }
 
 impl Soliton {
@@ -31,6 +52,28 @@ impl Soliton {
             self.report_failure(Level::Error, Text::Playback, &Failure::of(&error));
         }
         cx.notify();
+    }
+
+    /// Keeps the engine's queued copies as available as the catalog shows them,
+    /// so that a source back online plays again. Checked once per queue or
+    /// catalog change; a command refused by a busy engine is retried.
+    pub fn sync_queue_availability(&mut self) {
+        let Some(audio) = &self.audio else {
+            return;
+        };
+        if self
+            .availability_checked
+            .as_ref()
+            .is_some_and(|(queue, tracks)| {
+                Arc::ptr_eq(queue, &self.playback.queue) && Arc::ptr_eq(tracks, &self.tracks)
+            })
+        {
+            return;
+        }
+        let changes = stale_availability(&self.playback.queue, &self.tracks);
+        if changes.is_empty() || audio.send(Command::Availability(changes)).is_ok() {
+            self.availability_checked = Some((self.playback.queue.clone(), self.tracks.clone()));
+        }
     }
 
     /// Plays one edition of an album from `start`, skipping unavailable tracks.

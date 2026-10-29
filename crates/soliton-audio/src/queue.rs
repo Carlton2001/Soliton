@@ -119,6 +119,23 @@ impl Queue {
         self.publish();
     }
 
+    /// Applies the library's current availability to queued copies.
+    pub fn set_availability(&mut self, changes: &[(i64, bool)]) {
+        let changes: HashMap<_, _> = changes.iter().copied().collect();
+        let mut changed = false;
+        for track in &mut self.tracks {
+            if let Some(&available) = changes.get(&track.id)
+                && track.available != available
+            {
+                track.available = available;
+                changed = true;
+            }
+        }
+        if changed {
+            self.publish();
+        }
+    }
+
     /// Removing other occurrences never restarts the current stream.
     pub fn remove(&mut self, id: u64) {
         let Some(at) = self.order.iter().position(|&i| self.ids[i] == id) else {

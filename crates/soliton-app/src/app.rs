@@ -32,11 +32,16 @@ pub enum Section {
     Settings,
 }
 
+/// Library tracks by id.
+pub type Tracks = Arc<std::collections::HashMap<i64, soliton_core::model::Track>>;
+
 pub struct Soliton {
     pub updates: crate::updates::Updates,
     pub now_playing: bool,
     pub volume_popup: bool,
-    pub tracks: Arc<std::collections::HashMap<i64, soliton_core::model::Track>>,
+    pub tracks: Tracks,
+    /// Queue and catalog last compared for track availability.
+    pub availability_checked: Option<(Arc<soliton_audio::QueueSnapshot>, Tracks)>,
     pub track_menu: Option<(crate::track_list::Selection, bool)>,
     pub playlists: crate::playlists::Playlists,
     pub queue_scroll: UniformListScrollHandle,
@@ -190,6 +195,7 @@ impl Soliton {
             now_playing: false,
             volume_popup: false,
             tracks: Arc::default(),
+            availability_checked: None,
             track_menu: None,
             playlists: crate::playlists::Playlists::new(playlist_name),
             queue_scroll: UniformListScrollHandle::new(),
@@ -441,6 +447,7 @@ impl Soliton {
             self.query_pending = true;
             *last_refresh = Instant::now();
         }
+        self.sync_queue_availability();
         if self.query_pending && self.services.query.try_send(self.filter.clone()).is_ok() {
             self.query_pending = false;
         }

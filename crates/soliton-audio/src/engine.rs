@@ -348,6 +348,14 @@ impl Worker {
                     self.resume_at = Some(0);
                 }
             }
+            Command::Availability(changes) => {
+                self.queue.set_availability(&changes);
+                if let Some(track) = &mut self.playback.track
+                    && let Some(&(_, available)) = changes.iter().find(|(id, _)| *id == track.id)
+                {
+                    track.available = available;
+                }
+            }
             Command::RemoveQueued(id) => self.queue.remove(id),
             Command::MoveQueued { id, before } => self.queue.move_before(id, before),
             Command::ClearUpcoming => self.queue.clear_upcoming(),
