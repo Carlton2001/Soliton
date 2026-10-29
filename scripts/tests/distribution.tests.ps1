@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $fixture = Join-Path $projectRoot "target/distribution-tests/$([Guid]::NewGuid().ToString('N'))"
-foreach ($relative in @('scripts', 'licenses/dependencies/assets', 'target/x86_64-pc-windows-msvc/release')) {
+foreach ($relative in @('scripts', 'installer/windows', 'licenses/dependencies/assets', 'target/x86_64-pc-windows-msvc/release')) {
     New-Item -ItemType Directory -Path (Join-Path $fixture $relative) -Force | Out-Null
 }
 foreach ($script in @('build-distribution.ps1', 'write-update-manifest.ps1')) {
@@ -15,6 +15,7 @@ foreach ($script in @('update-third-party-licenses.ps1', 'check-third-party-lice
 foreach ($relative in @('LICENSE', 'licenses/dependencies/THIRD-PARTY-NOTICES.md', 'licenses/dependencies/assets/LUCIDE-LICENSE.txt')) {
     [IO.File]::WriteAllText((Join-Path $fixture $relative), 'Fixture license notice')
 }
+[IO.File]::WriteAllText((Join-Path $fixture 'installer/windows/README.txt'), 'Fixture readme')
 $executable = Join-Path $fixture 'target/x86_64-pc-windows-msvc/release/Soliton.exe'
 [IO.File]::WriteAllText($executable, 'Synthetic executable fixture')
 function cargo {
