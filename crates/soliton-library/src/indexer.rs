@@ -140,6 +140,7 @@ impl Library {
             let readers = std::thread::available_parallelism()
                 .map_or(2, usize::from)
                 .clamp(1, 4);
+            let source_root = root.as_path();
             for _ in 0..readers {
                 let jobs = jobs_rx.clone();
                 let results = results_tx.clone();
@@ -149,7 +150,7 @@ impl Library {
                         if cancel.is_cancelled() {
                             break;
                         }
-                        let value = metadata::read(&file.path, &covers);
+                        let value = metadata::read(&file.path, source_root, &covers);
                         if !discovery::send(&results, (file, value), cancel) {
                             break;
                         }

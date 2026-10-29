@@ -93,6 +93,13 @@ impl Album {
     pub fn tracks(&self) -> impl Iterator<Item = &Track> {
         self.editions.iter().flat_map(|edition| &edition.tracks)
     }
+    /// Whether `field` comes from folder and file names rather than tags.
+    pub fn inferred(&self, field: &str) -> bool {
+        self.primary()
+            .tracks
+            .first()
+            .is_some_and(|track| track.metadata.is_inferred(field))
+    }
 }
 
 #[derive(Clone, Debug, Default)]

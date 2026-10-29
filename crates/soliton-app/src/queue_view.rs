@@ -142,6 +142,10 @@ impl Soliton {
                                                 .truncate()
                                                 .whitespace_normal()
                                                 .line_clamp(1)
+                                                .when(
+                                                    track.metadata.is_inferred("title"),
+                                                    |title| title.italic(),
+                                                )
                                                 .child(track.metadata.title.clone()),
                                         )
                                         .child(
@@ -152,10 +156,7 @@ impl Soliton {
                                                 .truncate()
                                                 .whitespace_normal()
                                                 .line_clamp(1)
-                                                .child(format!(
-                                                    "{} · {}",
-                                                    track.metadata.artist, track.metadata.album
-                                                )),
+                                                .child(self.track_subtitle(&track.metadata)),
                                         ),
                                 )
                                 .when_some(album, |v, id| {

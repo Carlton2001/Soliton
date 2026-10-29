@@ -11,7 +11,7 @@ use soliton_core::model::Metadata;
 use std::path::{Path, PathBuf};
 
 /// Version of the extraction rules. Files read by an older version are re-read.
-pub(crate) const EXTRACTOR: i64 = 2;
+pub(crate) const EXTRACTOR: i64 = 3;
 
 pub(crate) struct Extracted {
     pub metadata: Metadata,
@@ -21,7 +21,8 @@ pub(crate) struct Extracted {
     pub created: Option<i64>,
 }
 
-pub(crate) fn read(path: &Path, covers: &Path) -> Result<Extracted> {
+/// `root` is the source folder: names are inferred only from folders below it.
+pub(crate) fn read(path: &Path, root: &Path, covers: &Path) -> Result<Extracted> {
     // Probe opens the source read-only. Never call any lofty save API here.
     let tagged = Probe::open(path)?.guess_file_type()?.read()?;
     let tags: Vec<_> = tagged
@@ -66,7 +67,7 @@ pub(crate) fn read(path: &Path, covers: &Path) -> Result<Extracted> {
             .to_ascii_uppercase(),
         inferred: Vec::new(),
     };
-    infer(&mut metadata, path);
+    infer(&mut metadata, path, root);
     let mut warnings = Vec::new();
     let mut cover = None;
     let pictures: Vec<_> = tags.iter().flat_map(|t| t.pictures()).collect();
@@ -109,7 +110,7 @@ fn clean(text: &str) -> String {
         .to_owned()
 }
 
-fn infer(metadata: &mut Metadata, path: &Path) {
+fn infer(metadata: &mut Metadata, path: &Path, root: &Path) {
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
     let number_end = stem
         .find(|c: char| !c.is_ascii_digit())
@@ -138,10 +139,12 @@ fn infer(metadata: &mut Metadata, path: &Path) {
         metadata.disc = disc;
         metadata.inferred.push("disc".into());
     }
-    // `Artist/Album/CD1/01.flac` reads like `Artist/Album/01.flac`.
+    // `Artist/Album/CD1/01.flac` reads like `Artist/Album/01.flac`. The source
+    // root and the folders above it only hold the library: they name nothing.
     let album = grouping::album_folder(path);
     let folder_name = |folder: Option<&Path>| {
         folder
+            .filter(|folder| folder.starts_with(root) && *folder != root)
             .and_then(Path::file_name)
             .map(|v| clean(&v.to_string_lossy()))
             .unwrap_or_default()

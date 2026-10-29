@@ -65,10 +65,12 @@ impl Soliton {
                 div()
                     .text_size(crate::widgets::TEXT_DISPLAY)
                     .font_weight(FontWeight::MEDIUM)
-                    .child(album.title.clone()),
+                    .when(album.inferred("album"), |title| title.italic())
+                    .child(self.album_label(&album.title)),
             )
             .child({
                 let artist = album.artist.clone();
+                let compilation = album.compilation && artist.is_empty();
                 div()
                     .id("album-artist")
                     .tab_index(0)
@@ -80,10 +82,14 @@ impl Soliton {
                     .text_color(theme.accent)
                     .rounded(crate::widgets::RADIUS)
                     .hover(move |s| s.bg(theme.hover))
+                    .when(album.inferred("album_artist"), |artist| artist.italic())
                     .child(self.album_artist(album))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.focus.focus(window);
-                        this.show_artist(artist.clone(), cx);
+                        // Various artists name no one to open.
+                        if !compilation {
+                            this.show_artist(artist.clone(), cx);
+                        }
                     }))
             })
             .child(

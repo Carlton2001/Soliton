@@ -80,12 +80,7 @@ impl Soliton {
                                             .text_color(theme.muted)
                                             .child(
                                                 track
-                                                    .map(|t| {
-                                                        format!(
-                                                            "{} · {}",
-                                                            t.metadata.artist, t.metadata.album
-                                                        )
-                                                    })
+                                                    .map(|t| self.track_subtitle(&t.metadata))
                                                     .unwrap_or_default(),
                                             ),
                                     ),

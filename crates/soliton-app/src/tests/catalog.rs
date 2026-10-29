@@ -296,3 +296,49 @@ fn artists_without_available_albums_are_hidden_with_them() {
     assert_eq!(shown(true), vec![("Band".into(), 1)]);
     assert!(visible_artist_cards(&facets.artist_cards, "solo", false).count() == 1);
 }
+
+#[test]
+fn albums_without_any_artist_gather_under_one_last_card() {
+    let mut loose = album("", "", vec![vec![track("Loose", "", "", 2000, "WAV")]]);
+    loose.compilation = false;
+    let mut resolve = album("Resolve", "", vec![vec![track("A", "", "", 2000, "WAV")]]);
+    resolve.compilation = false;
+    // A compilation without an album artist belongs to its track artists only.
+    let various = album(
+        "Hits",
+        "",
+        vec![vec![track("B", "Band", "Pop", 2000, "FLAC")]],
+    );
+    let facets = Facets::collect(&LibrarySnapshot {
+        sources: vec![],
+        albums: vec![loose, various, resolve],
+    });
+    let cards: Vec<_> = facets
+        .artist_cards
+        .iter()
+        .map(|card| (card.name.as_str(), card.albums))
+        .collect();
+    assert_eq!(cards, vec![("Band", 1), ("", 2)]);
+    assert_eq!(facets.artists, vec!["Band".to_string()]);
+}
+
+#[test]
+fn the_empty_artist_filter_lists_albums_without_any_artist() {
+    let mut resolve = album("Resolve", "", vec![vec![track("A", "", "", 2000, "WAV")]]);
+    resolve.compilation = false;
+    let various = album("Hits", "", vec![vec![track("B", "", "Pop", 2001, "FLAC")]]);
+    let tagged = album(
+        "Tagged",
+        "Band",
+        vec![vec![track("C", "Band", "Rock", 2002, "FLAC")]],
+    );
+    let catalog = Catalog::new(LibrarySnapshot {
+        sources: vec![],
+        albums: vec![resolve, various, tagged],
+    });
+    let filter = Filter {
+        artist: Some(String::new()),
+        ..Default::default()
+    };
+    assert_eq!(catalog.matches(&filter), vec![0]);
+}

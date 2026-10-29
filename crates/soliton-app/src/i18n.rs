@@ -147,6 +147,8 @@ pub enum Text {
     VariousArtists,
     Editions,
     SourceUnavailable,
+    UnknownArtist,
+    UnknownAlbum,
     SourceUnavailableHidden,
     Period,
     Artist,
@@ -459,6 +461,8 @@ pub fn text(language: Language, key: Text) -> &'static str {
             "source indisponible, son contenu reste affiché",
             "source unavailable, its content stays listed",
         ),
+        Text::UnknownArtist => ("Artiste inconnu", "Unknown artist"),
+        Text::UnknownAlbum => ("Album inconnu", "Unknown album"),
         Text::SourceUnavailableHidden => (
             "source indisponible, son contenu est masqué jusqu’à son retour",
             "source unavailable, its content is hidden until it returns",

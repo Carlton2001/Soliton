@@ -73,6 +73,10 @@ Ces règles restent en vigueur pour toute évolution.
 
 - Tags intégrés (`lofty`) ; à défaut, déduction depuis l'arborescence
   `Artiste/Album/01 - Titre`, stockée seulement dans Soliton et distinguée des tags.
+  Seuls les dossiers situés sous la racine de la source nomment artiste et album.
+  Valeurs manquantes affichées « Artiste inconnu » et « Album inconnu » (regroupés
+  par dossier, carte « Artiste inconnu » en fin de liste) ; valeurs déduites en
+  italique.
 - Modèle distinct : fichier, piste, édition, album regroupé, artiste.
 - Plusieurs éditions d'un album (par exemple 16/44,1 et 24/96) sont présentées
   ensemble, avec choix de l'édition. Regroupement prudent : en cas d'ambiguïté,

@@ -285,7 +285,8 @@ impl Soliton {
                         .whitespace_normal()
                         .line_clamp(1)
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child(album.title.clone()),
+                        .when(album.inferred("album"), |title| title.italic())
+                        .child(self.album_label(&album.title)),
                 )
                 .child(
                     div()
@@ -295,6 +296,7 @@ impl Soliton {
                         .line_clamp(1)
                         .text_size(TEXT_SMALL)
                         .text_color(theme.muted)
+                        .when(album.inferred("album_artist"), |artist| artist.italic())
                         .child(self.album_artist(album)),
                 )
                 .into_any_element();
@@ -322,7 +324,8 @@ impl Soliton {
                             .whitespace_normal()
                             .line_clamp(1)
                             .font_weight(FontWeight::MEDIUM)
-                            .child(album.title.clone()),
+                            .when(album.inferred("album"), |title| title.italic())
+                            .child(self.album_label(&album.title)),
                     )
                     .child(
                         div()
@@ -332,6 +335,7 @@ impl Soliton {
                             .line_clamp(1)
                             .text_size(TEXT_SMALL)
                             .text_color(theme.muted)
+                            .when(album.inferred("album_artist"), |artist| artist.italic())
                             .child(self.album_artist(album)),
                     )
                     .when(!available, |v| {
@@ -468,7 +472,7 @@ impl Soliton {
                                                     .whitespace_normal()
                                                     .line_clamp(1)
                                                     .font_weight(FontWeight::MEDIUM)
-                                                    .child(card.name.clone()),
+                                                    .child(this.artist_label(&card.name)),
                                             )
                                             .child(div().text_color(theme.muted).child(
                                                 crate::i18n::album_count(card.shown_albums(hide)),
@@ -507,7 +511,7 @@ impl Soliton {
                                                 .whitespace_normal()
                                                 .line_clamp(1)
                                                 .font_weight(FontWeight::SEMIBOLD)
-                                                .child(card.name.clone()),
+                                                .child(this.artist_label(&card.name)),
                                         )
                                         .child(
                                             div()

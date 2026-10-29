@@ -670,3 +670,32 @@ fn non_unicode_paths_are_reported_without_failing_the_scan() {
     assert!(report.complete);
     assert_eq!(report.progress.unchanged, 1);
 }
+
+#[test]
+fn loose_files_of_different_sources_stay_separate_albums() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first");
+    let second = dir.path().join("second");
+    wav(&first.join("01 - One.wav"));
+    wav(&second.join("01 - Two.wav"));
+    wav(&first.join("Resolve/01 - Three.wav"));
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    for source in [&first, &second] {
+        let id = library.add_source(source).unwrap();
+        scan(&mut library, id);
+    }
+    let snapshot = library.snapshot().unwrap();
+    let mut albums: Vec<_> = snapshot
+        .albums
+        .iter()
+        .map(|album| {
+            (
+                album.title.as_str(),
+                album.artist.as_str(),
+                album.editions.len(),
+            )
+        })
+        .collect();
+    albums.sort();
+    assert_eq!(albums, vec![("", "", 1), ("", "", 1), ("Resolve", "", 1)]);
+}

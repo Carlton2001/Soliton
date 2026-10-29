@@ -37,7 +37,7 @@ fn embedded_tags_cover_and_source_remain_intact() {
     let before = std::fs::read(&path).unwrap();
     let covers = dir.path().join("cache");
     std::fs::create_dir(&covers).unwrap();
-    let value = read(&path, &covers).unwrap();
+    let value = read(&path, dir.path(), &covers).unwrap();
     assert_eq!(value.metadata.title, "Été à Rome");
     assert_eq!(value.metadata.artist, "Invité");
     assert_eq!(value.metadata.album_artist, "Collectif");
@@ -53,7 +53,7 @@ fn fallback_marks_provenance_and_corruption_fails() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("Artiste/Album/03 - Chanson.wav");
     wav(&path);
-    let value = read(&path, dir.path()).unwrap();
+    let value = read(&path, dir.path(), dir.path()).unwrap();
     assert_eq!(value.metadata.title, "Chanson");
     assert_eq!(value.metadata.album, "Album");
     assert_eq!(value.metadata.artist, "Artiste");
@@ -61,11 +61,35 @@ fn fallback_marks_provenance_and_corruption_fails() {
     assert!(value.metadata.inferred.contains(&"title".into()));
     let disc = dir.path().join("Artiste/Double/CD2/01.wav");
     wav(&disc);
-    let value = read(&disc, dir.path()).unwrap();
+    let value = read(&disc, dir.path(), dir.path()).unwrap();
     assert_eq!(value.metadata.album, "Double");
     assert_eq!(value.metadata.artist, "Artiste");
     assert_eq!(value.metadata.disc, Some(2));
     assert!(value.metadata.is_inferred("disc"));
     std::fs::write(&path, b"broken").unwrap();
-    assert!(read(&path, dir.path()).is_err());
+    assert!(read(&path, dir.path(), dir.path()).is_err());
+}
+
+#[test]
+fn names_are_never_inferred_from_the_source_root_or_above() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("Musique");
+    let loose = root.join("01 - Loose.wav");
+    let folder = root.join("Resolve/02 - Grouped.wav");
+    wav(&loose);
+    wav(&folder);
+    let value = read(&loose, &root, dir.path()).unwrap();
+    assert_eq!(value.metadata.title, "Loose");
+    assert_eq!(
+        (
+            value.metadata.album.as_str(),
+            value.metadata.artist.as_str()
+        ),
+        ("", "")
+    );
+    assert!(value.metadata.is_inferred("album") && value.metadata.is_inferred("artist"));
+    let value = read(&folder, &root, dir.path()).unwrap();
+    assert_eq!(value.metadata.album, "Resolve");
+    assert_eq!(value.metadata.artist, "");
+    assert_eq!(value.metadata.album_artist, "");
 }

@@ -92,7 +92,7 @@ impl Soliton {
         match kind {
             FilterKind::Genre => f.genre.clone(),
             FilterKind::Period => f.period.map(|p| self.period_label(p)),
-            FilterKind::Artist => f.artist.clone(),
+            FilterKind::Artist => f.artist.as_deref().map(|a| self.artist_label(a)),
             FilterKind::Format => f.format.clone(),
             FilterKind::Quality => f.quality.map(|q| self.quality_label(q).into()),
         }

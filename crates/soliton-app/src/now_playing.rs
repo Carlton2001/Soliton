@@ -127,6 +127,10 @@ impl Soliton {
                     .text_center()
                     .text_size(TEXT_TITLE)
                     .font_weight(FontWeight::SEMIBOLD)
+                    .when(
+                        track.is_some_and(|t| t.metadata.is_inferred("title")),
+                        |title| title.italic(),
+                    )
                     .child(
                         track
                             .map(|t| t.metadata.title.clone())
@@ -141,7 +145,10 @@ impl Soliton {
                             this.leave_listening(window);
                             this.show_artist(artist.clone(), cx);
                         }))
-                        .child(track.metadata.artist.clone()),
+                        .when(track.metadata.is_inferred("artist"), |artist| {
+                            artist.italic()
+                        })
+                        .child(self.artist_label(&track.metadata.artist)),
                 )
             });
         let details = track.map(|track| {
@@ -163,7 +170,8 @@ impl Soliton {
                                 this.open_album(id, cx);
                             }
                         }))
-                        .child(track.metadata.album.clone()),
+                        .when(track.metadata.is_inferred("album"), |album| album.italic())
+                        .child(self.album_label(&track.metadata.album)),
                     true,
                     theme,
                 ))

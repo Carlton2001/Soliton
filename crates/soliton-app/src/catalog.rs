@@ -14,6 +14,7 @@ use std::{
 /// One tile of the Artists view.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArtistCard {
+    /// Empty for the albums without any artist.
     pub name: String,
     /// Albums by the artist, or containing at least one of their tracks.
     pub albums: usize,
@@ -104,6 +105,10 @@ fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCar
             .collect();
         names.insert(credited.clone());
         names.remove("");
+        // Albums without any artist gather under one card, shown last.
+        if credited.is_empty() && !album.compilation {
+            names.insert(String::new());
+        }
         let available = album.editions.iter().any(|edition| edition.available());
         for name in names {
             let entry = found.entry(name.clone()).or_default();
@@ -124,6 +129,7 @@ fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCar
     }
     artists
         .iter()
+        .chain(found.contains_key("").then_some(&String::new()))
         .map(|name| {
             let entry = found.get(&fold(name));
             ArtistCard {
@@ -307,7 +313,7 @@ impl Catalog {
                 let ok = [
                     artist
                         .as_ref()
-                        .is_none_or(|a| &text.artist == a || &track_text.artist == a),
+                        .is_none_or(|a| by_artist(a, album, text, track_text)),
                     genre.as_ref().is_none_or(|g| &track_text.genre == g),
                     filter
                         .period
@@ -358,7 +364,7 @@ impl Catalog {
                     (album_match || track_text.text.contains(&query))
                         && artist
                             .as_ref()
-                            .is_none_or(|a| &text.artist == a || &track_text.artist == a)
+                            .is_none_or(|a| by_artist(a, album, text, track_text))
                         && genre.as_ref().is_none_or(|g| &track_text.genre == g)
                         && filter
                             .period
@@ -384,6 +390,16 @@ impl Catalog {
             AlbumSort::Added => visible.sort_by_key(|&i| Reverse(added(i))),
         }
         visible
+    }
+}
+
+/// Whether a track counts for a folded artist filter. The empty name stands for
+/// albums without any artist, compilations excepted.
+fn by_artist(artist: &str, album: &Album, text: &AlbumText, track: &TrackText) -> bool {
+    if artist.is_empty() {
+        text.artist.is_empty() && !album.compilation
+    } else {
+        text.artist == artist || track.artist == artist
     }
 }
 

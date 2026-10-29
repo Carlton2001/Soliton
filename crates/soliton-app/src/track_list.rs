@@ -199,6 +199,7 @@ impl Soliton {
                             } else {
                                 theme.text
                             })
+                            .when(row.metadata.is_inferred("title"), |title| title.italic())
                             .child(row.metadata.title.clone()),
                     )
                     .child(
@@ -211,23 +212,19 @@ impl Soliton {
                             .text_color(theme.muted)
                             .child(if row.available {
                                 if matches!(selection, Selection::Album { .. }) {
-                                    format!("{} · {}", quality(row.metadata), row.metadata.artist)
+                                    format!(
+                                        "{} · {}",
+                                        quality(row.metadata),
+                                        self.artist_label(&row.metadata.artist)
+                                    )
                                 } else {
-                                    [row.metadata.artist.as_str(), row.metadata.album.as_str()]
-                                        .into_iter()
-                                        .filter(|value| !value.is_empty())
-                                        .collect::<Vec<_>>()
-                                        .join(" · ")
+                                    self.track_subtitle(row.metadata)
                                 }
                             } else if !matches!(selection, Selection::Album { .. }) {
                                 [
-                                    row.metadata.artist.as_str(),
-                                    row.metadata.album.as_str(),
-                                    self.t(Text::Unavailable),
+                                    self.track_subtitle(row.metadata),
+                                    self.t(Text::Unavailable).to_owned(),
                                 ]
-                                .into_iter()
-                                .filter(|value| !value.is_empty())
-                                .collect::<Vec<_>>()
                                 .join(" · ")
                             } else {
                                 self.t(Text::Unavailable).into()

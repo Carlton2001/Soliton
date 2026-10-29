@@ -559,10 +559,8 @@ impl Soliton {
         cx.notify();
     }
     /// Lists the albums of an artist.
+    /// Albums of `artist`; an empty name opens the albums without any artist.
     pub fn show_artist(&mut self, artist: String, cx: &mut Context<Self>) {
-        if artist.is_empty() {
-            return;
-        }
         self.record_place(cx);
         self.now_playing = false;
         self.menu = None;
@@ -572,13 +570,36 @@ impl Soliton {
         self.selected = None;
         self.refresh(cx);
     }
-    /// Displayed album artist, with a translated label for compilations.
+    /// Displayed album artist, with translated labels for compilations and
+    /// albums without any artist.
     pub fn album_artist(&self, album: &Album) -> String {
         if album.artist.is_empty() && album.compilation {
             self.t(Text::VariousArtists).into()
         } else {
-            album.artist.clone()
+            self.artist_label(&album.artist)
         }
+    }
+    pub fn artist_label(&self, artist: &str) -> String {
+        if artist.is_empty() {
+            self.t(Text::UnknownArtist).into()
+        } else {
+            artist.to_owned()
+        }
+    }
+    pub fn album_label(&self, album: &str) -> String {
+        if album.is_empty() {
+            self.t(Text::UnknownAlbum).into()
+        } else {
+            album.to_owned()
+        }
+    }
+    /// `Artist · Album` under a track title.
+    pub fn track_subtitle(&self, metadata: &soliton_core::model::Metadata) -> String {
+        format!(
+            "{} · {}",
+            self.artist_label(&metadata.artist),
+            self.album_label(&metadata.album)
+        )
     }
     /// Removes search-independent filters; display settings are kept.
     pub fn clear(&mut self, cx: &mut Context<Self>) {

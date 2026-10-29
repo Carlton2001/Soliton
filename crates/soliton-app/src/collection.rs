@@ -36,7 +36,7 @@ impl Soliton {
                         // Coming from an artist, the page is named after them.
                         Some(artist) => self.page_title_with(
                             crate::i18n::Text::Albums,
-                            artist.clone().into(),
+                            self.artist_label(artist).into(),
                             cx,
                         ),
                         None => self.page_title(crate::i18n::Text::Albums, cx),
