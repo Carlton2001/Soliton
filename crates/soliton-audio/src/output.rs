@@ -75,6 +75,11 @@ impl Output {
         info
     }
 
+    /// Completed device callbacks so far.
+    pub fn callbacks(&self) -> u64 {
+        self.callbacks.load(Ordering::SeqCst)
+    }
+
     /// Whether the device has called back at least once.
     pub fn ran(&self) -> bool {
         self.callbacks.load(Ordering::Relaxed) > 0

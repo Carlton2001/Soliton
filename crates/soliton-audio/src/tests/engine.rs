@@ -569,6 +569,48 @@ fn availability_updates_reach_queued_copies_and_the_current_track() {
 }
 
 #[test]
+#[ignore = "Requires a native output device; run explicitly with volume zero"]
+fn a_finished_track_plays_out_and_its_stream_serves_the_next_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.wav");
+    let second = dir.path().join("second.wav");
+    support::wav(&first, 44100, 1);
+    support::wav(&second, 44100, 1);
+    let mut worker = Worker::default();
+    worker.queue.set(
+        vec![
+            soliton_core::model::Track {
+                path: first,
+                ..missing(1, "")
+            },
+            soliton_core::model::Track {
+                path: second,
+                ..missing(2, "")
+            },
+        ],
+        0,
+    );
+    worker.start_current().unwrap();
+    let samples = worker.session.as_ref().unwrap().output.samples.clone();
+    let start = Instant::now();
+    let mut last_position = 0;
+    while worker.playback.track.as_ref().unwrap().id == 1 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "Track never ended"
+        );
+        last_position = worker.playback.position_ms;
+        worker.pump().unwrap();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    // Every frame of the first track was consumed before it was left.
+    assert!(last_position >= 990, "{last_position}");
+    let session = worker.session.as_ref().unwrap();
+    assert!(Arc::ptr_eq(&samples, &session.output.samples));
+    assert_eq!(worker.playback.state, PlaybackState::Playing);
+}
+
+#[test]
 fn automatic_playback_skips_unreadable_tracks_until_the_end_of_the_queue() {
     let mut worker = Worker::default();
     worker

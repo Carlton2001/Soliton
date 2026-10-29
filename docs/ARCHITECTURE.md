@@ -93,7 +93,10 @@ The callback only does atomic reads, pops complete frames from a preallocated
 lock-free buffer and applies volume. Pending PCM is bounded to two seconds. Seek
 keeps the stream open: the worker stops consuming, waits for two full callbacks,
 clears the buffer, then resets decoder and resampler; successive seeks are
-coalesced. Position comes from samples actually consumed.
+coalesced. Position comes from samples actually consumed. A finished track
+closes its stream only after three more callbacks (200 ms at most), so the
+device plays out its buffer; the next track keeps the stream when its rate,
+channels and output are the same.
 
 An undecodable packet is skipped and reported once per track; eight in a row make
 the file unreadable. A read error during playback ends the track with the audio

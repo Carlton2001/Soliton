@@ -18,6 +18,12 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Completed callbacks after the last queued frame before a finished track's
+/// stream may close: the device's own buffer still holds what they took.
+const DRAIN_CALLBACKS: u64 = 3;
+/// Bounds that wait when a device stops calling back.
+const DRAIN_WAIT: Duration = Duration::from_millis(200);
+
 /// A track failing after this long sits on a source that hangs rather than refuses.
 const SLOW_FAILURE: Duration = Duration::from_secs(1);
 
@@ -192,6 +198,10 @@ struct Session {
     base_ms: u64,
     /// Skipped passages are reported once per track.
     warned: bool,
+    /// Output the stream was opened for; `None` follows the system default.
+    target: Option<String>,
+    /// Callback count and time when the last frame was queued at end of track.
+    drain: Option<(u64, Instant)>,
 }
 
 impl Session {
@@ -207,6 +217,16 @@ impl Session {
         };
         let output = Output::open(reader.rate, reader.channels, volume, selected)
             .map_err(|error| Failure::wrap(Kind::OutputUnavailable, &error))?;
+        Self::with_output(reader, output, selected, base_ms)
+    }
+
+    /// Plays `reader`, already positioned at `base_ms`, on an open output.
+    fn with_output(
+        reader: Reader,
+        output: Output,
+        selected: Option<&str>,
+        base_ms: u64,
+    ) -> Result<Self> {
         let converter = Converter::new(
             reader.rate,
             reader.channels,
@@ -221,7 +241,29 @@ impl Session {
             eof: false,
             warned: false,
             base_ms,
+            target: selected.map(str::to_owned),
+            drain: None,
         })
+    }
+
+    /// The stream of a finished track serves the next one when nothing about it
+    /// would change: reopening a device is slow, notably over Bluetooth.
+    fn reuse(self, reader: &Reader, target: Option<&str>) -> Option<Output> {
+        let same = self.reader.rate == reader.rate
+            && self.reader.channels == reader.channels
+            && self.target.as_deref() == target
+            && !self.output.failed.load(Ordering::Relaxed);
+        same.then(|| {
+            self.output.flush();
+            self.output
+        })
+    }
+
+    /// Whether the device played out everything queued for a finished track.
+    fn drained(&mut self) -> bool {
+        let callbacks = self.output.callbacks();
+        let (start, since) = *self.drain.get_or_insert((callbacks, Instant::now()));
+        callbacks.wrapping_sub(start) >= DRAIN_CALLBACKS || since.elapsed() >= DRAIN_WAIT
     }
 
     /// Decodes at most one packet, so command latency stays bounded by one
@@ -320,6 +362,11 @@ impl Worker {
     }
 
     fn start_current_at(&mut self, position: u64) -> Result<()> {
+        self.start_after(position, None)
+    }
+
+    /// Starts the current track, on the stream of `finished` when it fits.
+    fn start_after(&mut self, position: u64, finished: Option<Session>) -> Result<()> {
         self.resume_at = None;
         self.session = None;
         self.playback.output = None;
@@ -348,12 +395,24 @@ impl Worker {
         } else {
             track.metadata.duration_ms
         };
-        let session = Session::open(
-            reader,
-            self.playback.volume,
-            self.output_target(),
-            (position > 0).then_some(position),
-        )?;
+        let target = self.output_target().map(str::to_owned);
+        let session = match finished.and_then(|s| s.reuse(&reader, target.as_deref())) {
+            Some(output) => {
+                let mut reader = reader;
+                let base_ms = if position > 0 {
+                    reader.seek(position)?
+                } else {
+                    0
+                };
+                Session::with_output(reader, output, target.as_deref(), base_ms)?
+            }
+            None => Session::open(
+                reader,
+                self.playback.volume,
+                target.as_deref(),
+                (position > 0).then_some(position),
+            )?,
+        };
         self.playback.output = Some(session.output.info());
         self.playback.state = PlaybackState::Playing;
         self.session = Some(session);
@@ -685,11 +744,15 @@ impl Worker {
             self.playback.warning = Some(warning);
         }
         self.playback.position_ms = session.base_ms + session.output.position_ms();
-        if session.eof && session.pending.is_empty() && session.output.samples.is_empty() {
-            self.session = None;
+        if session.eof
+            && session.pending.is_empty()
+            && session.output.samples.is_empty()
+            && session.drained()
+        {
+            let finished = self.session.take();
             self.playback.output = None;
             if self.queue.next(true) {
-                self.start_current()?;
+                self.start_after(0, finished)?;
             } else {
                 self.playback.state = PlaybackState::Stopped;
             }
