@@ -22,7 +22,7 @@ jobs:
           dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config
           pipewire-devel clang-devel libxkbcommon-devel libxkbcommon-x11-devel
           freetype-devel fontconfig-devel libxcb-devel wayland-devel
-          git rustup
+          git rustup tar zstd
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -32,6 +32,12 @@ jobs:
           # Minimum supported Rust: the workspace rust-version.
           "$HOME/.cargo/bin/rustup" toolchain install 1.89 --profile minimal
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      # Dependencies are rebuilt only when Cargo.lock or the toolchains change.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          shared-key: soliton-linux-v1
+          cache-bin: false
+          save-if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
       - name: License inventory
         run: sh scripts/check-third-party-licenses.sh
       - name: Shell scripts syntax
