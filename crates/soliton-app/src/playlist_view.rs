@@ -194,7 +194,7 @@ impl Soliton {
                                 .child(
                                     div()
                                         .text_size(TEXT_SMALL)
-                                        .font(crate::widgets::numeric_font())
+                                        .font(crate::widgets::tabular_font())
                                         .text_color(theme.muted)
                                         .child(format!(
                                             "{count} {} · {}",

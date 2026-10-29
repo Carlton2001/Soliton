@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
     Application::new()
         .with_assets(assets::Assets)
         .run(move |cx| {
-            assets::Assets::load_fonts(cx).expect("Cannot load the bundled Inter fonts");
+            assets::Assets::load_fonts(cx).expect("Cannot load the bundled fonts");
             input::bind_keys(cx);
             cx.on_window_closed(|cx| {
                 if cx.windows().is_empty() {

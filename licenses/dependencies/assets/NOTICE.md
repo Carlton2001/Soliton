@@ -11,7 +11,8 @@ Oxyde-GPUI, Copyright (C) 2026 Carlton2001, sous GPL-3.0.
 Les fontes Inter fournies dans `fonts/` sont embarquées sans modification.
 Copyright The Inter Project Authors, sous SIL Open Font License 1.1 ;
 licence dans `fonts/Inter-LICENSE.txt` (https://github.com/rsms/inter).
-JetBrains Mono est conservée parmi les ressources fournies, sans être embarquée.
+La fonte variable JetBrains Mono (romaine) est embarquée sans modification pour
+les chiffres.
 Copyright The JetBrains Mono Project Authors, sous SIL Open Font License 1.1 ;
 licence dans `fonts/JetBrainsMono-LICENSE.txt`
 (https://github.com/JetBrains/JetBrainsMono).

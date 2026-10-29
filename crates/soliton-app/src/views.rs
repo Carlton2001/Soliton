@@ -56,7 +56,7 @@ impl Soliton {
     fn title_block(&self, label: SharedString, cx: &App) -> Div {
         let title_font = Font {
             weight: FontWeight::SEMIBOLD,
-            ..font("Inter")
+            ..font(crate::widgets::UI_FONT)
         };
         let font_size = crate::scale::scaled_px(crate::widgets::TEXT_DISPLAY.0 * 16.);
         let line_height = font_size * 1.5;
@@ -375,7 +375,7 @@ impl Soliton {
                             .truncate()
                             .whitespace_normal()
                             .line_clamp(1)
-                            .font(crate::widgets::numeric_font())
+                            .font(crate::widgets::tabular_font())
                             .child(format!(
                                 "{} · {}",
                                 first.format,

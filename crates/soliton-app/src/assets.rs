@@ -28,6 +28,10 @@ impl Assets {
         cx.text_system().add_fonts(vec![
             Cow::Borrowed(include_bytes!("../../../assets/fonts/Inter-Regular.ttf").as_slice()),
             Cow::Borrowed(include_bytes!("../../../assets/fonts/Inter-Italic.ttf").as_slice()),
+            Cow::Borrowed(
+                include_bytes!("../../../assets/fonts/JetBrainsMono-VariableFont_wght.ttf")
+                    .as_slice(),
+            ),
         ])
     }
 }

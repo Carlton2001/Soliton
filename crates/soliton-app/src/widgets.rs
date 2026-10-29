@@ -78,15 +78,22 @@ pub fn input_field(input: Entity<crate::input::TextInput>, search: bool, theme: 
         .child(div().flex_1().min_w_0().child(input))
 }
 
-/// Inter's tabular digits align durations without changing the UI typeface.
+/// Interface typeface, embedded: no text depends on the fonts of the system.
+pub const UI_FONT: &str = "Inter";
+
+/// JetBrains Mono for figures on their own: track numbers, durations, values.
 pub fn numeric_font() -> Font {
+    gpui::font("JetBrains Mono")
+}
+
+/// Inter's tabular digits align figures within a line of words.
+pub fn tabular_font() -> Font {
     static FEATURES: std::sync::OnceLock<FontFeatures> = std::sync::OnceLock::new();
     Font {
-        family: "Inter".into(),
         features: FEATURES
             .get_or_init(|| FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)])))
             .clone(),
-        ..gpui::font("Inter")
+        ..gpui::font(UI_FONT)
     }
 }
 
@@ -646,6 +653,7 @@ impl Render for Tip {
                 .border_color(self.1.control_border)
                 .bg(self.1.panel)
                 .text_color(self.1.text)
+                .font_family(UI_FONT)
                 .text_size(TEXT_SMALL)
                 .child((self.0)(cx)),
         )

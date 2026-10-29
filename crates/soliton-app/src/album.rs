@@ -88,7 +88,7 @@ impl Soliton {
             })
             .child(
                 div()
-                    .font(crate::widgets::numeric_font())
+                    .font(crate::widgets::tabular_font())
                     .text_color(theme.muted)
                     .child(summary),
             )

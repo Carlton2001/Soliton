@@ -784,7 +784,7 @@ impl Render for Soliton {
             .flex_col()
             .bg(theme.background)
             .text_color(theme.text)
-            .font_family("Inter")
+            .font_family(crate::widgets::UI_FONT)
             .text_size(crate::widgets::TEXT_BODY)
             // Full screen is a listening mode: the library chrome stays hidden.
             .when(fullscreen, |content| {
