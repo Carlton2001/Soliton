@@ -710,7 +710,7 @@ impl Render for Tip {
             .when_some(detail, |tip, detail| {
                 // Tooltips are laid out at their minimum size: a measured width lets
                 // short text keep one line and long text wrap within the window.
-                let room = f32::from(window.viewport_size().width / window.rem_size()) - 1.;
+                let room = window.viewport_size().width / window.rem_size() - 1.;
                 let width = label_width(&detail, window).min(TIP_MAX_WIDTH).min(room);
                 tip.child(
                     div()

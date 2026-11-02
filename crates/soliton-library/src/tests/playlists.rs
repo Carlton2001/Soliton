@@ -90,7 +90,7 @@ fn block_move_persists_order_and_rejects_unknown_entries() {
             .is_err()
     );
     drop(library);
-    let mut library = Library::open(dir.path()).unwrap();
+    let library = Library::open(dir.path()).unwrap();
     let saved = library.playlists().unwrap().remove(0);
     assert_eq!(
         saved.entries.iter().map(|e| e.id).collect::<Vec<_>>(),
