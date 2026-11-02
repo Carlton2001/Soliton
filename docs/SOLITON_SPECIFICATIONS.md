@@ -113,7 +113,11 @@ These rules apply to every change.
   per-track quality when it differs. Disc.track numbers always shown.
 - Icon buttons: full label or icon only with tooltip, never in between. All
   buttons, grouped ones included, shrink together, playback buttons last. Menu
-  entries keep their label. Secondary track actions in an "Actions" menu.
+  entries keep their label. Secondary album track actions in an "Actions" menu;
+  queue and playlist rows use icon buttons.
+- Tooltips: anchored at the bottom left corner of their element, not the pointer,
+  and kept inside the window. They always name the command; any explanation
+  follows below at reduced opacity, wrapping when long.
 - Player: progress on top; artwork and metadata left; Shuffle, Previous,
   Play/Pause (centered), Next, Repeat, Queue; volume right, in a popover on narrow
   windows. Now Playing through the Expand button, which becomes Collapse to close
@@ -124,7 +128,7 @@ These rules apply to every change.
 - Icon: continuous wave on a rounded square, six palettes (Graphite and mint by
   default), applied without restart, independent of the theme. Window title
   "Soliton".
-- No playback of files outside the library and no drag and drop; folders are
+- No playback of files outside the library and no file drag and drop; folders are
   added from the settings or an empty view.
 
 ## 3.4 Playback
@@ -133,9 +137,11 @@ These rules apply to every change.
   without allocation, I/O, logging or blocking lock.
 - Album, selection, shuffle, repeat track/album, navigation. Gapless not a
   priority.
-- Named manual playlists and an editable queue. One occurrence per file: repeated
+- Named manual playlists, each with a unique name whatever its case, and an
+  editable queue. One occurrence per file: repeated
   additions are ignored. An unavailable track stays visible in its playlist. No
-  smart playlists or import/export.
+  smart playlists or import/export. Rows reorder by dragging after
+  a long press, alone or as a Shift-click range or Ctrl-click selection.
 - Persisted session (track, position, volume, output, modes) without listening
   history or statistics.
 

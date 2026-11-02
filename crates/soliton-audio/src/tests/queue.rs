@@ -110,6 +110,33 @@ fn shuffled_repeat_all_reshuffles_each_round() {
 }
 
 #[test]
+fn block_move_gathers_entries_and_keeps_current() {
+    let mut queue = Queue::default();
+    queue.set(tracks()[0..5].to_vec(), 1);
+    let ids: Vec<u64> = queue.snapshot.entries.iter().map(|e| e.id).collect();
+    let current = queue.snapshot.current;
+    queue.move_block(&[ids[1], ids[3]], None);
+    let order = |queue: &Queue| {
+        queue
+            .snapshot
+            .entries
+            .iter()
+            .map(|e| e.id)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(order(&queue), [ids[0], ids[2], ids[4], ids[1], ids[3]]);
+    assert_eq!(queue.snapshot.current, current);
+    queue.move_block(&[ids[4], ids[3]], Some(ids[0]));
+    assert_eq!(order(&queue), [ids[4], ids[3], ids[0], ids[2], ids[1]]);
+    // A target inside the block or an unknown one changes nothing.
+    let before = order(&queue);
+    queue.move_block(&[ids[0], ids[2]], Some(ids[2]));
+    queue.move_block(&[ids[0]], Some(u64::MAX));
+    assert_eq!(order(&queue), before);
+    assert_eq!(queue.snapshot.current, current);
+}
+
+#[test]
 fn edits_preserve_current_and_saved_snapshots() {
     let mut queue = Queue::default();
     queue.set(tracks()[2..5].to_vec(), 1);
@@ -169,7 +196,7 @@ fn next_insertion_and_manual_order_survive_shuffle_round_trip() {
 }
 
 #[test]
-fn shuffled_edits_and_clear_upcoming_keep_a_valid_permutation() {
+fn shuffled_edits_keep_a_valid_permutation() {
     let mut queue = Queue::default();
     queue.set(tracks(), 3);
     queue.shuffle(true);
@@ -178,10 +205,8 @@ fn shuffled_edits_and_clear_upcoming_keep_a_valid_permutation() {
     let upcoming = queue.snapshot.entries[4].id;
     queue.move_before(upcoming, Some(queue.snapshot.entries[2].id));
     queue.remove(queue.snapshot.entries[3].id);
-    queue.clear_upcoming();
     assert_eq!(queue.snapshot.current, current);
-    assert_eq!(queue.snapshot.entries.len(), 2);
-    assert!(!queue.next(false));
+    assert_eq!(queue.snapshot.entries.len(), tracks().len() - 1);
     queue.shuffle(false);
     let mut ids = queue
         .snapshot
@@ -217,7 +242,6 @@ fn playlist_highlight_follows_the_exact_occurrence_through_queue_edits() {
     assert!(queue.next(false));
     assert_eq!(queue.snapshot.current_playlist_entry(), Some(101));
     queue.remove(current);
-    queue.clear_upcoming();
     assert_eq!(queue.snapshot.current_playlist_entry(), Some(101));
     queue.set(tracks(), 0);
     assert_eq!(queue.snapshot.current_playlist_entry(), None);

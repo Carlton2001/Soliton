@@ -160,21 +160,29 @@ impl Queue {
     }
 
     pub fn move_before(&mut self, id: u64, before: Option<u64>) {
-        if Some(id) == before {
+        self.move_block(&[id], before);
+    }
+
+    /// Gathers the entries before `before`, in the given order.
+    pub fn move_block(&mut self, ids: &[u64], before: Option<u64>) {
+        if before.is_some_and(|target| {
+            ids.contains(&target) || !self.order.iter().any(|&i| self.ids[i] == target)
+        }) {
             return;
         }
-        let Some(from) = self.order.iter().position(|&i| self.ids[i] == id) else {
-            return;
-        };
-        if before.is_some_and(|target| !self.order.iter().any(|&i| self.ids[i] == target)) {
+        let moved: Vec<_> = ids
+            .iter()
+            .filter_map(|&id| self.order.iter().copied().find(|&i| self.ids[i] == id))
+            .collect();
+        if moved.is_empty() {
             return;
         }
         let current = self.order.get(self.cursor).copied();
-        let item = self.order.remove(from);
+        self.order.retain(|i| !moved.contains(i));
         let at = before
             .and_then(|target| self.order.iter().position(|&i| self.ids[i] == target))
             .unwrap_or(self.order.len());
-        self.order.insert(at, item);
+        self.order.splice(at..at, moved);
         self.cursor = current
             .and_then(|i| self.order.iter().position(|&j| j == i))
             .unwrap_or(0);
@@ -190,28 +198,6 @@ impl Queue {
         true
     }
 
-    pub fn clear_upcoming(&mut self) {
-        self.order.truncate((self.cursor + 1).min(self.order.len()));
-        let mut keep = vec![false; self.tracks.len()];
-        for &i in &self.order {
-            keep[i] = true;
-        }
-        let ids = std::mem::take(&mut self.ids);
-        let mut remap = vec![0; self.tracks.len()];
-        for (i, track) in std::mem::take(&mut self.tracks).into_iter().enumerate() {
-            if keep[i] {
-                remap[i] = self.tracks.len();
-                self.tracks.push(track);
-                self.ids.push(ids[i]);
-            }
-        }
-        for i in &mut self.order {
-            *i = remap[*i];
-        }
-        let retained: std::collections::HashSet<_> = self.ids.iter().copied().collect();
-        self.playlist_entries.retain(|id, _| retained.contains(id));
-        self.publish();
-    }
     pub fn current(&self) -> Option<&Track> {
         self.order
             .get(self.cursor)

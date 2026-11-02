@@ -143,7 +143,7 @@ impl Soliton {
                     .map(|output| self.output_label(output))
             })
             .unwrap_or_else(|| self.t(Text::AudioOutput).into());
-        crate::widgets::with_tooltip(
+        crate::widgets::with_detailed_tooltip(
             div()
                 .id("player-output")
                 .tab_index(0)
@@ -178,6 +178,7 @@ impl Soliton {
                     this.focus.focus(window);
                     this.navigate(crate::app::Section::Settings, cx);
                 })),
+            self.t(Text::AudioOutput).into(),
             name.into(),
             theme,
         )

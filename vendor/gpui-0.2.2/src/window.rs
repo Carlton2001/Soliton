@@ -2132,6 +2132,21 @@ impl Window {
                 }
             }
 
+            if let Some(anchor) = tooltip_request.tooltip.anchor {
+                // From the bottom left corner of its element, above it when there is no
+                // room below, keeping the same gap from the window's edges.
+                let gap = px(4.);
+                let mut y = anchor.bottom() + gap;
+                if y + tooltip_size.height + gap > window_bounds.bottom() {
+                    y = cmp::max(gap, anchor.top() - gap - tooltip_size.height);
+                }
+                let x = cmp::max(
+                    gap,
+                    cmp::min(anchor.left(), window_bounds.right() - tooltip_size.width - gap),
+                );
+                tooltip_bounds.origin = point(x, y);
+            }
+
             // It's possible for an element to have an active tooltip while not being painted (e.g.
             // via the `visible_on_hover` method). Since mouse listeners are not active in this
             // case, instead update the tooltip's visibility here.

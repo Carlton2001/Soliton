@@ -12,7 +12,7 @@ use soliton_core::{
     playlist::PlaylistChange,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Selection {
     Album {
         album: i64,
@@ -28,8 +28,6 @@ pub enum Selection {
 #[derive(Clone, Copy)]
 enum Action {
     Play,
-    Up,
-    Down,
     Remove,
     Next,
     Append,
@@ -43,8 +41,6 @@ pub struct TrackRow<'a> {
     pub metadata: &'a Metadata,
     pub available: bool,
     pub current: bool,
-    pub first: bool,
-    pub last: bool,
 }
 
 /// Source numbering is identical in albums, playlists and the playback queue.
@@ -56,6 +52,15 @@ fn track_number(metadata: &Metadata, index: usize) -> String {
         .map_or_else(|| (index + 1).to_string(), |number| number.to_string());
     format!("{disc}.{track}")
 }
+
+pub(crate) fn same_list(a: Selection, b: Selection) -> bool {
+    match (a, b) {
+        (Selection::Queue(_), Selection::Queue(_)) => true,
+        (Selection::Playlist { list: a, .. }, Selection::Playlist { list: b, .. }) => a == b,
+        _ => false,
+    }
+}
+
 impl Soliton {
     pub fn selection_row(&self, row: TrackRow<'_>, cx: &mut Context<Self>) -> AnyElement {
         self.album_selection_row(row, false, cx)
@@ -75,25 +80,22 @@ impl Soliton {
             Selection::Album { track, .. } => track as usize,
         };
         let playing = row.current && self.playback.state == soliton_audio::PlaybackState::Playing;
-        let mut actions = Vec::new();
-        if !matches!(selection, Selection::Queue(_)) {
-            actions.push(("skip-forward", Text::PlayNext, Action::Next));
-            actions.push(("list-end", Text::AppendQueue, Action::Append));
-        }
-        if !matches!(selection, Selection::Playlist { .. }) {
-            actions.push(("list-plus", Text::AddToPlaylist, Action::Save));
-        }
-        if !matches!(selection, Selection::Album { .. }) {
-            if !row.first {
-                actions.push(("arrow-up", Text::MoveUp, Action::Up));
-            }
-            if !row.last {
-                actions.push(("arrow-down", Text::MoveDown, Action::Down));
-            }
-            if !row.current || matches!(selection, Selection::Playlist { .. }) {
-                actions.push(("x", Text::RemoveEntry, Action::Remove));
-            }
-        }
+        let editable = !matches!(selection, Selection::Album { .. });
+        let marked = self.reorder.marked.contains(&selection);
+        let drag = self.reorder.drag.as_ref();
+        let dragged = drag.is_some_and(|d| d.rows.contains(&selection));
+        let frame = self.drag_frame(selection);
+        // Only album rows keep a menu: editable rows show their two commands directly.
+        let actions = if editable {
+            Vec::new()
+        } else {
+            vec![
+                ("skip-forward", Text::PlayNext, Action::Next),
+                ("list-end", Text::AppendQueue, Action::Append),
+                ("list-plus", Text::AddToPlaylist, Action::Save),
+            ]
+        };
+        let removable = !row.current || matches!(selection, Selection::Playlist { .. });
         let open = self
             .track_menu
             .filter(|(selected, _)| *selected == selection);
@@ -145,25 +147,55 @@ impl Soliton {
             .gap(rems(if compact { 0.375 } else { 0.75 }))
             .rounded(crate::widgets::RADIUS)
             .when(row.current, |v| v.bg(theme.selected))
-            .hover(move |s| s.bg(theme.hover))
+            .when(marked || dragged, |v| {
+                v.bg(Rgba {
+                    a: 0.18,
+                    ..theme.accent
+                })
+            })
+            .when(drag.is_none(), |v| v.hover(move |s| s.bg(theme.hover)))
+            .when_some(frame, |line, (top, bottom)| {
+                line.opacity(0.5)
+                    .when(!top, |v| v.rounded_t(px(0.)))
+                    .when(!bottom, |v| v.rounded_b(px(0.)))
+            })
+            .when(editable, |line| {
+                line.on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                        this.reorder_press(selection, event, cx);
+                    }),
+                )
+            })
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                if editable && !this.reorder_click(selection, event, cx) {
+                    return;
+                }
                 if event.click_count() == 2 {
                     this.selection_action(selection, Action::Play, window, cx);
                 }
             }))
             .child(
-                icon_button(
-                    ("selection-play", key),
-                    if playing { "pause" } else { "play" },
-                    self.t(if playing { Text::Pause } else { Text::Play }),
-                    false,
-                    theme,
-                )
-                .opacity(if row.available { 1. } else { 0.35 })
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    cx.stop_propagation();
-                    this.selection_action(selection, Action::Play, window, cx)
-                })),
+                // A press on a control must not start a long press on the row.
+                div()
+                    .flex_none()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(
+                        icon_button(
+                            ("selection-play", key),
+                            if playing { "pause" } else { "play" },
+                            self.t(if playing { Text::Pause } else { Text::Play }),
+                            false,
+                            theme,
+                        )
+                        .opacity(if row.available { 1. } else { 0.35 })
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
+                                cx.stop_propagation();
+                                this.selection_action(selection, Action::Play, window, cx)
+                            },
+                        )),
+                    ),
             )
             .child(
                 div()
@@ -240,51 +272,120 @@ impl Soliton {
                     .text_color(theme.muted)
                     .child(time(row.metadata.duration_ms)),
             )
-            .child(
-                div()
-                    .relative()
-                    .flex_shrink()
-                    .min_w(rems(4.))
-                    .max_w(relative(0.24))
-                    .child(
-                        button(
-                            ("selection-actions", key),
-                            "sliders-horizontal",
-                            self.t(Text::Actions),
-                            theme,
-                        )
-                        .max_w_full()
-                        .child(crate::widgets::icon("chevron-down", theme))
-                        .when(compact, |v| {
-                            v.px(rems(0.375)).text_size(crate::widgets::TEXT_CAPTION)
-                        })
-                        .on_click(cx.listener(
-                            move |this, _, window, cx| {
-                                cx.stop_propagation();
-                                let above = f32::from(window.mouse_position().y)
-                                    > f32::from(window.viewport_size().height)
-                                        - crate::scale::scaled(230.);
-                                this.track_menu = Some((selection, above));
-                                cx.notify();
-                            },
-                        )),
-                    )
-                    .when_some(open, |v, (_, above)| {
-                        v.child(
-                            deferred(
-                                div()
-                                    .absolute()
-                                    .right_0()
-                                    .when(above, |v| v.bottom_full().mb(rems(0.25)))
-                                    .when(!above, |v| v.top_full().mt(rems(0.25)))
-                                    .child(menu),
+            .when(!editable, |line| {
+                line.child(
+                    div()
+                        .relative()
+                        .flex_shrink()
+                        .min_w(rems(4.))
+                        .max_w(relative(0.24))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            button(
+                                ("selection-actions", key),
+                                "sliders-horizontal",
+                                self.t(Text::Actions),
+                                theme,
                             )
-                            .with_priority(1),
+                            .max_w_full()
+                            .child(crate::widgets::icon("chevron-down", theme))
+                            .when(compact, |v| {
+                                v.px(rems(0.375)).text_size(crate::widgets::TEXT_CAPTION)
+                            })
+                            .on_click(cx.listener(
+                                move |this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    let above = f32::from(window.mouse_position().y)
+                                        > f32::from(window.viewport_size().height)
+                                            - crate::scale::scaled(230.);
+                                    this.track_menu = Some((selection, above));
+                                    cx.notify();
+                                },
+                            )),
                         )
-                    }),
-            )
+                        .when_some(open, |v, (_, above)| {
+                            v.child(
+                                deferred(
+                                    div()
+                                        .absolute()
+                                        .right_0()
+                                        .when(above, |v| v.bottom_full().mb(rems(0.25)))
+                                        .when(!above, |v| v.top_full().mt(rems(0.25)))
+                                        .child(menu),
+                                )
+                                .with_priority(1),
+                            )
+                        }),
+                )
+            })
+            .when(editable, |line| {
+                line.child(
+                    div()
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .gap(rems(0.25))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            icon_button(
+                                ("selection-save", key),
+                                "list-plus",
+                                self.t(Text::AddToPlaylist),
+                                false,
+                                theme,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.selection_action(selection, Action::Save, window, cx);
+                                },
+                            )),
+                        )
+                        // Hidden rather than absent, so that durations stay aligned.
+                        .child(
+                            icon_button(
+                                ("selection-remove", key),
+                                "x",
+                                self.t(Text::RemoveEntry),
+                                false,
+                                theme,
+                            )
+                            .when(!removable, |v| v.invisible())
+                            .when(removable, |v| {
+                                v.on_click(cx.listener(move |this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.selection_action(selection, Action::Remove, window, cx);
+                                }))
+                            }),
+                        ),
+                )
+            })
             .into_any_element();
-        div().w_full().px(inset).child(line).into_any_element()
+        // The frame sits beside the dimmed row, so that it keeps its own opacity and
+        // adjacent rows open onto each other to share one outline.
+        let outline = frame.map(|(top, bottom)| {
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .border_l_2()
+                .border_r_2()
+                .when(top, |v| v.border_t_2())
+                .when(bottom, |v| v.border_b_2())
+                .border_color(Rgba {
+                    a: theme.accent.a * 0.5,
+                    ..theme.accent
+                })
+                .rounded(crate::widgets::RADIUS)
+                .when(!top, |v| v.rounded_t(px(0.)))
+                .when(!bottom, |v| v.rounded_b(px(0.)))
+        });
+        div()
+            .w_full()
+            .px(inset)
+            .child(div().relative().w_full().child(line).children(outline))
+            .into_any_element()
     }
 
     fn selection_track(&self, selection: Selection) -> Option<Track> {
@@ -375,22 +476,9 @@ impl Soliton {
                     }
                 }
                 Action::Remove => self.audio_command(Command::RemoveQueued(id), cx),
-                Action::Up | Action::Down => {
-                    let entries = &self.playback.queue.entries;
-                    let Some(at) = entries.iter().position(|e| e.id == id) else {
-                        return;
-                    };
-                    let before = match action {
-                        Action::Up if at > 0 => Some(entries[at - 1].id),
-                        Action::Down if at + 1 < entries.len() => entries.get(at + 2).map(|e| e.id),
-                        _ => return,
-                    };
-                    self.audio_command(Command::MoveQueued { id, before }, cx);
-                }
                 _ => {}
             },
             Selection::Playlist { list, entry } => match action {
-                Action::Save => {}
                 Action::Play => {
                     if self.playback.queue.current_playlist_entry() == Some(entry) {
                         self.play_pause(cx);
@@ -398,43 +486,10 @@ impl Soliton {
                         self.play_playlist(list, Some(entry), cx);
                     }
                 }
-                Action::Next | Action::Append => {
-                    if let Some(track) = self.selection_track(selection).filter(|t| t.available) {
-                        self.audio_command(
-                            Command::Enqueue {
-                                tracks: vec![track],
-                                next: matches!(action, Action::Next),
-                            },
-                            cx,
-                        );
-                    }
-                }
                 Action::Remove => {
                     self.change_playlist(PlaylistChange::Remove { id: list, entry }, cx);
                 }
-                Action::Up | Action::Down => {
-                    let Some(p) = self.playlists.lists.iter().find(|p| p.id == list) else {
-                        return;
-                    };
-                    let Some(at) = p.entries.iter().position(|e| e.id == entry) else {
-                        return;
-                    };
-                    let before = match action {
-                        Action::Up if at > 0 => Some(p.entries[at - 1].id),
-                        Action::Down if at + 1 < p.entries.len() => {
-                            p.entries.get(at + 2).map(|e| e.id)
-                        }
-                        _ => return,
-                    };
-                    self.change_playlist(
-                        PlaylistChange::Move {
-                            id: list,
-                            entry,
-                            before,
-                        },
-                        cx,
-                    );
-                }
+                _ => {}
             },
         }
     }

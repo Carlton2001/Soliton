@@ -45,6 +45,7 @@ pub struct Soliton {
     /// Queue and catalog last compared for track availability.
     pub availability_checked: Option<(Arc<soliton_audio::QueueSnapshot>, Tracks)>,
     pub track_menu: Option<(crate::track_list::Selection, bool)>,
+    pub reorder: crate::reorder::Reorder,
     pub playlists: crate::playlists::Playlists,
     pub queue_scroll: UniformListScrollHandle,
     pub queue_bar: Scrollbar,
@@ -199,6 +200,7 @@ impl Soliton {
             tracks: Arc::default(),
             availability_checked: None,
             track_menu: None,
+            reorder: Default::default(),
             playlists: crate::playlists::Playlists::new(playlist_name),
             queue_scroll: UniformListScrollHandle::new(),
             queue_bar: Scrollbar::default(),
@@ -589,8 +591,8 @@ impl Render for Soliton {
             self.now_playing_view(window, cx)
         } else {
             match self.section {
-                Section::Queue => self.queue_view(cx),
-                Section::Playlists => self.playlists_view(cx),
+                Section::Queue => self.queue_view(window, cx),
+                Section::Playlists => self.playlists_view(window, cx),
                 Section::Settings => self.settings_view(cx),
                 Section::Albums => self.collection_view(window, cx),
                 _ if self.selected.is_some() => self.album_view(window, cx),

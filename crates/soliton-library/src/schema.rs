@@ -10,7 +10,7 @@ use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 use soliton_core::model::Metadata;
 use std::{collections::BTreeSet, path::Path};
 
-pub(crate) const VERSION: i64 = 8;
+pub(crate) const VERSION: i64 = 9;
 
 pub(crate) fn version(connection: &Connection) -> Result<i64> {
     Ok(connection.query_row("PRAGMA user_version", [], |row| row.get(0))?)
@@ -74,12 +74,39 @@ pub(crate) fn migrate(connection: &mut Connection) -> Result<()> {
     if version < 8 {
         step(connection, 8, source_volumes)?;
     }
+    if version < 9 {
+        step(connection, 9, unique_playlist_names)?;
+    }
     let violations: i64 =
         connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
             row.get(0)
         })?;
     if violations > 0 {
         bail!("Library database has {violations} inconsistent references");
+    }
+    Ok(())
+}
+
+/// Numbers later duplicates, oldest first, so that each playlist has its own name.
+fn unique_playlist_names(transaction: &Transaction) -> Result<()> {
+    let lists = {
+        let mut query = transaction.prepare("SELECT id,name FROM playlists ORDER BY id")?;
+        query
+            .query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let mut taken: Vec<String> = Vec::with_capacity(lists.len());
+    for (id, name) in lists {
+        let unique = soliton_core::playlist::unique_name(&name, taken.iter().map(String::as_str));
+        if unique != name.trim() {
+            transaction.execute(
+                "UPDATE playlists SET name=?1 WHERE id=?2",
+                rusqlite::params![unique, id],
+            )?;
+        }
+        taken.push(unique);
     }
     Ok(())
 }

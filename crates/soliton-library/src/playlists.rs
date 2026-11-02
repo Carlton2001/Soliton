@@ -5,7 +5,7 @@ use rusqlite::{Connection, params};
 use soliton_core::{
     failure::{Failure, Kind},
     model::Track,
-    playlist::{Playlist, PlaylistChange, PlaylistEntry},
+    playlist::{MAX_NAME_CHARS, Playlist, PlaylistChange, PlaylistEntry, same_name},
 };
 
 impl Library {
@@ -44,6 +44,7 @@ impl Library {
         let tx = self.connection.transaction()?;
         match change {
             PlaylistChange::Create { name, tracks } => {
+                require_free_name(&tx, &name, None)?;
                 tx.execute(
                     "INSERT INTO playlists(name) VALUES(?1)",
                     [valid_name(&name)?],
@@ -52,6 +53,7 @@ impl Library {
             }
             PlaylistChange::Rename { id, name } => {
                 require_list(&tx, id)?;
+                require_free_name(&tx, &name, Some(id))?;
                 tx.execute(
                     "UPDATE playlists SET name=?1 WHERE id=?2",
                     params![valid_name(&name)?, id],
@@ -73,42 +75,67 @@ impl Library {
                 )?;
             }
             PlaylistChange::Move { id, entry, before } => {
-                require_list(&tx, id)?;
-                let mut query = tx.prepare(
-                    "SELECT id FROM playlist_entries WHERE playlist_id=?1 ORDER BY position,id",
-                )?;
-                let mut order = query
-                    .query_map([id], |row| row.get::<_, i64>(0))?
-                    .collect::<rusqlite::Result<Vec<_>>>()?;
-                if Some(entry) != before {
-                    let Some(from) = order.iter().position(|&e| e == entry) else {
-                        return Err(Failure::new(Kind::PlaylistGone).into());
-                    };
-                    if before.is_some_and(|e| !order.contains(&e)) {
-                        return Err(Failure::new(Kind::PlaylistGone).into());
-                    }
-                    order.remove(from);
-                    let at = before
-                        .and_then(|e| order.iter().position(|&v| v == e))
-                        .unwrap_or(order.len());
-                    order.insert(at, entry);
-                    for (position, entry) in order.into_iter().enumerate() {
-                        tx.execute("UPDATE playlist_entries SET position=?1 WHERE id=?2 AND playlist_id=?3", params![position as i64, entry, id])?;
-                    }
-                }
+                move_entries(&tx, id, &[entry], before)?;
             }
+            PlaylistChange::MoveBlock {
+                id,
+                entries,
+                before,
+            } => move_entries(&tx, id, &entries, before)?,
         }
         tx.commit()?;
         Ok(())
     }
 }
 
+fn move_entries(tx: &Connection, id: i64, moved: &[i64], before: Option<i64>) -> Result<()> {
+    require_list(tx, id)?;
+    let mut query =
+        tx.prepare("SELECT id FROM playlist_entries WHERE playlist_id=?1 ORDER BY position,id")?;
+    let mut order = query
+        .query_map([id], |row| row.get::<_, i64>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if before.is_some_and(|e| moved.contains(&e)) {
+        return Ok(());
+    }
+    if moved.iter().chain(&before).any(|e| !order.contains(e)) {
+        return Err(Failure::new(Kind::PlaylistGone).into());
+    }
+    order.retain(|e| !moved.contains(e));
+    let at = before
+        .and_then(|e| order.iter().position(|&v| v == e))
+        .unwrap_or(order.len());
+    order.splice(at..at, moved.iter().copied());
+    for (position, entry) in order.into_iter().enumerate() {
+        tx.execute(
+            "UPDATE playlist_entries SET position=?1 WHERE id=?2 AND playlist_id=?3",
+            params![position as i64, entry, id],
+        )?;
+    }
+    Ok(())
+}
+
 fn valid_name(name: &str) -> Result<&str> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > 200 {
+    if name.is_empty() || name.chars().count() > MAX_NAME_CHARS {
         return Err(Failure::new(Kind::PlaylistName).into());
     }
     Ok(name)
+}
+
+/// Compared here rather than by an index: SQLite only folds the case of ASCII.
+fn require_free_name(tx: &Connection, name: &str, except: Option<i64>) -> Result<()> {
+    let mut query = tx.prepare("SELECT id,name FROM playlists")?;
+    let rows = query.query_map([], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (id, taken) = row?;
+        if Some(id) != except && same_name(&taken, name) {
+            return Err(Failure::new(Kind::PlaylistNameTaken).into());
+        }
+    }
+    Ok(())
 }
 
 fn require_list(tx: &Connection, id: i64) -> Result<()> {

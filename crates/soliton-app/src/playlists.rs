@@ -11,7 +11,7 @@ use crate::{
 use gpui::{prelude::*, *};
 use soliton_core::{
     model::Track,
-    playlist::{Playlist, PlaylistChange},
+    playlist::{MAX_NAME_CHARS, Playlist, PlaylistChange, same_name, unique_name},
 };
 
 pub enum Dialog {
@@ -93,7 +93,11 @@ impl Soliton {
                 .find(|p| p.id == *id)
                 .map(|p| p.name.clone())
                 .unwrap_or_default(),
-            _ => self.t(Text::NewPlaylistName).to_string(),
+            Dialog::New(tracks) => {
+                let base = shared_album(tracks).unwrap_or(self.t(Text::NewPlaylistName));
+                unique_name(base, self.playlists.lists.iter().map(|p| p.name.as_str()))
+            }
+            _ => String::new(),
         };
         self.playlists.name.update(cx, |input, cx| {
             input.set_text(name);
@@ -114,8 +118,25 @@ impl Soliton {
         cx.notify();
     }
 
+    /// Whether another playlist than the renamed one already has this name.
+    fn name_taken(&self, name: &str, dialog: &Dialog) -> bool {
+        let renamed = match dialog {
+            Dialog::Rename(id) => Some(*id),
+            _ => None,
+        };
+        self.playlists
+            .lists
+            .iter()
+            .any(|p| Some(p.id) != renamed && same_name(&p.name, name))
+    }
+
     pub fn submit_playlist_dialog(&mut self, cx: &mut Context<Self>) {
         let name = self.playlists.name.read(cx).content.trim().to_string();
+        if self.playlists.dialog.as_ref().is_some_and(|d| {
+            matches!(d, Dialog::New(_) | Dialog::Rename(_)) && self.name_taken(&name, d)
+        }) {
+            return;
+        }
         let change = match &self.playlists.dialog {
             Some(Dialog::New(tracks)) if valid_name(&name) => PlaylistChange::Create {
                 name,
@@ -187,7 +208,9 @@ impl Soliton {
             Dialog::Delete(_) => Text::DeletePlaylistQuestion,
         };
         let naming = matches!(dialog, Dialog::New(_) | Dialog::Rename(_));
-        let valid = !naming || valid_name(self.playlists.name.read(cx).content.trim());
+        let name = self.playlists.name.read(cx).content.trim().to_string();
+        let taken = naming && self.name_taken(&name, dialog);
+        let valid = !naming || (valid_name(&name) && !taken);
         let mut panel = div()
             .track_focus(&self.modal_focus)
             .w(rems(29.))
@@ -212,8 +235,12 @@ impl Soliton {
                 .child(
                     div()
                         .text_size(crate::widgets::TEXT_SMALL)
-                        .text_color(theme.muted)
-                        .child(self.t(Text::PlaylistNameHint)),
+                        .text_color(if taken { theme.danger } else { theme.muted })
+                        .child(self.t(if taken {
+                            Text::PlaylistNameTaken
+                        } else {
+                            Text::PlaylistNameHint
+                        })),
                 );
         }
         if let Dialog::Delete(id) = dialog {
@@ -374,5 +401,19 @@ impl Soliton {
 }
 
 fn valid_name(name: &str) -> bool {
-    !name.is_empty() && name.chars().count() <= 200
+    !name.is_empty() && name.chars().count() <= MAX_NAME_CHARS
 }
+
+/// The album all these tracks come from, if they share a named one.
+fn shared_album(tracks: &[Track]) -> Option<&str> {
+    let album = tracks.first()?.metadata.album.trim();
+    (!album.is_empty()
+        && tracks
+            .iter()
+            .all(|track| track.metadata.album.trim() == album))
+    .then_some(album)
+}
+
+#[cfg(test)]
+#[path = "tests/playlists.rs"]
+mod tests;

@@ -30,6 +30,10 @@ Source: https://crates.io/crates/gpui/0.2.2
 - `src/platform/linux/wayland/client.rs`: accept `xdg_wm_base` from version 1 (as
   announced by WSLg) while negotiating up to version 5. The requests used exist in
   version 1; tiling states added in version 2 stay optional.
+- `src/app.rs`, `src/window.rs`, `src/elements/div.rs` and `src/elements/text.rs`:
+  `AnyTooltip::anchor` places an element's tooltip from that element's bottom left
+  corner, above it when there is no room below and always inside the window, rather
+  than at the pointer.
 
 No global log filter, no disabled debug assertions and no cursor change are applied.
 

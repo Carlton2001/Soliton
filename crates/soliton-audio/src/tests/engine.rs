@@ -81,9 +81,8 @@ fn editing_a_loaded_queue_does_not_open_outputs_or_reset_position() {
         })
         .unwrap();
     worker.command(Command::RemoveQueued(last)).unwrap();
-    worker.command(Command::ClearUpcoming).unwrap();
     assert_eq!(worker.snapshot().queue.current, current);
-    assert_eq!(worker.snapshot().queue.entries.len(), 1);
+    assert_eq!(worker.snapshot().queue.entries.len(), 2);
     assert_eq!(worker.playback.position_ms, 12_000);
     assert_eq!(worker.playback.state, PlaybackState::Paused);
     assert!(worker.session.is_none());
