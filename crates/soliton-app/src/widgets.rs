@@ -52,8 +52,6 @@ pub fn page_toolbar(theme: Theme) -> Div {
         .border_b_1()
         .border_color(theme.border)
         .flex()
-        // Buttons keep their labels: a narrow window wraps them instead.
-        .flex_wrap()
         .items_center()
         .gap(CONTROL_GAP)
 }
@@ -121,6 +119,23 @@ pub fn button(
     styled_button(id, name, label, theme, false)
 }
 
+/// [`button`] whose tooltip also explains the command below its name.
+pub fn explained_button(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: impl Into<SharedString>,
+    tip: impl Into<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
+    let label = label.into();
+    with_detailed_tooltip(
+        button_control(id, name, label.clone(), theme, false),
+        label,
+        tip.into(),
+        theme,
+    )
+}
+
 fn styled_button(
     id: impl Into<ElementId>,
     name: &'static str,
@@ -128,7 +143,21 @@ fn styled_button(
     theme: Theme,
     primary: bool,
 ) -> Stateful<Div> {
-    let tooltip_theme = theme;
+    let label = label.into();
+    with_tooltip(
+        button_control(id, name, label.clone(), theme, primary),
+        label,
+        theme,
+    )
+}
+
+fn button_control(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: SharedString,
+    theme: Theme,
+    primary: bool,
+) -> Stateful<Div> {
     let theme = if primary {
         Theme {
             text: theme.on_accent,
@@ -139,8 +168,7 @@ fn styled_button(
     } else {
         theme
     };
-    let label = label.into();
-    let control = div()
+    div()
         .id(id)
         .tab_index(0)
         .capture_any_mouse_down(keyboard_focus_only)
@@ -185,11 +213,10 @@ fn styled_button(
         })
         .child(adaptive::Content {
             icon: name,
-            label: label.clone(),
+            label,
             color: theme.text,
             primary,
-        });
-    with_tooltip(control, label, tooltip_theme)
+        })
 }
 
 /// Familiar playback command, named by a tooltip and optionally highlighted.
@@ -201,6 +228,17 @@ pub fn icon_button(
     theme: Theme,
 ) -> Stateful<Div> {
     with_tooltip(icon_control(id, name, active, theme), label.into(), theme)
+}
+
+/// [`icon_button`] whose tooltip adds an explanation below its label.
+pub fn detailed_icon_button(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: SharedString,
+    detail: SharedString,
+    theme: Theme,
+) -> Stateful<Div> {
+    with_detailed_tooltip(icon_control(id, name, false, theme), label, detail, theme)
 }
 
 /// [`icon_button`] filled with the accent, as the Play/Pause command. Its
@@ -641,24 +679,47 @@ pub fn list_box(rows: impl IntoIterator<Item = AnyElement>, theme: Theme) -> Div
 }
 
 /// GPUI keeps the tooltip view while the pointer stays, so its text is read at render.
-struct Tip(Rc<dyn Fn(&App) -> SharedString>, Theme);
+/// Widest explanation line in a tooltip, in rems.
+const TIP_MAX_WIDTH: f32 = 18.;
+
+struct Tip {
+    label: Rc<dyn Fn(&App) -> SharedString>,
+    detail: Option<SharedString>,
+    theme: Theme,
+}
 impl Render for Tip {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // GPUI places tooltips one pixel from the pointer tip: a transparent
-        // margin puts them below the pointer, like system tooltips.
-        div().pt(px(20.)).child(
-            div()
-                .px(rems(0.5))
-                .py(rems(0.25))
-                .rounded(RADIUS)
-                .border_1()
-                .border_color(self.1.control_border)
-                .bg(self.1.panel)
-                .text_color(self.1.text)
-                .font_family(UI_FONT)
-                .text_size(TEXT_SMALL)
-                .child((self.0)(cx)),
-        )
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = self.theme;
+        let label = (self.label)(cx);
+        // A detail repeating the name, like a default output, adds nothing.
+        let detail = self.detail.clone().filter(|detail| *detail != label);
+        div()
+            .flex()
+            .flex_col()
+            .px(rems(0.5))
+            .py(rems(0.25))
+            .rounded(RADIUS)
+            .border_1()
+            .border_color(theme.control_border)
+            .bg(theme.panel)
+            .text_color(theme.text)
+            .font_family(UI_FONT)
+            .text_size(TEXT_SMALL)
+            .whitespace_nowrap()
+            .child(label)
+            .when_some(detail, |tip, detail| {
+                // Tooltips are laid out at their minimum size: a measured width lets
+                // short text keep one line and long text wrap within the window.
+                let room = f32::from(window.viewport_size().width / window.rem_size()) - 1.;
+                let width = label_width(&detail, window).min(TIP_MAX_WIDTH).min(room);
+                tip.child(
+                    div()
+                        .w(rems(width))
+                        .whitespace_normal()
+                        .opacity(0.65)
+                        .child(detail),
+                )
+            })
     }
 }
 
@@ -666,13 +727,43 @@ pub fn with_tooltip(element: Stateful<Div>, label: SharedString, theme: Theme) -
     with_live_tooltip(element, move |_| label.clone(), theme)
 }
 
+/// Tooltip naming the command, with a dimmer line of explanation below.
+pub fn with_detailed_tooltip(
+    element: Stateful<Div>,
+    label: SharedString,
+    detail: SharedString,
+    theme: Theme,
+) -> Stateful<Div> {
+    tooltip(
+        element,
+        Rc::new(move |_| label.clone()),
+        Some(detail),
+        theme,
+    )
+}
+
 pub fn with_live_tooltip(
     element: Stateful<Div>,
     label: impl Fn(&App) -> SharedString + 'static,
     theme: Theme,
 ) -> Stateful<Div> {
-    let label: Rc<dyn Fn(&App) -> SharedString> = Rc::new(label);
-    element.tooltip(move |_, cx| cx.new(|_| Tip(label.clone(), theme)).into())
+    tooltip(element, Rc::new(label), None, theme)
+}
+
+fn tooltip(
+    element: Stateful<Div>,
+    label: Rc<dyn Fn(&App) -> SharedString>,
+    detail: Option<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
+    element.tooltip(move |_, cx| {
+        cx.new(|_| Tip {
+            label: label.clone(),
+            detail: detail.clone(),
+            theme,
+        })
+        .into()
+    })
 }
 
 pub fn cover(path: Option<&PathBuf>, side: f32, theme: Theme) -> AnyElement {

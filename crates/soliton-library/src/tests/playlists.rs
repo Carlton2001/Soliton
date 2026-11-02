@@ -17,6 +17,88 @@ fn track(id: i64) -> Track {
 }
 
 #[test]
+fn playlist_names_are_unique_whatever_their_case() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut library = Library::open(dir.path()).unwrap();
+    let create = |name: &str| PlaylistChange::Create {
+        name: name.into(),
+        tracks: Vec::new(),
+    };
+    library.change_playlist(create("Rock")).unwrap();
+    library.change_playlist(create("Jazz")).unwrap();
+    assert!(library.change_playlist(create(" rOCK ")).is_err());
+    let lists = library.playlists().unwrap();
+    assert_eq!(lists.len(), 2);
+    let jazz = lists[1].id;
+    let rename = |name: &str| PlaylistChange::Rename {
+        id: jazz,
+        name: name.into(),
+    };
+    assert!(library.change_playlist(rename("ROCK")).is_err());
+    library.change_playlist(rename("JAZZ")).unwrap();
+    assert_eq!(library.playlists().unwrap()[1].name, "JAZZ");
+}
+
+#[test]
+fn migration_numbers_duplicate_playlist_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut library = Library::open(dir.path()).unwrap();
+    library
+        .connection
+        .execute_batch(
+            "INSERT INTO playlists(name) VALUES('Rock'),('rock'),('Jazz'),('Rock');
+             PRAGMA user_version=8;",
+        )
+        .unwrap();
+    drop(library);
+    library = Library::open(dir.path()).unwrap();
+    let names: Vec<_> = library
+        .playlists()
+        .unwrap()
+        .into_iter()
+        .map(|p| p.name)
+        .collect();
+    assert_eq!(names, ["Rock", "rock (2)", "Jazz", "Rock (3)"]);
+}
+
+#[test]
+fn block_move_persists_order_and_rejects_unknown_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut library = Library::open(dir.path()).unwrap();
+    library
+        .change_playlist(PlaylistChange::Create {
+            name: "Block".into(),
+            tracks: vec![track(1), track(2), track(3), track(4)],
+        })
+        .unwrap();
+    let list = library.playlists().unwrap().remove(0);
+    let ids: Vec<i64> = list.entries.iter().map(|e| e.id).collect();
+    library
+        .change_playlist(PlaylistChange::MoveBlock {
+            id: list.id,
+            entries: vec![ids[0], ids[2]],
+            before: None,
+        })
+        .unwrap();
+    assert!(
+        library
+            .change_playlist(PlaylistChange::MoveBlock {
+                id: list.id,
+                entries: vec![ids[1], 99999],
+                before: None,
+            })
+            .is_err()
+    );
+    drop(library);
+    let mut library = Library::open(dir.path()).unwrap();
+    let saved = library.playlists().unwrap().remove(0);
+    assert_eq!(
+        saved.entries.iter().map(|e| e.id).collect::<Vec<_>>(),
+        vec![ids[1], ids[3], ids[0], ids[2]]
+    );
+}
+
+#[test]
 fn manual_lists_persist_unique_files_order_and_unavailable_entries() {
     let dir = tempfile::tempdir().unwrap();
     let mut library = Library::open(dir.path()).unwrap();

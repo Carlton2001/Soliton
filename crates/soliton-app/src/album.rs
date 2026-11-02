@@ -434,8 +434,6 @@ impl Soliton {
                                     .track
                                     .as_ref()
                                     .is_some_and(|t| t.id == track.id),
-                                first: index == 0,
-                                last: index + 1 == tracks.len(),
                             },
                             compact,
                             cx,

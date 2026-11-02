@@ -38,6 +38,7 @@ pub enum Kind {
     CoverIgnored,
     PathNotUnicode,
     PlaylistName,
+    PlaylistNameTaken,
     /// The playlist or entry changed meanwhile, for instance from another view.
     PlaylistGone,
     SettingsNotSaved,

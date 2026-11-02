@@ -4,19 +4,43 @@ use crate::{
     i18n::Text,
     playlists::Dialog,
     track_list::{Selection, TrackRow},
-    widgets::{TEXT_SMALL, button, cover, quality},
+    widgets::{TEXT_SMALL, button, cover, explained_button, quality},
 };
 use gpui::{prelude::*, *};
 use soliton_audio::Command;
 impl Soliton {
-    pub fn queue_view(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// Labels stay while the whole row fits; all of them drop together otherwise.
+    pub(crate) fn toolbar_density(
+        &self,
+        labels: &[Text],
+        window: &Window,
+    ) -> crate::widgets::Density {
+        use crate::widgets::{CONTROL_GAP, Density, PAGE_INSET, label_width};
+        // Padding, borders, icon and gap of a button, and slack for rounding.
+        let button = 1.5 + 2. / 16. + 1. + 0.5;
+        let needed = 2. * PAGE_INSET.0
+            + 1.
+            + labels
+                .iter()
+                .map(|&label| button + CONTROL_GAP.0 + label_width(self.t(label), window))
+                .sum::<f32>();
+        if crate::navigation::content_width(window) >= needed {
+            Density::Full
+        } else {
+            Density::Tight
+        }
+    }
+
+    pub fn queue_view(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         let count = self.playback.queue.entries.len();
         let rows = uniform_list(
             "queue",
             count,
             cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                let order = this.reorder_preview(Selection::Queue(0));
                 range
+                    .map(|i| order.as_ref().map_or(i, |order| order[i]))
                     .filter_map(|i| this.playback.queue.entries.get(i).map(|e| (i, e)))
                     .map(|(index, e)| {
                         this.selection_row(
@@ -31,8 +55,6 @@ impl Soliton {
                                     e.track.available
                                 },
                                 current: this.playback.queue.current == Some(e.id),
-                                first: index == 0,
-                                last: index + 1 == this.playback.queue.entries.len(),
                             },
                             cx,
                         )
@@ -46,57 +68,72 @@ impl Soliton {
         let track = self.playback.track.as_ref();
         let album = self.current_album().map(|a| a.id);
         let output = self.output_description();
+        let restorable = self.original_queue_order().is_some();
+        let mut labels = vec![Text::SaveQueue, Text::ClearQueue];
+        if restorable {
+            labels.push(Text::RestoreOrder);
+        }
+        let density = self.toolbar_density(&labels, window);
+        let toolbar = crate::widgets::with_density(density, || {
+            crate::widgets::page_toolbar(theme)
+                .child(
+                    button("save-queue", "list-plus", self.t(Text::SaveQueue), theme)
+                        .opacity(if count > 0 { 1. } else { 0.4 })
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            let tracks = this
+                                .playback
+                                .queue
+                                .entries
+                                .iter()
+                                .map(|e| e.track.clone())
+                                .filter(|t| t.id > 0)
+                                .collect::<Vec<_>>();
+                            if !tracks.is_empty() {
+                                this.open_playlist_dialog(Dialog::New(tracks), window, cx);
+                            }
+                        })),
+                )
+                .when(restorable, |toolbar| {
+                    toolbar.child(
+                        explained_button(
+                            "restore-order",
+                            "undo-2",
+                            self.t(Text::RestoreOrder),
+                            self.t(Text::RestoreOrderHint),
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            if let Some(ids) = this.original_queue_order() {
+                                this.audio_command(
+                                    Command::MoveQueuedBlock { ids, before: None },
+                                    cx,
+                                );
+                            }
+                        })),
+                    )
+                })
+                .child(
+                    button("clear-queue", "eraser", self.t(Text::ClearQueue), theme)
+                        .opacity(if count > 0 { 1. } else { 0.4 })
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.audio_command(
+                                Command::Load {
+                                    tracks: Vec::new(),
+                                    start: 0,
+                                    position_ms: 0,
+                                },
+                                cx,
+                            );
+                        })),
+                )
+        });
         div()
             .flex_1()
             .min_h_0()
             .flex()
             .flex_col()
             .child(self.page_title(Text::Queue, cx))
-            .child(
-                crate::widgets::page_toolbar(theme)
-                    .child(
-                        button("save-queue", "list-plus", self.t(Text::SaveQueue), theme)
-                            .opacity(if count > 0 { 1. } else { 0.4 })
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                let tracks = this
-                                    .playback
-                                    .queue
-                                    .entries
-                                    .iter()
-                                    .map(|e| e.track.clone())
-                                    .filter(|t| t.id > 0)
-                                    .collect::<Vec<_>>();
-                                if !tracks.is_empty() {
-                                    this.open_playlist_dialog(Dialog::New(tracks), window, cx);
-                                }
-                            })),
-                    )
-                    .child(
-                        button(
-                            "clear-upcoming",
-                            "arrow-down-from-line",
-                            self.t(Text::ClearUpcoming),
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.audio_command(Command::ClearUpcoming, cx)
-                        })),
-                    )
-                    .child(
-                        button("clear-queue", "eraser", self.t(Text::ClearQueue), theme)
-                            .opacity(if count > 0 { 1. } else { 0.4 })
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.audio_command(
-                                    Command::Load {
-                                        tracks: Vec::new(),
-                                        start: 0,
-                                        position_ms: 0,
-                                    },
-                                    cx,
-                                );
-                            })),
-                    ),
-            )
+            .child(toolbar)
             .child(
                 crate::widgets::page_body()
                     .when_some(track, |v, track| {
@@ -106,12 +143,13 @@ impl Soliton {
                                 .flex()
                                 .items_center()
                                 .gap(rems(0.75))
-                                .child(crate::widgets::with_tooltip(
+                                .child(crate::widgets::with_detailed_tooltip(
                                     div().id("queue-track-details").flex_none().child(cover(
                                         track.cover.as_ref(),
                                         48.,
                                         theme,
                                     )),
+                                    self.t(Text::PlaybackDetails).into(),
                                     output
                                         .as_ref()
                                         .map_or_else(
@@ -185,7 +223,12 @@ impl Soliton {
                                 .child(self.t(Text::QueueEmpty)),
                         )
                     })
-                    .child(crate::views::scroll_area(rows, &self.queue_bar, theme)),
+                    .child(
+                        self.reorder_area(
+                            crate::views::scroll_area(rows, &self.queue_bar, theme),
+                            cx,
+                        ),
+                    ),
             )
             .into_any_element()
     }

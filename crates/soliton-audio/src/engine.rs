@@ -482,7 +482,7 @@ impl Worker {
             }
             Command::RemoveQueued(id) => self.queue.remove(id),
             Command::MoveQueued { id, before } => self.queue.move_before(id, before),
-            Command::ClearUpcoming => self.queue.clear_upcoming(),
+            Command::MoveQueuedBlock { ids, before } => self.queue.move_block(&ids, before),
             Command::PlayQueued(id) => {
                 if self.queue.select(id) {
                     self.start_current()?;

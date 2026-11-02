@@ -31,6 +31,7 @@ mod playlist_view;
 mod playlists;
 mod preferences;
 mod queue_view;
+mod reorder;
 mod resume;
 mod scale;
 mod scrollbar;

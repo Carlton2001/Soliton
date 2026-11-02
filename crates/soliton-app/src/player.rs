@@ -143,13 +143,18 @@ impl Soliton {
                     .map(|output| self.output_label(output))
             })
             .unwrap_or_else(|| self.t(Text::AudioOutput).into());
-        crate::widgets::icon_button("player-output", "speaker", name, false, self.theme()).on_click(
-            cx.listener(|this, _, window, cx| {
-                this.focus.focus(window);
-                this.navigate(crate::app::Section::Settings, cx);
-                this.reveal_audio_output.set(true);
-            }),
+        crate::widgets::detailed_icon_button(
+            "player-output",
+            "speaker",
+            self.t(Text::AudioOutput).into(),
+            name.into(),
+            self.theme(),
         )
+        .on_click(cx.listener(|this, _, window, cx| {
+            this.focus.focus(window);
+            this.navigate(crate::app::Section::Settings, cx);
+            this.reveal_audio_output.set(true);
+        }))
     }
     fn compact_volume(&self, cx: &mut Context<Self>) -> Div {
         let theme = self.theme();

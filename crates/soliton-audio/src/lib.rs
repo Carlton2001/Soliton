@@ -117,8 +117,11 @@ pub enum Command {
         id: u64,
         before: Option<u64>,
     },
+    MoveQueuedBlock {
+        ids: Vec<u64>,
+        before: Option<u64>,
+    },
     PlayQueued(u64),
-    ClearUpcoming,
     Play {
         tracks: Vec<Track>,
         start: usize,
