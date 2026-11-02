@@ -80,10 +80,12 @@ pub fn setting_row(
         .into_any_element()
 }
 
-/// Secondary explanation shown under a card.
+/// Secondary explanation shown under a card, in block flow: inside a flex column
+/// the card would shrink to its content instead of taking the full width.
 pub fn hint(text: impl Into<SharedString>, theme: Theme) -> Div {
     div()
         .w_full()
+        .mt(rems(0.5))
         .px(rems(0.25))
         .text_size(TEXT_SMALL)
         .text_color(theme.muted)

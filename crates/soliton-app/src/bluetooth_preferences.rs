@@ -228,9 +228,7 @@ impl Soliton {
                 .into_any_element(),
         );
         let body = div()
-            .flex()
-            .flex_col()
-            .gap(rems(0.5))
+            .w_full()
             .child(list_box(rows, theme))
             .when_some(self.bluetooth.error.as_ref(), |view, error| {
                 view.child(notice(

@@ -161,9 +161,7 @@ impl Soliton {
                 self.t(Text::About),
                 None,
                 div()
-                    .flex()
-                    .flex_col()
-                    .gap(rems(0.625))
+                    .w_full()
                     .child(list_box([version], theme))
                     .child(hint(self.t(Text::UpdatesUnsupported), theme)),
             );
@@ -194,29 +192,23 @@ impl Soliton {
             this.save();
             cx.notify();
         }));
-        let mut body = div()
-            .w_full()
-            .flex_shrink_0()
-            .flex()
-            .flex_col()
-            .gap(rems(0.625))
-            .child(list_box(
-                [
-                    version,
-                    setting_row(
-                        self.t(Text::CheckUpdates),
-                        Some(self.t(Text::UpdateHint)),
-                        check,
-                        theme,
-                    ),
-                    div()
-                        .px(crate::widgets::PAGE_INSET)
-                        .py(rems(0.625))
-                        .child(automatic)
-                        .into_any_element(),
-                ],
-                theme,
-            ));
+        let mut body = div().w_full().flex_shrink_0().child(list_box(
+            [
+                version,
+                setting_row(
+                    self.t(Text::CheckUpdates),
+                    Some(self.t(Text::UpdateHint)),
+                    check,
+                    theme,
+                ),
+                div()
+                    .px(crate::widgets::PAGE_INSET)
+                    .py(rems(0.625))
+                    .child(automatic)
+                    .into_any_element(),
+            ],
+            theme,
+        ));
         let status = if repository().is_none() {
             Some(Text::UpdateNotConfigured)
         } else if self.updates.failed {
@@ -234,6 +226,7 @@ impl Soliton {
         if let Some(release) = &self.updates.available {
             body = body.child(
                 div()
+                    .mt(rems(0.5))
                     .flex()
                     .flex_wrap()
                     .items_center()

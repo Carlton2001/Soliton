@@ -76,9 +76,7 @@ impl Soliton {
             );
         }
         let body = div()
-            .flex()
-            .flex_col()
-            .gap(rems(0.5))
+            .w_full()
             .child(list_box(rows, theme))
             .when(missing, |view| {
                 view.child(notice(
@@ -196,9 +194,7 @@ impl Soliton {
         let empty =
             self.playback.network_enabled && !self.playback.network_discovering && rows.is_empty();
         let body = div()
-            .flex()
-            .flex_col()
-            .gap(rems(0.5))
+            .w_full()
             .when(!rows.is_empty(), |view| view.child(list_box(rows, theme)))
             .when(empty, |view| {
                 view.child(list_box(
