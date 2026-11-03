@@ -79,7 +79,7 @@ first download of the Windows executable.
 | Key | Public (repository) | Signs |
 |---|---|---|
 | Minisign | `installer/signing/soliton-update.pub` | the Windows installer, checked by the updater |
-| GPG ed25519 `7BFC00A65179DAEDD7CD26298EED1CC9F8CE693B` | `installer/signing/soliton-packages.asc` | the RPM (embedded signature) and every other file (detached `.asc`) |
+| GPG ed25519 `7BFC00A65179DAEDD7CD26298EED1CC9F8CE693B` | `installer/signing/soliton-packages.asc` | the RPM (embedded signature) and `SHA256SUMS` (detached `SHA256SUMS.asc`), which lists every package |
 
 Private keys stay outside the repository (`~/.soliton-keys/update.key`, the
 author's GPG keyring), backed up off the machine. `scripts/sign-release.sh` checks
@@ -94,7 +94,8 @@ GitHub setup (Actions enabled on `Carlton2001/Soliton`):
   (`gpg --armor --export-secret-keys`), `SOLITON_GPG_PASSPHRASE`.
 
 A Minisign key rotation must let older versions verify new installers. Verify a
-package: `gpg --import soliton-packages.asc` then `gpg --verify <file>.asc`, or
+package: `gpg --import soliton-packages.asc`, `gpg --verify SHA256SUMS.asc`, then
+`sha256sum -c --ignore-missing SHA256SUMS` next to the downloaded files, or
 `sudo rpm --import soliton-packages.asc` before installing the RPM.
 
 ## Prepare a version

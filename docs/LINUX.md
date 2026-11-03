@@ -239,7 +239,8 @@ last commit of `main`: `scripts/flatpak-cargo-sources.py` regenerates
 
 For Flathub, `scripts/flathub-manifest.sh vX.Y.Z` writes to `target/flathub` a
 copy of the manifest whose source is the GitHub repository at that tag and
-commit, with `cargo-sources.json`; the release attaches them too. The author
+commit, with `cargo-sources.json` (not attached to the release; see
+[FLATHUB.md](FLATHUB.md)). The author
 opens the submission (pull request on `flathub/flathub`) personally: Flathub
 refuses AI-made submissions. Screenshot URLs in the metainfo point to the tag;
 the version bump scripts update them.

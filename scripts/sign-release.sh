@@ -1,7 +1,8 @@
 #!/bin/sh
 # Signs the release files in place: Minisign for the Windows installer read by
-# the updater, an embedded GPG signature for the RPM and a detached one (.asc)
-# for every other package. Each signature is checked against the public keys
+# the updater, an embedded GPG signature for the RPM, then one SHA256SUMS file
+# listing every package with its detached GPG signature (SHA256SUMS.asc). The
+# per-package .sha256 files are replaced by SHA256SUMS. Each signature is checked against the public keys
 # committed in installer/signing before the script succeeds.
 # Needs minisign, gpg, rpmsign and base64. Keys come from the environment:
 #   SOLITON_UPDATE_PRIVATE_KEY, SOLITON_UPDATE_PRIVATE_KEY_PASSWORD (Minisign)
@@ -55,8 +56,6 @@ for rpm in "$dir"/*.rpm; do
     rpmsign --addsign --define "__gpg /usr/bin/gpg" --define "_gpg_name $fingerprint" \
         --define "_gpg_sign_cmd_extra_args --batch --pinentry-mode loopback --passphrase-file $work/passphrase" \
         "$rpm" >/dev/null
-    # Signing rewrites the header, so the checksum follows.
-    (cd "$dir" && sha256sum "$(basename "$rpm")" > "$(basename "$rpm").sha256")
 done
 
 # A keyring holding only the committed public key checks every signature.
@@ -71,11 +70,19 @@ for rpm in "$dir"/*.rpm; do
         exit 1
     fi
 done
-for file in "$dir"/*; do
-    case "$file" in
-        *.sha256 | *.sig | *.asc | *.rpm | */latest.json) continue ;;
-    esac
-    gpg --local-user "$fingerprint" --armor --detach-sign -o "$file.asc" "$file"
-    command gpg --batch --quiet --homedir "$check" --verify "$file.asc" "$file" 2>/dev/null
-done
+# Signing rewrote the RPM header, so every checksum is computed afresh.
+rm -f "$dir"/*.sha256 "$dir"/*.asc "$dir/SHA256SUMS"
+(
+    cd "$dir"
+    for file in *; do
+        case "$file" in
+            *.sig | latest.json) continue ;;
+        esac
+        sha256sum "$file"
+    done
+) > "$work/SHA256SUMS"
+mv "$work/SHA256SUMS" "$dir/SHA256SUMS"
+gpg --local-user "$fingerprint" --armor --detach-sign -o "$dir/SHA256SUMS.asc" "$dir/SHA256SUMS"
+command gpg --batch --quiet --homedir "$check" --verify "$dir/SHA256SUMS.asc" "$dir/SHA256SUMS" 2>/dev/null
+(cd "$dir" && sha256sum --quiet -c SHA256SUMS)
 echo "Signed with Minisign and GPG key $fingerprint."
