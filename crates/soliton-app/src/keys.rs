@@ -171,11 +171,7 @@ impl Soliton {
                 };
                 return self.audio_command(command, cx);
             }
-            "up" | "down" if control => {
-                let delta = if key == "up" { 0.05 } else { -0.05 };
-                self.set_volume(self.settings.volume + delta, true, cx);
-                return;
-            }
+            "up" | "down" if control => return self.step_volume(key == "up", cx),
             "left" | "right" if control => {
                 let position = self
                     .seek_target

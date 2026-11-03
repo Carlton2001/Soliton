@@ -116,6 +116,8 @@ pub struct Soliton {
     pub seek_preview: Option<f32>,
     /// Volume restored when sound is turned back on.
     pub muted_volume: Option<f32>,
+    /// Touchpad scroll over the volume not yet worth a step, in pixels.
+    pub volume_scroll: f32,
     /// Last seek sent and when, shown until the engine reports it.
     pub seek_target: Option<(u64, Instant)>,
     query_pending: bool,
@@ -274,6 +276,7 @@ impl Soliton {
             volume_slider: Slider::default(),
             seek_preview: None,
             muted_volume: None,
+            volume_scroll: 0.,
             seek_target: None,
             query_pending: true,
             tray_menu: None,

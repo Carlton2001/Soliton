@@ -172,6 +172,17 @@ impl Soliton {
         self.audio_command(Command::Volume(self.settings.volume), cx);
     }
 
+    /// Moves to the next 5 % mark, so that a dragged value returns to the grid.
+    pub fn step_volume(&mut self, up: bool, cx: &mut Context<Self>) {
+        let steps = self.settings.volume * 20.;
+        let steps = if up {
+            (steps + 1e-3).floor() + 1.
+        } else {
+            (steps - 1e-3).ceil() - 1.
+        };
+        self.set_volume(steps / 20., true, cx);
+    }
+
     /// Kept for the next sessions, like the volume.
     pub fn set_shuffle(&mut self, value: bool, cx: &mut Context<Self>) {
         self.settings.shuffle = value;
