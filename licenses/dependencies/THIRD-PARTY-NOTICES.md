@@ -11214,7 +11214,7 @@ DEALINGS IN THE SOFTWARE.
 - anyhow 1.0.104
 - async-channel 1.9.0
 - async-channel 2.5.0
-- async-executor 1.14.0
+- async-executor 1.14.1
 - async-fs 2.2.0
 - async-global-executor 2.4.1
 - async-io 2.6.0
