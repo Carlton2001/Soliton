@@ -105,14 +105,7 @@ impl Soliton {
                 theme,
             ))
             .when(local, |view| {
-                view.child(hint(
-                    self.t(if soliton_audio::DEFAULT_FOLLOWED {
-                        Text::FollowedOutputStreamHint
-                    } else {
-                        Text::OutputStreamHint
-                    }),
-                    theme,
-                ))
+                view.child(hint(self.t(Text::OutputStreamHint), theme))
             });
         section(self.t(Text::AudioOutput), None, body)
     }

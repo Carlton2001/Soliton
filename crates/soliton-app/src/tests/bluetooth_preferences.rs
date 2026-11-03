@@ -14,12 +14,14 @@ fn only_native_associations_with_unambiguous_active_outputs_are_selectable() {
             label: "Echo Stereo".into(),
             bluetooth: true,
             selectable: true,
+            default: false,
         },
         soliton_audio::OutputDevice {
             name: "Duplicate".into(),
             label: "Duplicate".into(),
             bluetooth: true,
             selectable: false,
+            default: false,
         },
     ];
     assert_eq!(ready_outputs(&device, &outputs), ["Echo Stereo"]);

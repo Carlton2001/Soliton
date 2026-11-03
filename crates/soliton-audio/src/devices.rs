@@ -9,6 +9,9 @@ pub struct OutputDevice {
     pub label: String,
     pub bluetooth: bool,
     pub selectable: bool,
+    /// The system default, when the backend reports it (CPAL only: PipeWire
+    /// streams already follow the default on their own).
+    pub default: bool,
 }
 
 impl OutputDevice {
@@ -18,6 +21,7 @@ impl OutputDevice {
             label,
             bluetooth,
             selectable: true,
+            default: false,
         }
     }
 }

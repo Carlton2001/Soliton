@@ -15,7 +15,7 @@ use windows::{
         },
     },
     Foundation::TypedEventHandler,
-    Media::Devices::MediaDevice,
+    Media::Devices::{DefaultAudioRenderDeviceChangedEventArgs, MediaDevice},
     core::{HSTRING, IInspectable},
 };
 use windows_collections::IIterable;
@@ -25,7 +25,7 @@ use windows_collections::IIterable;
 pub(crate) enum Source {
     /// Paired Bluetooth and Bluetooth LE devices, with their connection state.
     PairedBluetooth,
-    /// Enabled audio render endpoints.
+    /// Enabled audio render endpoints, and the default one.
     AudioOutputs,
 }
 
@@ -54,9 +54,12 @@ pub(crate) fn watch(sources: &'static [Source]) -> Result<(Watch, Receiver<()>)>
             let watchers = super::bluetooth::Runtime::new()
                 .and_then(|runtime| start(sources, &changes).map(|watchers| (runtime, watchers)));
             match watchers {
-                Ok((_runtime, watchers)) => {
+                Ok((_runtime, (watchers, default))) => {
                     let _ = started.send(Ok(()));
                     let _ = stopped.recv();
+                    if let Some(token) = default {
+                        let _ = MediaDevice::RemoveDefaultAudioRenderDeviceChanged(token);
+                    }
                     for watcher in watchers {
                         if matches!(
                             watcher.Status(),
@@ -76,7 +79,8 @@ pub(crate) fn watch(sources: &'static [Source]) -> Result<(Watch, Receiver<()>)>
     Ok((Watch { stop: Some(stop) }, receiver))
 }
 
-fn start(sources: &[Source], changes: &Sender<()>) -> Result<Vec<DeviceWatcher>> {
+/// Returns the watchers and the registration of the default output handler.
+fn start(sources: &[Source], changes: &Sender<()>) -> Result<(Vec<DeviceWatcher>, Option<i64>)> {
     let mut watchers = Vec::new();
     for source in sources {
         watchers.push(match source {
@@ -101,7 +105,24 @@ fn start(sources: &[Source], changes: &Sender<()>) -> Result<Vec<DeviceWatcher>>
     for watcher in &watchers {
         watcher.Start()?;
     }
-    Ok(watchers)
+    // Plugging a jack headset back in changes the default without necessarily
+    // adding or removing an endpoint. Registered last, so no error leaves it.
+    let mut default = None;
+    if sources
+        .iter()
+        .any(|source| matches!(source, Source::AudioOutputs))
+    {
+        let changes = changes.clone();
+        default = Some(MediaDevice::DefaultAudioRenderDeviceChanged(
+            &TypedEventHandler::<IInspectable, DefaultAudioRenderDeviceChangedEventArgs>::new(
+                move |_, _| {
+                    let _ = changes.try_send(());
+                    Ok(())
+                },
+            ),
+        )?);
+    }
+    Ok((watchers, default))
 }
 
 fn watcher(

@@ -20,9 +20,6 @@ mod resample;
 mod test_support;
 
 pub use devices::{OutputDevice, OutputInfo};
-/// Whether a stream on the system default moves as soon as the default
-/// changes, rather than when the next stream opens.
-pub const DEFAULT_FOLLOWED: bool = cfg!(target_os = "linux");
 pub use engine::Engine;
 pub use soliton_core::config::Repeat;
 use soliton_core::{failure::Failure, model::Track};

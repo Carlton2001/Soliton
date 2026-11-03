@@ -471,12 +471,14 @@ fn a_missing_output_pauses_at_the_position_and_its_return_ends_the_fallback() {
         label: "Speakers".into(),
         bluetooth: false,
         selectable: true,
+        default: false,
     };
     let headset = crate::OutputDevice {
         name: "headset".into(),
         label: "Headset".into(),
         bluetooth: true,
         selectable: true,
+        default: false,
     };
     // A listing sent before the loss was noticed still contains the output.
     let stale = vec![speakers.clone(), headset.clone()];

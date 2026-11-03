@@ -80,6 +80,7 @@ impl Engine {
                                 );
                                 worker.playback.outputs_error = None;
                                 worker.outputs_changed(&previous);
+                                worker.default_changed(&previous);
                             }
                             Err(error) => worker.playback.outputs_error = Some(Failure::of(&error)),
                         }

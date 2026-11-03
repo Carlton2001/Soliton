@@ -72,7 +72,6 @@ pub enum Text {
     AmbiguousOutput,
     NoActiveOutput,
     OutputStreamHint,
-    FollowedOutputStreamHint,
     BluetoothAudio,
     AddBluetoothDevice,
     OpeningBluetoothSettings,
@@ -352,10 +351,6 @@ pub fn text(language: Language, key: Text) -> &'static str {
             "Output details are shown during playback.",
         ),
         Text::OutputStreamHint => (
-            "Format envoyé par Soliton, avant les traitements du système et du périphérique. Le choix système par défaut s’applique au démarrage d’une piste ou après un changement de position ou de sortie.",
-            "Format sent by Soliton, before system and device processing. The system default applies when starting a track or after seeking or switching outputs.",
-        ),
-        Text::FollowedOutputStreamHint => (
             "Format envoyé par Soliton, avant les traitements du système et du périphérique. Le choix système par défaut suit aussitôt la sortie choisie dans les paramètres Son.",
             "Format sent by Soliton, before system and device processing. The system default immediately follows the output chosen in the Sound settings.",
         ),

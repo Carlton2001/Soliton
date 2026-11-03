@@ -149,7 +149,8 @@ These rules apply to every change.
 
 - Local shared output (`cpal`, PipeWire on Linux), persisted selection, switching
   without losing track or position, never a silent fallback to another output.
-- With "System default device", a lost output (headset off) lets playback
+- With "System default device", playback follows the system default as soon
+  as it changes (headset plugged in); a lost output (headset off) lets playback
   continue on the new system default; pause only if none opens. A pause requested
   by the system (WirePlumber on Linux) is respected.
 - Chosen output lost or missing: pause at the same position, warning shown until

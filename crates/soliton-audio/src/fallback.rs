@@ -1,5 +1,5 @@
 //! Lost or missing local outputs. Following the system default, playback goes
-//! on with the next default. A chosen output is never replaced by itself:
+//! on with the next default, and moves again whenever the default changes. A chosen output is never replaced by itself:
 //! playback pauses where it was, resuming plays on the system default until
 //! the chosen output is listed again, then playback returns to it.
 use super::*;
@@ -26,6 +26,35 @@ impl Worker {
             && self.playback.network_output.is_none()
             && self.remote_generation.is_none()
             && self.replace_output(None).is_ok()
+    }
+
+    /// With the system default followed, playback moves to a new default (a
+    /// headset plugged back in) even though the current output still works.
+    /// Only a transition counts, so a default that fails to open is not retried
+    /// on every listing; the current stream then keeps playing.
+    pub(super) fn default_changed(&mut self, previous: &[crate::OutputDevice]) {
+        let default = |outputs: &[crate::OutputDevice]| {
+            outputs
+                .iter()
+                .find(|device| device.default && device.selectable)
+                .map(|device| device.name.clone())
+        };
+        let Some(name) = default(&self.playback.outputs) else {
+            return;
+        };
+        let moves = self.session.as_ref().is_some_and(|session| {
+            session.target.is_none() && session.output.info().device_name != name
+        });
+        if !moves
+            || default(previous).as_ref() == Some(&name)
+            || self.playback.network_output.is_some()
+            || self.remote_generation.is_some()
+        {
+            return;
+        }
+        if let Err(error) = self.replace_output(None) {
+            self.playback.output_error = Some(Failure::of(&error));
+        }
     }
 
     /// Pauses at the current position on local output failures; `false`, and

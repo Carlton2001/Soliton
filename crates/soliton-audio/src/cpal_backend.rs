@@ -47,12 +47,17 @@ pub(crate) fn watch_outputs(
 }
 
 fn list() -> Result<Vec<OutputDevice>> {
-    let devices = cpal::default_host()
+    let host = cpal::default_host();
+    let default = host
+        .default_output_device()
+        .and_then(|device| device.name().ok());
+    let devices = host
         .output_devices()?
         .map(|device| {
-            device
-                .name()
-                .map(|name| OutputDevice::new(name.clone(), name, false))
+            device.name().map(|name| OutputDevice {
+                default: default.as_ref() == Some(&name),
+                ..OutputDevice::new(name.clone(), name, false)
+            })
         })
         .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(describe(devices))
