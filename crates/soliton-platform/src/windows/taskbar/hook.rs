@@ -14,6 +14,8 @@ use windows::{
     core::w,
 };
 
+use super::DEFAULT_ASPECT;
+
 const SUBCLASS: usize = 0x52415054;
 
 pub(super) fn install(window: HWND, events: Sender<DesktopEvent>) -> Result<Arc<Shared>> {
@@ -24,6 +26,7 @@ pub(super) fn install(window: HWND, events: Sender<DesktopEvent>) -> Result<Arc<
         enabled: true.into(),
         toolbar_ready: false.into(),
         thumbnails: 0.into(),
+        aspect: DEFAULT_ASPECT.into(),
         created: unsafe { RegisterWindowMessageW(w!("TaskbarButtonCreated")) },
         detach: unsafe { RegisterWindowMessageW(w!("Soliton.Taskbar.Detach")) },
     });
@@ -110,6 +113,11 @@ pub(super) fn thumbnail(window: HWND, shared: &Shared, lparam: LPARAM) -> LRESUL
             ((lparam.0 as u32 >> 16) & 0xffff) as i32,
             (lparam.0 as u32 & 0xffff) as i32,
         );
+        if size.0 > 0 && size.1 > 0 {
+            // The worker re-renders at this shape; meanwhile the current frame is fitted.
+            let aspect = (size.1 as u32 * 1000 / size.0 as u32).clamp(1, 4000);
+            shared.aspect.store(aspect, Ordering::Release);
+        }
         // A bounded GDI scale/copy only: decoding and layout are already done.
         if let Ok(bitmap) = frame.bitmap(size.0, size.1) {
             unsafe {

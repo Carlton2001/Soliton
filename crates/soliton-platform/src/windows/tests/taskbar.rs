@@ -57,7 +57,7 @@ fn peek_reaches_the_window_procedure_with_and_without_a_music_thumbnail() {
         || unsafe { SendMessageW(window, WM_DWMSENDICONICLIVEPREVIEWBITMAP, None, None).0 };
     assert_eq!(request_peek(), PEEK_RESULT);
     let frame = Renderer::default()
-        .render(&MediaState::default(), Language::French)
+        .render(&MediaState::default(), Language::French, DEFAULT_ASPECT)
         .unwrap();
     *shared.frame.lock().unwrap() = Some(Arc::new(frame));
     assert_eq!(request_peek(), PEEK_RESULT);

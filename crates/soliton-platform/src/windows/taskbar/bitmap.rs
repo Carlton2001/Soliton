@@ -7,8 +7,25 @@ use windows::{
         Foundation::{COLORREF, RECT},
         Graphics::Gdi::*,
     },
-    core::w,
+    core::{PCWSTR, w},
 };
+
+/// Registers the bundled faces privately for this process, once.
+fn load_fonts() {
+    static LOADED: std::sync::Once = std::sync::Once::new();
+    LOADED.call_once(|| {
+        for font in [
+            include_bytes!("../../../../../assets/fonts/Inter-Regular.ttf").as_slice(),
+            include_bytes!("../../../../../assets/fonts/JetBrainsMono-VariableFont_wght.ttf"),
+        ] {
+            let count = 0;
+            // A failure falls back to GDI's default face rather than failing the preview.
+            unsafe {
+                let _ = AddFontMemResourceEx(font.as_ptr().cast(), font.len() as u32, None, &count);
+            }
+        }
+    });
+}
 
 pub(super) struct Frame {
     pub width: i32,
@@ -142,7 +159,8 @@ impl Surface {
         }
     }
 
-    pub fn image(&mut self, image: &image::RgbaImage, x: i32, y: i32) {
+    /// Blends `image` with its alpha scaled by `opacity` (0..=255).
+    pub fn image(&mut self, image: &image::RgbaImage, x: i32, y: i32, opacity: u8) {
         let stride = self.width as usize;
         let height = self.height;
         let pixels = self.pixels();
@@ -153,7 +171,7 @@ impl Surface {
             }
             let start = (dy as usize * stride + dx as usize) * 4;
             for (channel, source) in [rgba[2], rgba[1], rgba[0]].into_iter().enumerate() {
-                let alpha = u32::from(rgba[3]);
+                let alpha = u32::from(rgba[3]) * u32::from(opacity) / 255;
                 pixels[start + channel] = ((u32::from(source) * alpha
                     + u32::from(pixels[start + channel]) * (255 - alpha))
                     / 255) as u8;
@@ -169,6 +187,34 @@ impl Surface {
         bold: bool,
         color: u32,
     ) -> Result<()> {
+        self.draw_text(text, bounds, size, bold, color, DT_LEFT, w!("Inter"))
+    }
+
+    /// Figures use the application's monospace face, as durations do in the UI.
+    pub fn figures(
+        &self,
+        text: &str,
+        bounds: (i32, i32, i32, i32),
+        size: i32,
+        color: u32,
+        right: bool,
+    ) -> Result<()> {
+        let align = if right { DT_RIGHT } else { DT_LEFT };
+        self.draw_text(text, bounds, size, true, color, align, w!("JetBrains Mono"))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_text(
+        &self,
+        text: &str,
+        bounds: (i32, i32, i32, i32),
+        size: i32,
+        bold: bool,
+        color: u32,
+        align: DRAW_TEXT_FORMAT,
+        family: PCWSTR,
+    ) -> Result<()> {
+        load_fonts();
         let mut units: Vec<u16> = text
             .replace(['\r', '\n'], " ")
             .chars()
@@ -194,7 +240,7 @@ impl Surface {
                 CLIP_DEFAULT_PRECIS,
                 ANTIALIASED_QUALITY,
                 DEFAULT_PITCH.0 as u32,
-                w!("Segoe UI"),
+                family,
             );
             anyhow::ensure!(!font.is_invalid(), "Cannot create preview font");
             let previous = SelectObject(self.dc, font.into());
@@ -214,7 +260,7 @@ impl Surface {
                 self.dc,
                 &mut units,
                 &mut rect,
-                DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX | DT_VCENTER,
+                align | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX | DT_VCENTER,
             );
             SelectObject(self.dc, previous);
             let _ = DeleteObject(font.into());

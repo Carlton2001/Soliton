@@ -30,6 +30,9 @@ pub(super) const TOGGLE: u32 = PREVIOUS + 1;
 pub(super) const NEXT: u32 = PREVIOUS + 2;
 pub(super) const STOP: u32 = PREVIOUS + 3;
 
+/// 16:9 until DWM tells the thumbnail size it actually displays.
+const DEFAULT_ASPECT: u32 = 562;
+
 pub(super) struct Shared {
     frame: Mutex<Option<Arc<bitmap::Frame>>>,
     events: Sender<DesktopEvent>,
@@ -37,6 +40,8 @@ pub(super) struct Shared {
     enabled: AtomicBool,
     toolbar_ready: AtomicBool,
     thumbnails: AtomicU32,
+    /// Requested thumbnail height per 1000 width.
+    aspect: AtomicU32,
     created: u32,
     detach: u32,
 }
@@ -54,9 +59,11 @@ pub(super) struct Taskbar {
     shared: Arc<Shared>,
     api: ITaskbarList4,
     icons: [Icon; 5],
-    accent: u32,
+    light: bool,
+    colors: crate::PreviewColors,
+    next_theme_poll: Instant,
     renderer: Renderer,
-    last_frame: Option<(MediaState, Language)>,
+    last_frame: Option<(MediaState, Language, i32)>,
     last_buttons: Option<(bool, bool, Language)>,
     generation: u32,
     next_attempt: Instant,
@@ -73,14 +80,16 @@ impl Taskbar {
         unsafe {
             api.HrInit()?;
         }
-        let accent = crate::PreviewColors::default().accent;
-        let icons = icons::toolbar(accent)?;
+        let light = icons::system_light_theme();
+        let icons = icons::toolbar(light)?;
         Ok(Self {
             proxy: proxy::Proxy::new(window, shared.clone())?,
             shared,
             api,
             icons,
-            accent,
+            light,
+            colors: icons::system_preview(light),
+            next_theme_poll: Instant::now() + Duration::from_secs(1),
             renderer: Renderer::default(),
             last_frame: None,
             last_buttons: None,
@@ -93,20 +102,29 @@ impl Taskbar {
         if !self.shared.enabled.load(Ordering::Acquire) {
             return Ok(());
         }
-        if self.accent != state.preview.accent {
-            self.icons = icons::toolbar(state.preview.accent)?;
-            self.accent = state.preview.accent;
-            self.last_buttons = None;
+        if Instant::now() >= self.next_theme_poll {
+            self.next_theme_poll = Instant::now() + Duration::from_secs(1);
+            let light = icons::system_light_theme();
+            self.colors = icons::system_preview(light);
+            if light != self.light {
+                self.icons = icons::toolbar(light)?;
+                self.light = light;
+                self.last_buttons = None;
+            }
         }
         let mut display = state.clone();
+        // The thumbnail lives in a system flyout, so it follows the system theme.
+        display.preview = self.colors;
         // Refresh at most once per second, and immediately on state/metadata/theme changes.
         display.position_ms = display.position_ms / 1000 * 1000;
-        if self.last_frame.as_ref() != Some(&(display.clone(), language)) {
-            let frame = Arc::new(self.renderer.render(&display, language)?);
+        let aspect = self.shared.aspect.load(Ordering::Acquire);
+        let height = render::height(aspect);
+        if self.last_frame.as_ref() != Some(&(display.clone(), language, height)) {
+            let frame = Arc::new(self.renderer.render(&display, language, aspect)?);
             if let Ok(mut current) = self.shared.frame.lock() {
                 *current = Some(frame);
             }
-            self.last_frame = Some((display, language));
+            self.last_frame = Some((display, language, height));
             unsafe {
                 let _ = DwmInvalidateIconicBitmaps(self.proxy.window());
             }
@@ -149,6 +167,17 @@ impl Taskbar {
             self.last_buttons = Some((enabled, playing, language));
         }
         Ok(())
+    }
+
+    /// Re-renders the last state when DWM asked for another thumbnail shape.
+    pub fn refresh(&mut self) -> Result<()> {
+        let Some((state, language, height)) = self.last_frame.clone() else {
+            return Ok(());
+        };
+        if height == render::height(self.shared.aspect.load(Ordering::Acquire)) {
+            return Ok(());
+        }
+        self.update(&state, language)
     }
 
     fn buttons(&self, enabled: bool, playing: bool, language: Language) -> [THUMBBUTTON; 4] {

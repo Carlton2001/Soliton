@@ -51,7 +51,7 @@ fn toolbar_icons_keep_their_orientation_and_straight_alpha() {
         <rect y="12" width="24" height="12" fill="currentColor" fill-opacity="0.5"/>
     </svg>"#;
     let pixels = pixels(&Icon::new(svg, 0x3366cc).unwrap());
-    let at = |row: usize| &pixels[row * 32 * 4..row * 32 * 4 + 4];
+    let at = |row: usize| &pixels[(row * 32 + 16) * 4..(row * 32 + 16) * 4 + 4];
     assert_eq!(at(0), [0xcc, 0x66, 0x33, 0xff]);
     let bottom = at(31);
     assert!(bottom[3].abs_diff(128) <= 1, "{bottom:?}");

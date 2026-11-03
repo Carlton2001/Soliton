@@ -30,9 +30,15 @@ fn render_clears_artwork_and_uses_the_supplied_palette() {
         position_ms: 42_000,
         ..Default::default()
     };
-    let frame = renderer.render(&state, Language::French).unwrap();
-    let pixel = (80 * frame.width as usize + 80) * 4;
-    assert_eq!(&frame.pixels[pixel..pixel + 4], &[10, 25, 250, 255]);
+    let frame = renderer
+        .render(&state, Language::French, super::super::DEFAULT_ASPECT)
+        .unwrap();
+    // Between the album line and the durations, clear of any text.
+    let pixel = (250 * frame.width as usize + 600) * 4;
+    // The artwork only tints the backdrop: red rises, blue falls, at reduced opacity.
+    let tinted = &frame.pixels[pixel..pixel + 4];
+    assert!(tinted[2] > 0x19 + 40 && tinted[2] < 200, "{tinted:?}");
+    assert!(tinted[0] < 0x24, "{tinted:?}");
     assert!(
         frame
             .pixels
@@ -43,7 +49,9 @@ fn render_clears_artwork_and_uses_the_supplied_palette() {
     );
     state.track.as_mut().unwrap().cover = None;
     state.preview.background = 0xf5f6f8;
-    let clear = renderer.render(&state, Language::English).unwrap();
+    let clear = renderer
+        .render(&state, Language::English, super::super::DEFAULT_ASPECT)
+        .unwrap();
     assert_eq!(&clear.pixels[pixel..pixel + 4], &[248, 246, 245, 255]);
 }
 
@@ -63,7 +71,9 @@ fn export_preview_for_visual_qa() {
         position_ms: 90_000,
         ..Default::default()
     };
-    let frame = renderer.render(&state, Language::English).unwrap();
+    let frame = renderer
+        .render(&state, Language::English, super::super::DEFAULT_ASPECT)
+        .unwrap();
     frame
         .bitmap(320, 180)
         .unwrap()

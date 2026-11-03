@@ -274,6 +274,9 @@ fn run(
         if let Some(appearance) = &mut appearance {
             appearance.poll(events);
         }
+        if let Some(error) = taskbar.as_mut().and_then(|taskbar| taskbar.refresh().err()) {
+            let _ = events.try_send(DesktopEvent::Warning(format!("Taskbar: {error:#}")));
+        }
         if restore.swap(false, Ordering::AcqRel) {
             unsafe {
                 let window = HWND(window as *mut _);
