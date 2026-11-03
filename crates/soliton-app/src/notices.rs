@@ -21,6 +21,8 @@ pub struct Notice {
     /// Where it happened: playback, library, an output…
     pub label: Text,
     pub text: String,
+    /// What to do next, shown muted under the text.
+    pub hint: Option<String>,
 }
 
 #[derive(Default)]
@@ -40,7 +42,12 @@ impl Notices {
         {
             return;
         }
-        self.items.push(Notice { level, label, text });
+        self.items.push(Notice {
+            level,
+            label,
+            text,
+            hint: None,
+        });
         if self.items.len() > KEPT {
             self.items.remove(0);
         }
@@ -76,7 +83,8 @@ impl Soliton {
         Some(Notice {
             level: Level::Warning,
             label: Text::PlaybackPaused,
-            text: format!("{reason} — {next}"),
+            text: reason,
+            hint: Some(next.into()),
         })
     }
 
@@ -90,19 +98,32 @@ impl Soliton {
                 Level::Warning => "triangle-alert",
             };
             let label = notice.label;
+            // Long messages wrap so their end stays readable in a narrow window;
+            // the icon and label stay on the first line.
             div()
                 .flex()
-                .items_center()
+                .items_start()
                 .gap(rems(0.5))
                 .min_w_0()
-                .child(tinted_icon(name, theme.accent))
-                .child(div().flex_shrink_0().child(self.t(label)))
                 .child(
                     div()
+                        .flex()
+                        .items_center()
+                        .gap(rems(0.5))
+                        .flex_shrink_0()
+                        .child(tinted_icon(name, theme.accent))
+                        .child(div().font_weight(FontWeight::SEMIBOLD).child(self.t(label))),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
                         .flex_1()
                         .min_w_0()
-                        .truncate()
-                        .child(plain_paths(&notice.text)),
+                        .child(plain_paths(&notice.text))
+                        .when_some(notice.hint.as_ref(), |view, hint| {
+                            view.child(div().text_color(theme.muted).child(hint.clone()))
+                        }),
                 )
         };
         let latest = self.notices.items.last();

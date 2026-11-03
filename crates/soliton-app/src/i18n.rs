@@ -331,12 +331,12 @@ pub fn text(language: Language, key: Text) -> &'static str {
         ),
         Text::PlaybackPaused => ("Lecture en pause", "Playback paused"),
         Text::ResumeOnDefaultOutput => (
-            "reprenez la lecture pour continuer sur la sortie système par défaut",
-            "resume playback to continue on the default system output",
+            "Reprenez la lecture pour continuer sur la sortie système par défaut.",
+            "Resume playback to continue on the default system output.",
         ),
         Text::ResumePlayback => (
-            "reprenez la lecture pour continuer",
-            "resume playback to continue",
+            "Reprenez la lecture pour continuer.",
+            "Resume playback to continue.",
         ),
         Text::PreferredOutputUnavailable => (
             "sortie préférée indisponible ; reconnectez-la ou choisissez une autre sortie",
