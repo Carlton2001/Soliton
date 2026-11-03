@@ -136,6 +136,15 @@ impl Soliton {
         }
         match key {
             "space" if root => return self.play_pause(cx),
+            "m" if root && !control => return self.toggle_mute(cx),
+            "left" | "right" if control && event.keystroke.modifiers.shift => {
+                let command = if key == "left" {
+                    Command::Previous
+                } else {
+                    Command::Next
+                };
+                return self.audio_command(command, cx);
+            }
             "up" | "down" if control => {
                 let delta = if key == "up" { 0.05 } else { -0.05 };
                 self.set_volume(self.settings.volume + delta, true, cx);
