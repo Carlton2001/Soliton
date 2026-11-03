@@ -81,6 +81,8 @@ These rules apply to every change.
   tracks carry that same artist. Compilations and contradictory or inferred
   cases stay separate.
 - Compilations: album artist distinct from track artist, single album.
+- Artists view, artist filter and artist page list album artists only; track
+  artists (guests) show on their tracks and in search, without their own card.
 - Artwork only embedded in files (no `folder.jpg`, no download), local cache
   invalidated when the image changes, neutral visual otherwise.
 

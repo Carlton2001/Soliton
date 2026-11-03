@@ -92,6 +92,11 @@ impl Soliton {
         let theme = self.theme();
         let track = self.playback.track.as_ref();
         let album_id = self.current_album().map(|album| album.id);
+        // The artist link opens the album artist: guests have no artist page.
+        let album_artist = self
+            .current_album()
+            .filter(|album| !(album.compilation && album.artist.is_empty()))
+            .map(|album| album.artist.clone());
         let height = f32::from(window.viewport_size().height) / f32::from(window.rem_size());
         let width = layout.width - 1.5;
         let side = (height - layout.reserved)
@@ -138,12 +143,13 @@ impl Soliton {
                     ),
             )
             .when_some(track, |heading, track| {
-                let artist = track.metadata.artist.clone();
                 heading.child(
-                    link("now-artist", true, theme)
+                    link("now-artist", album_artist.is_some(), theme)
                         .on_click(cx.listener(move |this, _, window, cx| {
-                            this.leave_listening(window);
-                            this.show_artist(artist.clone(), cx);
+                            if let Some(artist) = &album_artist {
+                                this.leave_listening(window);
+                                this.show_artist(artist.clone(), cx);
+                            }
                         }))
                         .when(track.metadata.is_inferred("artist"), |artist| {
                             artist.italic()

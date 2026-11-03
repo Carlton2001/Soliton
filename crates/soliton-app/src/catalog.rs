@@ -61,10 +61,10 @@ impl Facets {
         let mut genres = Variants::default();
         let mut formats = BTreeSet::new();
         for album in &snapshot.albums {
+            // Artists are album artists: guests on a track do not get an entry.
             artists.add(&album.artist);
             for track in album.tracks() {
                 let m = &track.metadata;
-                artists.add(&m.artist);
                 genres.add(&m.genre);
                 formats.insert(m.format.clone());
             }
@@ -79,11 +79,10 @@ impl Facets {
     }
 }
 
-/// Cover of the artist's most recent album: albums credited to the artist come
-/// before those where they only appear on a track; undated albums come last.
+/// Cover of the artist's most recent album; undated albums come last.
 fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCard> {
-    /// Credited, dated, newest, then title: the smallest key wins.
-    type Rank = (bool, bool, Reverse<u32>, String);
+    /// Dated, newest, then title: the smallest key wins.
+    type Rank = (bool, Reverse<u32>, String);
     #[derive(Default)]
     struct Found<'a> {
         albums: usize,
@@ -98,32 +97,24 @@ fn artist_cards(snapshot: &LibrarySnapshot, artists: &[String]) -> Vec<ArtistCar
             .iter()
             .filter_map(|track| track.metadata.year)
             .max();
-        let credited = fold(&album.artist);
-        let mut names: BTreeSet<String> = album
-            .tracks()
-            .map(|track| fold(&track.metadata.artist))
-            .collect();
-        names.insert(credited.clone());
-        names.remove("");
-        // Albums without any artist gather under one card, shown last.
-        if credited.is_empty() && !album.compilation {
-            names.insert(String::new());
+        // Albums without any artist gather under one card, shown last;
+        // compilations without an album artist have no card.
+        let name = fold(&album.artist);
+        if name.is_empty() && album.compilation {
+            continue;
         }
         let available = album.editions.iter().any(|edition| edition.available());
-        for name in names {
-            let entry = found.entry(name.clone()).or_default();
-            entry.albums += 1;
-            entry.available += usize::from(available);
-            if let Some(cover) = album.cover() {
-                let rank = (
-                    name != credited,
-                    year.is_none(),
-                    Reverse(year.unwrap_or(0)),
-                    fold(&album.title),
-                );
-                if entry.best.as_ref().is_none_or(|(best, _)| rank < *best) {
-                    entry.best = Some((rank, cover));
-                }
+        let entry = found.entry(name).or_default();
+        entry.albums += 1;
+        entry.available += usize::from(available);
+        if let Some(cover) = album.cover() {
+            let rank = (
+                year.is_none(),
+                Reverse(year.unwrap_or(0)),
+                fold(&album.title),
+            );
+            if entry.best.as_ref().is_none_or(|(best, _)| rank < *best) {
+                entry.best = Some((rank, cover));
             }
         }
     }
@@ -270,7 +261,6 @@ struct AlbumText {
 struct TrackText {
     /// Title, artist and genre, one per line.
     text: String,
-    artist: String,
     genre: String,
 }
 
@@ -311,9 +301,7 @@ impl Catalog {
                 let m = &track.metadata;
                 let quality = Quality::of(m);
                 let ok = [
-                    artist
-                        .as_ref()
-                        .is_none_or(|a| by_artist(a, album, text, track_text)),
+                    artist.as_ref().is_none_or(|a| by_artist(a, album, text)),
                     genre.as_ref().is_none_or(|g| &track_text.genre == g),
                     filter
                         .period
@@ -324,7 +312,6 @@ impl Catalog {
                 let others = |skip: usize| ok.iter().enumerate().all(|(i, &ok)| i == skip || ok);
                 if others(0) {
                     options.artists.insert(text.artist.clone());
-                    options.artists.insert(track_text.artist.clone());
                 }
                 if others(1) {
                     options.genres.insert(track_text.genre.clone());
@@ -362,9 +349,7 @@ impl Catalog {
                 let any = album.tracks().zip(&text.tracks).any(|(track, track_text)| {
                     let m = &track.metadata;
                     (album_match || track_text.text.contains(&query))
-                        && artist
-                            .as_ref()
-                            .is_none_or(|a| by_artist(a, album, text, track_text))
+                        && artist.as_ref().is_none_or(|a| by_artist(a, album, text))
                         && genre.as_ref().is_none_or(|g| &track_text.genre == g)
                         && filter
                             .period
@@ -393,13 +378,13 @@ impl Catalog {
     }
 }
 
-/// Whether a track counts for a folded artist filter. The empty name stands for
-/// albums without any artist, compilations excepted.
-fn by_artist(artist: &str, album: &Album, text: &AlbumText, track: &TrackText) -> bool {
+/// Whether an album counts for a folded album artist filter. The empty name
+/// stands for albums without any artist, compilations excepted.
+fn by_artist(artist: &str, album: &Album, text: &AlbumText) -> bool {
     if artist.is_empty() {
         text.artist.is_empty() && !album.compilation
     } else {
-        text.artist == artist || track.artist == artist
+        text.artist == artist
     }
 }
 
@@ -421,10 +406,9 @@ fn album_text(album: &Album) -> AlbumText {
             .tracks()
             .map(|track| {
                 let m = &track.metadata;
-                let (artist, genre) = (fold(&m.artist), fold(&m.genre));
+                let genre = fold(&m.genre);
                 TrackText {
-                    text: format!("{}\n{artist}\n{genre}", fold(&m.title)),
-                    artist,
+                    text: format!("{}\n{}\n{genre}", fold(&m.title), fold(&m.artist)),
                     genre,
                 }
             })

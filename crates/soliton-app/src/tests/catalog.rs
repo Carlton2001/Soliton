@@ -98,7 +98,7 @@ fn searches_every_edition_and_labels_compilations() {
         };
         assert_eq!(catalog.matches(&filter), vec![1]);
     }
-    assert_eq!(catalog.facets.artists, ["Alpha", "Miles Davis"]);
+    assert_eq!(catalog.facets.artists, ["Miles Davis"]);
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn periods_qualities_sorting_and_unavailable_albums() {
 }
 
 #[test]
-fn artist_cover_comes_from_the_latest_credited_album() {
+fn artist_cards_list_album_artists_with_their_latest_cover() {
     let mut late = album(
         "Late",
         "Band",
@@ -234,11 +234,11 @@ fn artist_cover_comes_from_the_latest_credited_album() {
         vec![vec![track("B", "Band", "Rock", 1971, "FLAC")]],
     );
     early.editions[0].tracks[0].cover = Some("early.png".into());
-    // A newer album where the band only guests does not represent it.
+    // A newer album where the band only guests neither counts nor represents it.
     let mut guest = album(
         "Guest",
         "Other",
-        vec![vec![track("C", "Band", "Rock", 2020, "FLAC")]],
+        vec![vec![track("C", "Band, Friend", "Rock", 2020, "FLAC")]],
     );
     guest.editions[0].tracks[0].cover = Some("guest.png".into());
     let facets = Facets::collect(&LibrarySnapshot {
@@ -250,8 +250,12 @@ fn artist_cover_comes_from_the_latest_credited_album() {
         .iter()
         .find(|card| card.name == "Band")
         .unwrap();
-    assert_eq!(band.albums, 3);
+    assert_eq!(band.albums, 2);
     assert_eq!(band.cover, Some("late.png".into()));
+    assert_eq!(
+        facets.artists,
+        vec!["Band".to_string(), "Other".to_string()]
+    );
     let other = facets
         .artist_cards
         .iter()
@@ -303,7 +307,7 @@ fn albums_without_any_artist_gather_under_one_last_card() {
     loose.compilation = false;
     let mut resolve = album("Resolve", "", vec![vec![track("A", "", "", 2000, "WAV")]]);
     resolve.compilation = false;
-    // A compilation without an album artist belongs to its track artists only.
+    // A compilation without an album artist has no card.
     let various = album(
         "Hits",
         "",
@@ -318,8 +322,8 @@ fn albums_without_any_artist_gather_under_one_last_card() {
         .iter()
         .map(|card| (card.name.as_str(), card.albums))
         .collect();
-    assert_eq!(cards, vec![("Band", 1), ("", 2)]);
-    assert_eq!(facets.artists, vec!["Band".to_string()]);
+    assert_eq!(cards, vec![("", 2)]);
+    assert!(facets.artists.is_empty());
 }
 
 #[test]
