@@ -5798,7 +5798,7 @@ dependencies = [
 
 [[package]]
 name = "soliton-app"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
@@ -5818,7 +5818,7 @@ dependencies = [
 
 [[package]]
 name = "soliton-audio"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "cpal",
@@ -5837,7 +5837,7 @@ dependencies = [
 
 [[package]]
 name = "soliton-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -5848,7 +5848,7 @@ dependencies = [
 
 [[package]]
 name = "soliton-library"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "blake3",
@@ -5866,7 +5866,7 @@ dependencies = [
 
 [[package]]
 name = "soliton-network"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -5889,7 +5889,7 @@ dependencies = [
 
 [[package]]
 name = "soliton-platform"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
