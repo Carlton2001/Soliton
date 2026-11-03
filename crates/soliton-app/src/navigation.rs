@@ -1,4 +1,4 @@
-//! Section rail on the left of the window: icons only, their names in tooltips.
+//! Section rail on the left of the window: icons only, their names and shortcuts in tooltips.
 use crate::{
     app::{Section, Soliton},
     i18n::Text,
@@ -27,6 +27,7 @@ impl Soliton {
                 ("nav", index),
                 icon,
                 self.t(label),
+                Some(crate::shortcuts::section_keys(index)),
                 self.section == section,
                 theme,
             )
@@ -89,6 +90,7 @@ impl Soliton {
                                 "nav-info",
                                 "info",
                                 self.t(self.update_tooltip()),
+                                None,
                                 false,
                                 crate::theme::Theme {
                                     muted: theme.accent,

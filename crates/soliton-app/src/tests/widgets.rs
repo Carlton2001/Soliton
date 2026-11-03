@@ -20,7 +20,7 @@ fn shared_controls_build_without_duplicate_interaction_styles() {
             let _ = toggle_button("toggle", "tag", "Filters", selected, theme);
             let _ = icon_button("icon", "play", "Play", selected, theme);
             let _ = nav_item("nav", "disc-3", "Albums", selected, theme);
-            let _ = nav_icon("rail", "disc-3", "Albums", selected, theme);
+            let _ = nav_icon("rail", "disc-3", "Albums", Some("Ctrl+2"), selected, theme);
             let _ = segment("segment", Some("list"), "List", selected, theme);
             let _ = menu_item("menu", "Option", selected, theme);
             let _ = checkbox("checkbox", selected, "Option", theme);

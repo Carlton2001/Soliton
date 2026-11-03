@@ -61,6 +61,12 @@ const ALL: [Shortcut; 22] = [
     Shortcut::RowRemove,
 ];
 
+/// Keys of the section at `index` in the navigation rail, as in [`Shortcut::Sections`].
+pub fn section_keys(index: usize) -> &'static str {
+    const KEYS: [&str; 5] = ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5"];
+    KEYS[index]
+}
+
 /// Description and keys of a shortcut.
 pub fn shortcut(language: Language, shortcut: Shortcut) -> (&'static str, &'static str) {
     let (fr, en) = match shortcut {

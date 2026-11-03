@@ -484,11 +484,13 @@ pub fn ghost(
     with_tooltip(control, label, theme)
 }
 
-/// Icon-only navigation entry of the section rail; its label is the tooltip.
+/// Icon-only navigation entry of the section rail; its label and optional
+/// keyboard shortcut are the tooltip.
 pub fn nav_icon(
     id: impl Into<ElementId>,
     name: &'static str,
     label: impl Into<SharedString>,
+    keys: Option<&'static str>,
     selected: bool,
     theme: Theme,
 ) -> Stateful<Div> {
@@ -512,7 +514,14 @@ pub fn nav_icon(
         entry.hover(move |style| style.bg(theme.hover))
     };
     let color = if selected { theme.text } else { theme.muted };
-    with_tooltip(entry.child(tinted_icon(name, color)), label.into(), theme)
+    let label = label.into();
+    tooltip(
+        entry.child(tinted_icon(name, color)),
+        Rc::new(move |_| label.clone()),
+        None,
+        keys,
+        theme,
+    )
 }
 
 /// Navigation entry; selection uses a tinted background and body foreground.
