@@ -98,6 +98,22 @@ impl Soliton {
                 self.set_ui_rem_size(soliton_core::config::Settings::DEFAULT_REM_SIZE, cx);
                 return;
             }
+            // Sections in the order of the navigation bar.
+            "1" | "2" | "3" | "4" | "5" if control && !listening => {
+                let section = match key {
+                    "1" => Section::Artists,
+                    "2" => Section::Albums,
+                    "3" => Section::Playlists,
+                    "4" => Section::Queue,
+                    _ => Section::Settings,
+                };
+                if section == Section::Playlists {
+                    self.playlists.selected = None;
+                }
+                self.navigate(section, cx);
+                self.focus.focus(window);
+                return;
+            }
             "f11" => {
                 self.volume_popup = false;
                 window.toggle_fullscreen();
