@@ -109,6 +109,7 @@ pub struct Soliton {
     /// Last seek sent and when, shown until the engine reports it.
     pub seek_target: Option<(u64, Instant)>,
     query_pending: bool,
+    pub tray_menu: Option<WindowHandle<crate::tray_menu::TrayMenu>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -258,6 +259,7 @@ impl Soliton {
             muted_volume: None,
             seek_target: None,
             query_pending: true,
+            tray_menu: None,
             _subscriptions: subscriptions,
         };
         if let Some(error) = audio_error {
@@ -267,6 +269,7 @@ impl Soliton {
         this.playlists.selected = last.playlist;
         this.queue_bar = bar(&this.queue_scroll);
         this.start_desktop(window);
+        this.watch_tray_menu(cx);
         this.scan(Vec::new(), cx);
         if this.settings.check_updates {
             this.check_for_updates(cx);

@@ -111,7 +111,13 @@ impl Soliton {
         }
     }
 
-    fn system_media(&mut self, command: MediaCommand, cx: &mut Context<Self>) {
+    pub fn show_from_tray(&self) {
+        if let Some(desktop) = &self.desktop {
+            desktop.show();
+        }
+    }
+
+    pub fn system_media(&mut self, command: MediaCommand, cx: &mut Context<Self>) {
         match command {
             MediaCommand::Toggle => self.play_pause(cx),
             MediaCommand::Play if self.playback.state != PlaybackState::Playing => {

@@ -7,8 +7,11 @@ pub(crate) mod device_watch;
 mod media;
 mod taskbar;
 mod tray;
+mod tray_popup;
 
-use crate::{DesktopEvent, MediaState};
+pub(crate) use tray_popup::{place_tray_menu, raise_tray_menu};
+
+use crate::{DesktopEvent, MediaState, TrayAnchor};
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use raw_window_handle::RawWindowHandle;
@@ -37,6 +40,8 @@ pub(super) struct Integration {
     ready: Arc<AtomicBool>,
     shutdown: Arc<AtomicBool>,
     restore: Arc<AtomicBool>,
+    native_menu: Arc<AtomicBool>,
+    menu_requests: Receiver<TrayAnchor>,
     worker: Option<JoinHandle<()>>,
 }
 
@@ -56,6 +61,9 @@ impl Integration {
         let ready = Arc::new(AtomicBool::new(false));
         let shutdown = Arc::new(AtomicBool::new(false));
         let restore = Arc::new(AtomicBool::new(false));
+        let native_menu = Arc::new(AtomicBool::new(false));
+        let worker_native_menu = native_menu.clone();
+        let (menu_sender, menu_requests) = bounded(1);
         let worker_ready = ready.clone();
         let worker_shutdown = shutdown.clone();
         let worker_restore = restore.clone();
@@ -76,6 +84,8 @@ impl Integration {
                     ready: &worker_ready,
                     shutdown: &worker_shutdown,
                     restore: &worker_restore,
+                    native_menu: &worker_native_menu,
+                    menu_requests: menu_sender,
                 };
                 if let Err(error) = run(
                     window,
@@ -115,6 +125,8 @@ impl Integration {
                 ready,
                 shutdown,
                 restore,
+                native_menu,
+                menu_requests,
                 worker: Some(worker),
             },
             receiver,
@@ -150,6 +162,14 @@ impl Integration {
         self.restore.store(true, Ordering::Release);
     }
 
+    pub fn tray_menu_requests(&self) -> Receiver<TrayAnchor> {
+        self.menu_requests.clone()
+    }
+
+    pub fn show_native_tray_menu(&self) {
+        self.native_menu.store(true, Ordering::Release);
+    }
+
     pub fn set_autostart(&self, enabled: bool) -> Result<()> {
         self.startup
             .try_send(enabled)
@@ -175,6 +195,8 @@ struct Flags<'a> {
     ready: &'a Arc<AtomicBool>,
     shutdown: &'a AtomicBool,
     restore: &'a AtomicBool,
+    native_menu: &'a AtomicBool,
+    menu_requests: Sender<TrayAnchor>,
 }
 
 fn run(
@@ -187,6 +209,8 @@ fn run(
         ready,
         shutdown,
         restore,
+        native_menu,
+        menu_requests,
     }: Flags,
     taskbar_binding: Option<Arc<taskbar::Shared>>,
 ) -> Result<()> {
@@ -202,13 +226,14 @@ fn run(
             None
         }
     };
-    let mut tray = match tray::Tray::new(events.clone(), ready.clone(), language, icon) {
-        Ok(tray) => Some(tray),
-        Err(error) => {
-            let _ = events.try_send(DesktopEvent::Warning(format!("Tray: {error:#}")));
-            None
-        }
-    };
+    let mut tray =
+        match tray::Tray::new(events.clone(), menu_requests, ready.clone(), language, icon) {
+            Ok(tray) => Some(tray),
+            Err(error) => {
+                let _ = events.try_send(DesktopEvent::Warning(format!("Tray: {error:#}")));
+                None
+            }
+        };
     let initialized = unsafe { RoInitialize(RO_INIT_MULTITHREADED).is_ok() };
     let mut media = if initialized {
         match media::Media::new(HWND(window as *mut _), events.clone()) {
@@ -262,6 +287,11 @@ fn run(
                 );
                 let _ = SetForegroundWindow(window);
             }
+        }
+        if native_menu.swap(false, Ordering::AcqRel)
+            && let Some(tray) = &tray
+        {
+            tray.show_native_menu();
         }
         if let Some(icons) = &mut window_icons
             && let Err(error) = icons.apply(wanted_icon)

@@ -93,6 +93,7 @@ pub enum Text {
     OnClose,
     QuitApp,
     HideToTray,
+    ShowSoliton,
     AskOnClose,
     Autostart,
     CloseQuestion,
@@ -396,6 +397,7 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::OnClose => ("À la fermeture", "When closing"),
         Text::QuitApp => ("Quitter Soliton", "Quit Soliton"),
         Text::HideToTray => ("Masquer et continuer", "Hide and keep playing"),
+        Text::ShowSoliton => ("Afficher Soliton", "Show Soliton"),
         Text::AskOnClose => ("Demander", "Ask"),
         Text::Autostart => (
             "Lancer Soliton à l’ouverture de session",

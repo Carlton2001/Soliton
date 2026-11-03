@@ -7,6 +7,7 @@ mod watch;
 pub use watch::{AudioOutputs, DeviceWatch};
 
 mod desktop;
+pub use desktop::TrayAnchor;
 pub use desktop::{
     Desktop, DesktopEvent, MediaCommand, MediaState, MediaTrack, PreviewColors, TransportState,
 };

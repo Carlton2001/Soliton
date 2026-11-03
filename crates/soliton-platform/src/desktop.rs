@@ -27,6 +27,13 @@ pub enum DesktopEvent {
     Warning(String),
 }
 
+/// Pointer position in physical screen pixels when the tray menu was requested.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TrayAnchor {
+    pub x: i32,
+    pub y: i32,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TransportState {
     #[default]
@@ -146,6 +153,61 @@ impl Desktop {
     pub fn show(&self) {
         #[cfg(target_os = "windows")]
         self.native.show();
+    }
+
+    /// Wakes the application as soon as the tray icon asks for its menu; the
+    /// channel disconnects at shutdown. `None` where there is no tray icon.
+    pub fn tray_menu_requests(&self) -> Option<Receiver<TrayAnchor>> {
+        #[cfg(target_os = "windows")]
+        return Some(self.native.tray_menu_requests());
+        #[cfg(not(target_os = "windows"))]
+        None
+    }
+
+    /// Moves a popup above the anchor, inside the work area of the anchor's
+    /// monitor. `size` is in pixels at 100% scale.
+    pub fn place_tray_menu(
+        &self,
+        window: &impl HasWindowHandle,
+        anchor: TrayAnchor,
+        size: (f32, f32),
+    ) -> Result<()> {
+        #[cfg(target_os = "windows")]
+        {
+            let handle = window
+                .window_handle()
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                .as_raw();
+            crate::windows::place_tray_menu(handle, anchor, size)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (window, anchor, size);
+            anyhow::bail!("Tray menus are not implemented on this platform")
+        }
+    }
+
+    /// Puts an open tray menu back above the shell's own topmost flyouts.
+    pub fn raise_tray_menu(window: &impl HasWindowHandle) -> Result<()> {
+        #[cfg(target_os = "windows")]
+        {
+            let handle = window
+                .window_handle()
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                .as_raw();
+            crate::windows::raise_tray_menu(handle)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = window;
+            anyhow::bail!("Tray menus are not implemented on this platform")
+        }
+    }
+
+    /// Falls back on the system menu when the styled one cannot open.
+    pub fn show_native_tray_menu(&self) {
+        #[cfg(target_os = "windows")]
+        self.native.show_native_tray_menu();
     }
 
     pub fn set_autostart(&self, enabled: bool) -> Result<()> {

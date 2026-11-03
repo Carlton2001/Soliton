@@ -42,6 +42,7 @@ mod system;
 mod theme;
 mod title_bar;
 mod track_list;
+mod tray_menu;
 mod updates;
 mod views;
 mod widgets;

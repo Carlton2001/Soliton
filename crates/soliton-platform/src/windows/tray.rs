@@ -1,6 +1,6 @@
 //! The hidden top-level owner receives Shell callbacks and Explorer restarts.
 use super::app_icons::Icon;
-use crate::{DesktopEvent, MediaCommand, TransportState};
+use crate::{DesktopEvent, MediaCommand, TransportState, TrayAnchor};
 use anyhow::Result;
 use crossbeam_channel::Sender;
 use soliton_core::config::{AppIcon, Language};
@@ -37,6 +37,7 @@ pub(super) struct Tray {
 
 struct State {
     events: Sender<DesktopEvent>,
+    menu_requests: Sender<TrayAnchor>,
     ready: Arc<AtomicBool>,
     restart: u32,
     data: NOTIFYICONDATAW,
@@ -47,6 +48,7 @@ struct State {
 impl Tray {
     pub fn new(
         events: Sender<DesktopEvent>,
+        menu_requests: Sender<TrayAnchor>,
         ready: Arc<AtomicBool>,
         language: Language,
         palette: AppIcon,
@@ -106,6 +108,7 @@ impl Tray {
             data.Anonymous.uVersion = NOTIFYICON_VERSION_4;
             let state = Box::new(State {
                 events,
+                menu_requests,
                 ready,
                 restart: RegisterWindowMessageW(w!("TaskbarCreated")),
                 data,
@@ -131,6 +134,10 @@ impl Tray {
     pub fn update(&mut self, state: TransportState, language: Language) {
         self.state.language = language;
         self.state.playing = state == TransportState::Playing;
+    }
+
+    pub fn show_native_menu(&self) {
+        self.state.native_menu(self.window);
     }
 
     pub fn set_icon(&mut self, palette: AppIcon) -> Result<()> {
@@ -168,6 +175,32 @@ impl State {
                 "Windows notification area unavailable".into(),
             ));
             let _ = self.events.try_send(DesktopEvent::Show);
+        }
+    }
+
+    /// The shell lets the process take the foreground only during this callback.
+    fn request_menu(&self, window: HWND) {
+        let mut point = POINT::default();
+        let requested = unsafe {
+            let _ = SetForegroundWindow(window);
+            GetCursorPos(&mut point).is_ok()
+        } && self
+            .menu_requests
+            .try_send(TrayAnchor {
+                x: point.x,
+                y: point.y,
+            })
+            .is_ok();
+        if !requested {
+            self.native_menu(window);
+        }
+    }
+
+    fn native_menu(&self, window: HWND) {
+        if let Err(error) = self.menu(window) {
+            let _ = self
+                .events
+                .try_send(DesktopEvent::Warning(format!("Tray menu: {error:#}")));
         }
     }
 
@@ -265,13 +298,7 @@ unsafe extern "system" fn procedure(
                 NIN_SELECT | NIN_KEYSELECT => {
                     let _ = state.events.try_send(DesktopEvent::Show);
                 }
-                WM_CONTEXTMENU => {
-                    if let Err(error) = state.menu(window) {
-                        let _ = state
-                            .events
-                            .try_send(DesktopEvent::Warning(format!("Tray menu: {error:#}")));
-                    }
-                }
+                WM_CONTEXTMENU => state.request_menu(window),
                 _ => {}
             }
             return LRESULT(0);

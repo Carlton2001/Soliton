@@ -25,7 +25,7 @@ windows = { version = "=0.61.3", features = [
     "Media", "Media_Control", "Storage", "Storage_Streams",
     "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_Com", "Win32_System_LibraryLoader",
     "Win32_Networking_WinHttp",
-    "Win32_System_WinRT", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging",
+    "Win32_System_WinRT", "Win32_UI_HiDpi", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
