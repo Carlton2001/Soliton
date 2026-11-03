@@ -850,6 +850,26 @@ impl PlatformWindow for WindowsWindow {
         self.0.state.borrow_mut().callbacks.hit_test_window_control = Some(callback);
     }
 
+    fn show_window_menu(&self, position: Point<Pixels>) {
+        let scale_factor = self.scale_factor();
+        let mut point = POINT {
+            x: (position.x.0 * scale_factor) as i32,
+            y: (position.y.0 * scale_factor) as i32,
+        };
+        unsafe {
+            ClientToScreen(self.0.hwnd, &mut point).ok().log_err();
+            // The menu loop repaints the window, so it must run outside event dispatch.
+            let lparam = (point.y as u16 as u32) << 16 | point.x as u16 as u32;
+            PostMessageW(
+                Some(self.0.hwnd),
+                WM_GPUI_SHOW_WINDOW_MENU,
+                WPARAM(0),
+                LPARAM(lparam as i32 as isize),
+            )
+            .log_err();
+        }
+    }
+
     fn on_appearance_changed(&self, callback: Box<dyn FnMut()>) {
         self.0.state.borrow_mut().callbacks.appearance_changed = Some(callback);
     }

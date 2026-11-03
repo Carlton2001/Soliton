@@ -27,6 +27,7 @@ pub(crate) const WM_GPUI_DOCK_MENU_ACTION: u32 = WM_USER + 4;
 pub(crate) const WM_GPUI_FORCE_UPDATE_WINDOW: u32 = WM_USER + 5;
 pub(crate) const WM_GPUI_KEYBOARD_LAYOUT_CHANGED: u32 = WM_USER + 6;
 pub(crate) const WM_GPUI_GPU_DEVICE_LOST: u32 = WM_USER + 7;
+pub(crate) const WM_GPUI_SHOW_WINDOW_MENU: u32 = WM_USER + 8;
 
 const SIZE_MOVE_LOOP_TIMER_ID: usize = 1;
 const AUTO_HIDE_TASKBAR_THICKNESS_PX: i32 = 1;
@@ -109,6 +110,7 @@ impl WindowsWindowInner {
             WM_GPUI_CURSOR_STYLE_CHANGED => self.handle_cursor_changed(lparam),
             WM_GPUI_FORCE_UPDATE_WINDOW => self.draw_window(handle, true),
             WM_GPUI_GPU_DEVICE_LOST => self.handle_device_lost(lparam),
+            WM_GPUI_SHOW_WINDOW_MENU => self.handle_show_window_menu(handle, lparam),
             _ => None,
         };
         if let Some(n) = handled {
@@ -1195,6 +1197,48 @@ impl WindowsWindowInner {
         let devices = lparam.0 as *const DirectXDevices;
         let devices = unsafe { &*devices };
         lock.renderer.handle_device_lost(&devices);
+        Some(0)
+    }
+
+    /// System menu at `lparam` (screen coordinates), with items matching the window state.
+    fn handle_show_window_menu(&self, handle: HWND, lparam: LPARAM) -> Option<isize> {
+        let maximized = self.state.borrow().is_maximized();
+        let state = |enabled: bool| if enabled { MF_ENABLED } else { MF_GRAYED };
+        unsafe {
+            let menu = GetSystemMenu(handle, false);
+            if menu.is_invalid() {
+                return Some(0);
+            }
+            for (item, enabled) in [
+                (SC_RESTORE, maximized),
+                (SC_MOVE, !maximized),
+                (SC_SIZE, !maximized),
+                (SC_MINIMIZE, true),
+                (SC_MAXIMIZE, !maximized),
+                (SC_CLOSE, true),
+            ] {
+                let _ = EnableMenuItem(menu, item, MF_BYCOMMAND | state(enabled));
+            }
+            let _ = SetMenuDefaultItem(menu, SC_CLOSE, 0);
+            let command = TrackPopupMenu(
+                menu,
+                TPM_RETURNCMD | TPM_RIGHTBUTTON,
+                lparam.signed_loword().into(),
+                lparam.signed_hiword().into(),
+                None,
+                handle,
+                None,
+            );
+            if command.0 != 0 {
+                PostMessageW(
+                    Some(handle),
+                    WM_SYSCOMMAND,
+                    WPARAM(command.0 as usize),
+                    LPARAM(0),
+                )
+                .log_err();
+            }
+        }
         Some(0)
     }
 

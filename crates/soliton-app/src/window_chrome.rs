@@ -40,11 +40,18 @@ pub fn drag_region(id: &'static str, window: &mut Window, cx: &mut App) -> State
         .window_control_area(WindowControlArea::Drag)
         .on_mouse_down(MouseButton::Middle, |_, window, _| window.minimize_window());
     if !cfg!(target_os = "linux") {
-        return region;
+        // Opens on release, as over a native caption.
+        return region.on_mouse_up(MouseButton::Right, |event, window, cx| {
+            window.show_window_menu(event.position);
+            cx.stop_propagation();
+        });
     }
     // Moving on press hands the pointer to the compositor and loses double-clicks.
     let pressed = window.use_keyed_state(id, cx, |_, _| false);
     region
+        .on_mouse_down(MouseButton::Right, |event, window, _| {
+            window.show_window_menu(event.position)
+        })
         .on_mouse_down(MouseButton::Left, {
             let pressed = pressed.clone();
             move |_, _, cx| pressed.update(cx, |pressed, _| *pressed = true)

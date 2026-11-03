@@ -17,6 +17,9 @@ Source: https://crates.io/crates/gpui/0.2.2
   a non-client click is consumed only if a handler stops its propagation, no longer
   as soon as focus calls `prevent_default`, so dragging and native buttons keep
   working. The top resize edge is tested before control areas.
+- `src/platform/windows/window.rs` and `events.rs`: `show_window_menu` posts a
+  message that opens the system menu at the pointer outside event dispatch, items
+  enabled for the window state; a chosen command is sent as `WM_SYSCOMMAND`.
 - `src/platform/windows/events.rs`: `WM_DESTROY` marks the window destroyed,
   removes its callbacks and revokes drag and drop before the HWND is lost.
 - `src/platform/windows/window.rs`: the destructor removes callbacks to the dropped
