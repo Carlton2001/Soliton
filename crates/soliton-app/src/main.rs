@@ -22,6 +22,7 @@ mod input;
 mod keys;
 mod list_focus;
 mod list_keys;
+mod menu_keys;
 mod navigation;
 mod notices;
 mod now_playing;

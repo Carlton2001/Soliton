@@ -112,10 +112,16 @@ impl Soliton {
                 } else {
                     self.back(cx);
                 }
-                self.focus.focus(window);
+                // Focus inside a closing menu returns to its opener instead.
+                if !self.menu_focus.contains_focused(window, cx) {
+                    self.focus.focus(window);
+                }
                 return;
             }
             _ => {}
+        }
+        if self.menu_key(event, window, cx) {
+            return;
         }
         let typing = [&self.search, &self.menu_search, &self.playlists.name]
             .iter()

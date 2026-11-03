@@ -330,6 +330,7 @@ impl Soliton {
                             deferred(
                                 div().absolute().top_full().right_0().mt(rems(0.25)).child(
                                     crate::widgets::popover(theme)
+                                        .track_focus(&self.menu_focus)
                                         .flex()
                                         .flex_col()
                                         .gap(rems(0.25))

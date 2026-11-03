@@ -243,6 +243,7 @@ impl Soliton {
     fn sort_menu(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = self.theme();
         popover(theme)
+            .track_focus(&self.menu_focus)
             .flex()
             .flex_col()
             .children(SORTS.iter().map(|&sort| {
@@ -274,6 +275,7 @@ impl Soliton {
             .unwrap_or(0);
         let values_width = (longest as f32 * 0.5 + 4.).clamp(14., 24.);
         popover(theme)
+            .track_focus(&self.menu_focus)
             .w(rems(12. + 0.5 + values_width))
             .h(rems(24.))
             .flex()

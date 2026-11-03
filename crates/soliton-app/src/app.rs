@@ -62,6 +62,11 @@ pub struct Soliton {
     pub playback: soliton_audio::Playback,
     pub focus: FocusHandle,
     pub modal_focus: FocusHandle,
+    /// Tracked by the open menu.
+    pub menu_focus: FocusHandle,
+    /// Control focused when the open menu was opened from the keyboard.
+    pub menu_opener: Option<FocusHandle>,
+    pub menu_was_open: bool,
     pub album_focus: crate::list_focus::ListFocus<i64>,
     pub artist_focus: crate::list_focus::ListFocus<String>,
     pub track_focus: crate::list_focus::ListFocus<crate::track_list::Selection>,
@@ -223,6 +228,9 @@ impl Soliton {
             playback,
             focus: cx.focus_handle(),
             modal_focus: cx.focus_handle(),
+            menu_focus: cx.focus_handle(),
+            menu_opener: None,
+            menu_was_open: false,
             album_focus: Default::default(),
             artist_focus: Default::default(),
             track_focus: Default::default(),
@@ -547,6 +555,7 @@ impl Drop for Soliton {
 impl Render for Soliton {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::scale::apply(self.settings.ui_rem_size, window);
+        self.sync_menu_focus(window, cx);
         // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         // Cover, padding, then the 2 px focus border on each side.

@@ -126,6 +126,7 @@ impl Soliton {
             .filter(|(selected, _)| *selected == selection);
         let menu = div()
             .id(("track-action-menu", key))
+            .track_focus(&self.menu_focus)
             .p(rems(0.5))
             .flex()
             .flex_col()
