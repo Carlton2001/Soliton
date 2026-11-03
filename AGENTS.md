@@ -36,5 +36,6 @@ Soliton is a high-performance Rust/GPUI audio library player for large local col
 ## Validation
 
 - After Rust changes: `cargo fmt --check`, `cargo check` and the relevant tests. State which checks were not run and why.
+- After any change to `Cargo.lock` or a `Cargo.toml`: run `scripts/update-third-party-licenses.ps1`, then `scripts/check-third-party-licenses.ps1`, and commit the regenerated `licenses/dependencies`.
 - Prioritize critical behavior: metadata, album and edition grouping, incremental indexing, source availability, audio engine states.
 - Keep platform-specific code isolated.
