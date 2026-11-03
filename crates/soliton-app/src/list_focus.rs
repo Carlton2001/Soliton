@@ -115,7 +115,7 @@ pub fn next_with_letter<'a>(
         names
             .clone()
             .nth(index)
-            .is_some_and(|name| soliton_core::text::fold(name).chars().next() == Some(letter))
+            .is_some_and(|name| soliton_core::text::fold(name).starts_with(letter))
     })
 }
 
@@ -125,8 +125,8 @@ pub fn page_rows(scroll: &gpui::UniformListScrollHandle, rows: usize) -> usize {
     let Some(size) = state.last_item_size.filter(|_| rows > 0) else {
         return 1;
     };
-    let row = f32::from(size.contents.height) / rows as f32;
-    let height = f32::from(state.base_handle.bounds().size.height);
+    let row = f32::from(size.row_height);
+    let height = f32::from(size.item.height);
     if row <= 0. {
         return 1;
     }

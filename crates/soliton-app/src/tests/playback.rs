@@ -1,4 +1,5 @@
-use super::{SEEK_SETTLED_MS, SEEK_TIMEOUT, seek_settled, stale_availability};
+use super::{SEEK_SETTLED_MS, SEEK_TIMEOUT, seek_settled, stale_availability, wheel_steps};
+use gpui::{ScrollDelta, point, px};
 use soliton_audio::{QueueEntry, QueueSnapshot};
 use soliton_core::model::Track;
 use std::{collections::HashMap, time::Duration};
@@ -73,4 +74,40 @@ fn queued_copies_follow_the_catalog_availability() {
         (3, track(3, true)),
     ]);
     assert!(stale_availability(&queue, &catalog).is_empty());
+}
+
+#[test]
+fn wheel_steps_once_per_notch_and_ignores_sideways_scrolling() {
+    let mut pending = 0.;
+    // Windows reports a notch as several lines.
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Lines(point(0., 3.))),
+        1
+    );
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Lines(point(0., -3.))),
+        -1
+    );
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Lines(point(2., 0.))),
+        0
+    );
+    // Fractions of a line and touchpad pixels add up to a step.
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Lines(point(0., 0.5))),
+        0
+    );
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Lines(point(0., 0.5))),
+        1
+    );
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Pixels(point(px(0.), px(-15.)))),
+        0
+    );
+    assert_eq!(
+        wheel_steps(&mut pending, ScrollDelta::Pixels(point(px(0.), px(-30.)))),
+        -2
+    );
+    assert_eq!(pending, -5.);
 }

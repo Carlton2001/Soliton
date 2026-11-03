@@ -5801,6 +5801,7 @@ name = "soliton-app"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-channel 2.5.0",
  "crossbeam-channel",
  "embed-resource",
  "gpui",

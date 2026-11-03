@@ -150,6 +150,18 @@ impl Soliton {
                     self.visible = view.visible;
                     self.facets = view.facets;
                     self.filter_options = view.options;
+                    // A restored artist may only appear on tracks, which no
+                    // longer list albums; once indexed, show all albums instead.
+                    if !self.scanning
+                        && self
+                            .filter
+                            .artist
+                            .as_ref()
+                            .is_some_and(|artist| !self.facets.has_artist(artist))
+                    {
+                        self.filter.artist = None;
+                        self.query_pending = true;
+                    }
                 }
                 Ok(_) => {}
                 Err(error) => {

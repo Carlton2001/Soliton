@@ -144,10 +144,22 @@ fn manual_lists_persist_unique_files_order_and_unavailable_entries() {
     library
         .change_playlist(PlaylistChange::Remove {
             id: list.id,
-            entry: list.entries[0].id,
+            entries: vec![list.entries[0].id],
         })
         .unwrap();
-    assert_eq!(library.playlists().unwrap()[0].entries.len(), 3);
+    let left = library.playlists().unwrap().remove(0).entries;
+    assert_eq!(left.len(), 3);
+    library
+        .change_playlist(PlaylistChange::Remove {
+            id: list.id,
+            entries: vec![left[0].id, left[2].id],
+        })
+        .unwrap();
+    let after = library.playlists().unwrap().remove(0).entries;
+    assert_eq!(
+        after.iter().map(|e| e.id).collect::<Vec<_>>(),
+        vec![left[1].id]
+    );
     library
         .change_playlist(PlaylistChange::Delete(list.id))
         .unwrap();

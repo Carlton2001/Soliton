@@ -88,14 +88,24 @@ impl Soliton {
         else {
             return;
         };
+        // A blocking wait on GPUI's executor would hold one of its threads for
+        // the whole session; this thread ends when the channel disconnects.
+        let (sender, received) = async_channel::bounded(1);
+        let forward = std::thread::Builder::new()
+            .name("tray-menu-requests".into())
+            .spawn(move || {
+                while let Ok(anchor) = requests.recv() {
+                    if sender.send_blocking(anchor).is_err() {
+                        break;
+                    }
+                }
+            });
+        if let Err(error) = forward {
+            tracing::warn!("Tray menu requests unavailable: {error}");
+            return;
+        }
         cx.spawn(async move |this, cx| {
-            loop {
-                let requests = requests.clone();
-                let request = cx
-                    .background_executor()
-                    .spawn(async move { requests.recv() })
-                    .await;
-                let Ok(anchor) = request else { break };
+            while let Ok(anchor) = received.recv().await {
                 if this
                     .update(cx, |this, cx| this.open_tray_menu(anchor, cx))
                     .is_err()

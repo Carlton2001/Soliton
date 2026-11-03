@@ -125,6 +125,10 @@ pub struct ItemSize {
     /// The size of the item's contents, which may be larger than the item itself,
     /// if the item was bounded by a parent element.
     pub contents: Size<Pixels>,
+    /// Height of one row.
+    pub row_height: Pixels,
+    /// Vertical padding above the first row, included in `contents`.
+    pub padding_top: Pixels,
 }
 
 impl UniformListScrollHandle {
@@ -353,6 +357,8 @@ impl Element for UniformList {
             handle.last_item_size = Some(ItemSize {
                 item: padded_bounds.size,
                 contents: content_size,
+                row_height: longest_item_size.height,
+                padding_top: padding.top,
             });
             handle.deferred_scroll_to_item.take()
         });

@@ -16,7 +16,7 @@ use std::{
 pub struct ArtistCard {
     /// Empty for the albums without any artist.
     pub name: String,
-    /// Albums by the artist, or containing at least one of their tracks.
+    /// Albums credited to the artist.
     pub albums: usize,
     /// Of those albums, the ones with an available edition.
     pub available: usize,
@@ -76,6 +76,14 @@ impl Facets {
             genres: genres.into_values(),
             formats: formats.into_iter().collect(),
         }
+    }
+
+    /// Whether `artist` has a card; the empty name stands for albums without any artist.
+    pub fn has_artist(&self, artist: &str) -> bool {
+        let artist = fold(artist);
+        self.artist_cards
+            .iter()
+            .any(|card| fold(&card.name) == artist)
     }
 }
 

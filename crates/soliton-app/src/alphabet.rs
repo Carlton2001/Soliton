@@ -120,14 +120,13 @@ impl Soliton {
         let Some(size) = state.last_item_size.filter(|_| rows > 0) else {
             return 0..0;
         };
-        // The list's vertical padding, split evenly, is part of its contents.
         let height = f32::from(state.base_handle.bounds().size.height);
-        let padding = height - f32::from(size.item.height);
-        let row = (f32::from(size.contents.height) - padding) / rows as f32;
+        let row = f32::from(size.row_height);
         if row <= 0. {
             return 0..0;
         }
-        let top = -f32::from(state.base_handle.offset().y) - padding / 2.;
+        // Rows start below the list's top padding.
+        let top = -f32::from(state.base_handle.offset().y + size.padding_top);
         let bottom = top + height;
         let first = (top / row).floor().max(0.) as usize;
         let last = (bottom / row).ceil() as usize;

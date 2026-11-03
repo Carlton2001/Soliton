@@ -419,16 +419,7 @@ impl Soliton {
             .items_center()
             .gap(rems(0.25))
             .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _, cx| {
-                // One step per wheel notch; touchpads step every 20 pixels.
-                let steps = match event.delta {
-                    ScrollDelta::Lines(delta) => delta.y.signum() as i32,
-                    ScrollDelta::Pixels(delta) => {
-                        this.volume_scroll += f32::from(delta.y);
-                        let steps = (this.volume_scroll / 20.).trunc();
-                        this.volume_scroll -= steps * 20.;
-                        steps as i32
-                    }
-                };
+                let steps = crate::playback::wheel_steps(&mut this.volume_scroll, event.delta);
                 for _ in 0..steps.unsigned_abs() {
                     this.step_volume(steps > 0, cx);
                 }

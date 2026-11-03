@@ -58,7 +58,7 @@ pub enum PlaylistChange {
     },
     Remove {
         id: i64,
-        entry: i64,
+        entries: Vec<i64>,
     },
     Move {
         id: i64,

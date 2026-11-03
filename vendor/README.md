@@ -41,7 +41,7 @@ Source: https://crates.io/crates/gpui/0.2.2
   start below the top padding once instead of twice, rows crossing the bottom
   padding stay rendered, and `scroll_to_item` places rows inside the padded
   viewport and stops at the real end of the content. Without padding the behavior
-  is unchanged.
+  is unchanged. `ItemSize` also reports the row height and the top padding.
 
 No global log filter, no disabled debug assertions and no cursor change are applied.
 

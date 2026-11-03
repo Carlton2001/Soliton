@@ -523,7 +523,13 @@ impl Soliton {
                     }
                 }
                 Action::Remove => {
-                    self.change_playlist(PlaylistChange::Remove { id: list, entry }, cx);
+                    self.change_playlist(
+                        PlaylistChange::Remove {
+                            id: list,
+                            entries: vec![entry],
+                        },
+                        cx,
+                    );
                 }
                 _ => {}
             },

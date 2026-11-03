@@ -275,8 +275,8 @@ pub fn text(language: Language, key: Text) -> &'static str {
         ),
         Text::RestoreOrder => ("Rétablir l'ordre", "Restore order"),
         Text::RestoreOrderHint => (
-            "Remet chaque album dans son ordre d'origine, sans changer de morceau",
-            "Puts each album back in its original order, without changing the current track",
+            "Remet chaque album dans son ordre d'origine et arrête la lecture aléatoire, sans changer de morceau",
+            "Puts each album back in its original order and turns shuffle off, without changing the current track",
         ),
         Text::ClearQueue => ("Vider la file", "Clear queue"),
         Text::PlayNext => ("Jouer ensuite", "Play next"),

@@ -4,11 +4,13 @@ use crate::{
     track_list::{Selection, same_list},
 };
 use gpui::{prelude::*, *};
-use soliton_audio::Command;
-use soliton_core::playlist::PlaylistChange;
+use soliton_audio::{Command, QueueSnapshot};
+use soliton_core::{model::LibrarySnapshot, playlist::PlaylistChange};
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     hash::Hash,
+    sync::Arc,
     time::Duration,
 };
 
@@ -26,7 +28,11 @@ pub struct Reorder {
     /// The release ending a drag must not count as a click on its row.
     swallow_click: bool,
     task: Option<Task<()>>,
+    /// Original queue order for the queue and library it was computed from.
+    original: RefCell<Option<OriginalOrder>>,
 }
+
+type OriginalOrder = (Arc<QueueSnapshot>, Arc<LibrarySnapshot>, Option<Vec<u64>>);
 
 pub struct Drag {
     pub rows: Vec<Selection>,
@@ -135,6 +141,23 @@ impl Soliton {
             }
         }
         places
+    }
+
+    /// Whether manual edits or shuffling have changed the queue's original
+    /// order. Computed once per queue and library, not at each frame.
+    pub(crate) fn queue_restorable(&self) -> bool {
+        let (queue, snapshot) = (&self.playback.queue, &self.snapshot);
+        let mut cached = self.reorder.original.borrow_mut();
+        if let Some((q, s, order)) = cached.as_ref()
+            && Arc::ptr_eq(q, queue)
+            && Arc::ptr_eq(s, snapshot)
+        {
+            return order.is_some();
+        }
+        let order = self.original_queue_order();
+        let restorable = order.is_some();
+        *cached = Some((queue.clone(), snapshot.clone(), order));
+        restorable
     }
 
     /// The queue's original order, when manual edits or shuffling have changed it.
@@ -311,13 +334,15 @@ impl Soliton {
         }
     }
 
-    /// Row height and scrolling state as laid out by the list.
-    fn drag_metrics(&self, count: usize) -> Option<(f32, f32, f32)> {
+    /// Row height, scroll offset, furthest scroll and top padding, as laid out
+    /// by the list.
+    fn drag_metrics(&self, count: usize) -> Option<(f32, f32, f32, f32)> {
         let state = self.drag_handle()?.0.borrow();
         let size = state.last_item_size?;
-        let row = f32::from(size.contents.height) / count.max(1) as f32;
-        let most = (f32::from(size.contents.height) - f32::from(size.item.height)).max(0.);
-        (row > 0.).then(|| (row, f32::from(state.base_handle.offset().y), most))
+        let row = f32::from(size.row_height);
+        let most = (row * count as f32 - f32::from(size.item.height)).max(0.);
+        let offset = f32::from(state.base_handle.offset().y);
+        (row > 0.).then_some((row, offset, most, f32::from(size.padding_top)))
     }
 
     fn update_start(&mut self, cx: &mut Context<Self>) {
@@ -331,14 +356,16 @@ impl Soliton {
         };
         let others = count.saturating_sub(drag.rows.len());
         let grab = drag.grab;
-        let start = drag
-            .pointer
-            .zip(metrics)
-            .and_then(|((at, bounds), (row, offset, _))| {
-                bounds
-                    .contains(&at)
-                    .then(|| start_at(f32::from(at.y - bounds.top()), offset, row, grab, others))
-            });
+        let start =
+            drag.pointer
+                .zip(metrics)
+                .and_then(|((at, bounds), (row, offset, _, padding))| {
+                    // Rows start below the list's top padding.
+                    let y = f32::from(at.y - bounds.top()) - padding;
+                    bounds
+                        .contains(&at)
+                        .then(|| start_at(y, offset, row, grab, others))
+                });
         if drag.start != start {
             drag.start = start;
             cx.notify();
@@ -354,7 +381,7 @@ impl Soliton {
             return true;
         };
         let count = self.list_rows(first).len();
-        let Some((row, offset, most)) = self.drag_metrics(count) else {
+        let Some((row, offset, most, _)) = self.drag_metrics(count) else {
             return true;
         };
         let y = f32::from(at.y);
@@ -510,14 +537,7 @@ impl Soliton {
         let up = keystroke.key == "up";
         match keystroke.key.as_str() {
             "up" | "down" if modifiers.alt => {
-                let moved = if self.reorder.marked.contains(&row) {
-                    rows.iter()
-                        .copied()
-                        .filter(|r| self.reorder.marked.contains(r))
-                        .collect()
-                } else {
-                    vec![row]
-                };
+                let moved = self.block_of(&rows, row);
                 if let Some(start) = block_step(&rows, &moved, up)
                     && let Some(before) = plan_move(&rows, &moved, start)
                 {
@@ -536,8 +556,14 @@ impl Soliton {
                 } else {
                     (index + 1).min(rows.len() - 1)
                 };
-                let anchor = *self.reorder.anchor.get_or_insert(row);
-                self.reorder.marked = range_between(&rows, anchor, rows[target]);
+                // Without a visible selection in this list, this row starts a new one.
+                let reorder = &mut self.reorder;
+                let anchor = reorder
+                    .anchor
+                    .filter(|a| !reorder.marked.is_empty() && rows.contains(a))
+                    .unwrap_or(row);
+                reorder.anchor = Some(anchor);
+                reorder.marked = range_between(&rows, anchor, rows[target]);
                 self.track_focus.focus(rows[target], window, cx);
                 self.list_scroll(row)
                     .scroll_to_item(target, ScrollStrategy::Center);
@@ -545,28 +571,69 @@ impl Soliton {
                 true
             }
             "delete" => {
+                // A selected block goes as a whole, like a move; the playing
+                // queue entry stays.
+                let current = self.playback.queue.current;
+                let removed: Vec<Selection> = self
+                    .block_of(&rows, row)
+                    .into_iter()
+                    .filter(|r| !matches!(r, Selection::Queue(id) if current == Some(*id)))
+                    .collect();
+                if removed.is_empty() {
+                    return true;
+                }
                 match row {
-                    Selection::Queue(id) if self.playback.queue.current != Some(id) => {
-                        self.audio_command(Command::RemoveQueued(id), cx);
+                    Selection::Queue(_) => {
+                        for r in &removed {
+                            if let Selection::Queue(id) = *r {
+                                self.audio_command(Command::RemoveQueued(id), cx);
+                            }
+                        }
                     }
-                    Selection::Playlist { list, entry } => {
-                        if !self.change_playlist(PlaylistChange::Remove { id: list, entry }, cx) {
+                    Selection::Playlist { list, .. } => {
+                        let entries = removed
+                            .iter()
+                            .filter_map(|r| match r {
+                                Selection::Playlist { entry, .. } => Some(*entry),
+                                _ => None,
+                            })
+                            .collect();
+                        if !self.change_playlist(PlaylistChange::Remove { id: list, entries }, cx) {
                             return true;
                         }
                     }
-                    _ => return true,
+                    Selection::Album { .. } => return true,
                 }
-                // Focus stays in the list, on the row taking the removed one's place.
-                let next = rows
-                    .get(index + 1)
-                    .or(index.checked_sub(1).map(|i| &rows[i]));
-                match next {
-                    Some(&next) => self.track_focus.focus(next, window, cx),
-                    None => self.focus.focus(window),
+                self.reorder.marked.clear();
+                self.reorder.anchor = None;
+                if removed.contains(&row) {
+                    // Focus stays in the list, on the row taking the removed one's place.
+                    let next = rows[index + 1..]
+                        .iter()
+                        .chain(rows[..index].iter().rev())
+                        .find(|r| !removed.contains(r));
+                    match next {
+                        Some(&next) => self.track_focus.focus(next, window, cx),
+                        None => self.focus.focus(window),
+                    }
                 }
+                cx.notify();
                 true
             }
             _ => false,
+        }
+    }
+
+    /// The selected rows in list order when `row` is one of them, otherwise `row` alone.
+    fn block_of(&self, rows: &[Selection], row: Selection) -> Vec<Selection> {
+        let marked = &self.reorder.marked;
+        if marked.contains(&row) {
+            rows.iter()
+                .copied()
+                .filter(|r| marked.contains(r))
+                .collect()
+        } else {
+            vec![row]
         }
     }
 

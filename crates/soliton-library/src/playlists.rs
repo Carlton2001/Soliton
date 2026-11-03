@@ -67,12 +67,14 @@ impl Library {
                 require_list(&tx, id)?;
                 append(&tx, id, &tracks)?;
             }
-            PlaylistChange::Remove { id, entry } => {
+            PlaylistChange::Remove { id, entries } => {
                 require_list(&tx, id)?;
-                tx.execute(
-                    "DELETE FROM playlist_entries WHERE playlist_id=?1 AND id=?2",
-                    params![id, entry],
-                )?;
+                for entry in entries {
+                    tx.execute(
+                        "DELETE FROM playlist_entries WHERE playlist_id=?1 AND id=?2",
+                        params![id, entry],
+                    )?;
+                }
             }
             PlaylistChange::Move { id, entry, before } => {
                 move_entries(&tx, id, &[entry], before)?;

@@ -68,7 +68,7 @@ impl Soliton {
         .min_h_0();
         let track = self.playback.track.as_ref();
         let album = self.current_album().map(|a| a.id);
-        let restorable = self.original_queue_order().is_some();
+        let restorable = self.queue_restorable();
         let mut labels = vec![Text::SaveQueue, Text::ClearQueue];
         if restorable {
             labels.push(Text::RestoreOrder);
@@ -104,6 +104,10 @@ impl Soliton {
                         )
                         .on_click(cx.listener(|this, _, _, cx| {
                             if let Some(ids) = this.original_queue_order() {
+                                // Shuffling again would undo the restored order.
+                                if this.playback.shuffle {
+                                    this.set_shuffle(false, cx);
+                                }
                                 this.audio_command(
                                     Command::MoveQueuedBlock { ids, before: None },
                                     cx,

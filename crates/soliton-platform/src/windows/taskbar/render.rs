@@ -8,6 +8,10 @@ use std::path::PathBuf;
 const WIDTH: i32 = 640;
 const MARGIN: i32 = 24;
 const RAIL: i32 = 12;
+/// Bottom of the album line, the last one placed from the top.
+const TEXT_BOTTOM: i32 = MARGIN + 150 + 54;
+/// Height of the times placed above the rail, from the bottom.
+const TIMES: i32 = 66;
 /// Backdrop artwork stays quiet so the text keeps its contrast.
 const BACKDROP_OPACITY: u8 = 56;
 
@@ -88,7 +92,7 @@ impl Renderer {
         )?;
         let current = duration(state.position_ms.min(state.duration_ms));
         let total = duration(state.duration_ms);
-        let times = (MARGIN, frame_height - RAIL - 66, WIDTH - MARGIN * 2, 58);
+        let times = (MARGIN, frame_height - RAIL - TIMES, WIDTH - MARGIN * 2, 58);
         surface.figures(&current, times, 40, colors.text, false)?;
         surface.figures(&total, times, 40, colors.text, true)?;
         // Complete GDI text before writing the DIB directly for the progress bar.
@@ -109,7 +113,9 @@ impl Renderer {
 }
 
 pub(super) fn height(aspect: u32) -> i32 {
-    (WIDTH as u32 * aspect / 1000).clamp(300, 480) as i32
+    // Short enough frames would put the times over the album line.
+    let lowest = (TEXT_BOTTOM + TIMES + RAIL) as u32;
+    (WIDTH as u32 * aspect / 1000).clamp(lowest, 480) as i32
 }
 
 fn duration(milliseconds: u64) -> String {

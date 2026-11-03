@@ -22,6 +22,26 @@ fn seek_settled(position_ms: u64, target_ms: u64, elapsed: Duration, track_chang
     track_changed || elapsed >= SEEK_TIMEOUT || position_ms.abs_diff(target_ms) < SEEK_SETTLED_MS
 }
 
+/// Touchpad pixels per volume step.
+const WHEEL_STEP_PX: f32 = 20.;
+
+/// Volume steps for a vertical wheel event: one per notch, which scrolls one or
+/// more lines; touchpads and line fractions add up in `pending` until a step.
+pub(crate) fn wheel_steps(pending: &mut f32, delta: ScrollDelta) -> i32 {
+    let amount = match delta {
+        ScrollDelta::Lines(delta) if delta.y.abs() >= 1. => {
+            *pending = 0.;
+            return delta.y.signum() as i32;
+        }
+        ScrollDelta::Lines(delta) => delta.y * WHEEL_STEP_PX,
+        ScrollDelta::Pixels(delta) => f32::from(delta.y),
+    };
+    *pending += amount;
+    let steps = (*pending / WHEEL_STEP_PX).trunc();
+    *pending -= steps * WHEEL_STEP_PX;
+    steps as i32
+}
+
 /// Library tracks whose queued copy disagrees with the catalog; a track gone
 /// from the library is unavailable.
 fn stale_availability(queue: &QueueSnapshot, tracks: &HashMap<i64, Track>) -> Vec<(i64, bool)> {
@@ -173,6 +193,7 @@ impl Soliton {
     }
 
     /// Moves to the next 5 % mark, so that a dragged value returns to the grid.
+    /// See [`wheel_steps`] for the wheel.
     pub fn step_volume(&mut self, up: bool, cx: &mut Context<Self>) {
         let steps = self.settings.volume * 20.;
         let steps = if up {

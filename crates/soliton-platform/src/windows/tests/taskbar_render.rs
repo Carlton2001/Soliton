@@ -12,6 +12,13 @@ fn duration_progress_and_thumbnail_size_are_bounded() {
 }
 
 #[test]
+fn wide_thumbnails_keep_the_times_below_the_album_line() {
+    assert_eq!(height(562), 359);
+    assert_eq!(height(4000), 480);
+    assert!(height(1) - RAIL - TIMES >= TEXT_BOTTOM);
+}
+
+#[test]
 fn render_clears_artwork_and_uses_the_supplied_palette() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("cover.png");
