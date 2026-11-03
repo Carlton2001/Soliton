@@ -141,6 +141,7 @@ impl Soliton {
                     .child(self.network_preferences(cx))
                     .children(self.system_preferences(cx))
                     .child(self.sources_section(theme, cx))
+                    .child(self.shortcuts_section(cx))
                     .child(self.update_preferences(cx)),
             );
         // The title stays above the scrolled sections, as on the other pages.

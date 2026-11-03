@@ -2,6 +2,7 @@
 use crate::{
     app::Soliton,
     i18n::Text,
+    shortcuts::Shortcut,
     slider::OnChange,
     widgets::{CONTROL_HEIGHT, TEXT_CAPTION, TEXT_SMALL, cover, time},
 };
@@ -206,10 +207,10 @@ impl Soliton {
         let theme = self.theme();
         let p = &self.playback;
         let playing = p.state == PlaybackState::Playing;
-        let (repeat_icon, repeat_label, next_repeat) = match p.repeat {
-            Repeat::Off => ("repeat", Text::RepeatOff, Repeat::All),
-            Repeat::All => ("repeat", Text::RepeatAll, Repeat::Track),
-            Repeat::Track => ("repeat-1", Text::RepeatTrack, Repeat::Off),
+        let (repeat_icon, repeat_label) = match p.repeat {
+            Repeat::Off => ("repeat", Text::RepeatOff),
+            Repeat::All => ("repeat", Text::RepeatAll),
+            Repeat::Track => ("repeat-1", Text::RepeatTrack),
         };
         let soliton = cx.weak_entity();
         let play_pause_label = move |cx: &App| -> SharedString {
@@ -234,10 +235,11 @@ impl Soliton {
             .gap(rems(if compact { 0.25 } else { 0.5 }))
             .when(self.audio.is_none(), |v| v.opacity(0.4))
             .child(
-                crate::widgets::icon_button(
+                crate::widgets::shortcut_icon_button(
                     "shuffle",
                     "shuffle",
                     self.t(Text::Shuffle),
+                    self.shortcut_keys(Shortcut::Shuffle),
                     p.shuffle,
                     theme,
                 )
@@ -247,10 +249,11 @@ impl Soliton {
                 ),
             )
             .child(
-                crate::widgets::icon_button(
+                crate::widgets::shortcut_icon_button(
                     "previous",
                     "skip-back",
                     self.t(Text::Previous),
+                    self.shortcut_keys(Shortcut::Previous),
                     false,
                     theme,
                 )
@@ -262,16 +265,18 @@ impl Soliton {
                     "play-pause",
                     if playing { "pause" } else { "play" },
                     play_pause_label,
+                    Some(self.shortcut_keys(Shortcut::PlayPause)),
                     theme,
                 )
                 .size(rems(if compact { 2.5 } else { 3. }))
                 .on_click(cx.listener(|this, _, _, cx| this.play_pause(cx))),
             )
             .child(
-                crate::widgets::icon_button(
+                crate::widgets::shortcut_icon_button(
                     "next",
                     "skip-forward",
                     self.t(Text::Next),
+                    self.shortcut_keys(Shortcut::Next),
                     false,
                     theme,
                 )
@@ -279,15 +284,16 @@ impl Soliton {
                 .on_click(cx.listener(|this, _, _, cx| this.audio_command(Command::Next, cx))),
             )
             .child(
-                crate::widgets::icon_button(
+                crate::widgets::shortcut_icon_button(
                     "repeat",
                     repeat_icon,
                     self.labelled(self.t(Text::Repeat), self.t(repeat_label)),
+                    self.shortcut_keys(Shortcut::Repeat),
                     p.repeat != Repeat::Off,
                     theme,
                 )
                 .when(compact, |button| button.size(rems(1.75)))
-                .on_click(cx.listener(move |this, _, _, cx| this.set_repeat(next_repeat, cx))),
+                .on_click(cx.listener(|this, _, _, cx| this.cycle_repeat(cx))),
             )
             .child(
                 crate::widgets::icon_button(
@@ -411,8 +417,15 @@ impl Soliton {
             .items_center()
             .gap(rems(0.25))
             .child(
-                crate::widgets::icon_button("mute", name, self.t(label), false, theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.toggle_mute(cx))),
+                crate::widgets::shortcut_icon_button(
+                    "mute",
+                    name,
+                    self.t(label),
+                    self.shortcut_keys(Shortcut::Mute),
+                    false,
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_mute(cx))),
             )
             .child(
                 div()

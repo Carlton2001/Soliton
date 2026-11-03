@@ -67,6 +67,8 @@ pub struct Soliton {
     /// Control focused when the open menu was opened from the keyboard.
     pub menu_opener: Option<FocusHandle>,
     pub menu_was_open: bool,
+    /// Whether the settings page lists the keyboard shortcuts.
+    pub shortcuts_open: bool,
     pub album_focus: crate::list_focus::ListFocus<i64>,
     pub artist_focus: crate::list_focus::ListFocus<String>,
     pub track_focus: crate::list_focus::ListFocus<crate::track_list::Selection>,
@@ -231,6 +233,7 @@ impl Soliton {
             menu_focus: cx.focus_handle(),
             menu_opener: None,
             menu_was_open: false,
+            shortcuts_open: false,
             album_focus: Default::default(),
             artist_focus: Default::default(),
             track_focus: Default::default(),
@@ -556,6 +559,7 @@ impl Render for Soliton {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::scale::apply(self.settings.ui_rem_size, window);
         self.sync_menu_focus(window, cx);
+        self.track_list_focus(window, cx);
         // Tile and gap widths, then the list padding and scrollbar margin.
         let gap = crate::scale::scaled(crate::views::TILE_GAP * 16.);
         // Cover, padding, then the 2 px focus border on each side.

@@ -40,6 +40,7 @@ mod scale;
 mod scrollbar;
 mod service;
 mod settings_writer;
+mod shortcuts;
 mod slider;
 mod system;
 mod theme;

@@ -185,6 +185,17 @@ impl Soliton {
         self.audio_command(Command::Repeat(value), cx);
     }
 
+    /// Off, then the whole queue, then the current track.
+    pub fn cycle_repeat(&mut self, cx: &mut Context<Self>) {
+        use soliton_audio::Repeat;
+        let next = match self.playback.repeat {
+            Repeat::Off => Repeat::All,
+            Repeat::All => Repeat::Track,
+            Repeat::Track => Repeat::Off,
+        };
+        self.set_repeat(next, cx);
+    }
+
     pub fn toggle_mute(&mut self, cx: &mut Context<Self>) {
         let restored = self.muted_volume.take();
         match restored {

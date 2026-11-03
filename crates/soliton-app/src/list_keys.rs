@@ -1,10 +1,11 @@
 //! Arrow keys move the keyboard focus through the lists of the current page.
 use crate::{
     app::{Section, Soliton},
-    list_focus::moved,
+    list_focus::{moved, next_with_letter, page_rows},
     track_list::Selection,
 };
 use gpui::*;
+use soliton_core::config::AlbumSort;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum List {
@@ -26,6 +27,24 @@ impl Soliton {
         } else {
             self.playlist_focus.focused(window).map(|_| List::Playlists)
         }
+    }
+
+    /// Starts a frame; once drawn, a focused item scrolled out of view hands
+    /// the focus back to the window, and the arrows resume from it.
+    pub(super) fn track_list_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.album_focus.begin_frame();
+        self.artist_focus.begin_frame();
+        self.track_focus.begin_frame();
+        self.playlist_focus.begin_frame();
+        cx.on_next_frame(window, |this, window, _| {
+            if this.album_focus.focus_hidden(window)
+                || this.artist_focus.focus_hidden(window)
+                || this.track_focus.focus_hidden(window)
+                || this.playlist_focus.focus_hidden(window)
+            {
+                this.focus.focus(window);
+            }
+        });
     }
 
     /// List taking the arrows when no list item is focused.
@@ -96,15 +115,47 @@ impl Soliton {
         }
     }
 
-    pub(super) fn list_key(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if !matches!(key, "left" | "right" | "up" | "down") {
+    pub(super) fn list_key(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(row) = self.track_focus.focused(window)
+            && self.reorder_key(row, keystroke, window, cx)
+        {
             return;
         }
+        let key = keystroke.key.as_str();
+        let modifiers = keystroke.modifiers;
         let focused = self.focused_list(window);
+        // Typing a letter in a focused list jumps to the next name starting with it.
+        let letter = key
+            .chars()
+            .next()
+            .filter(|c| key.len() == 1 && c.is_ascii_alphanumeric())
+            .filter(|_| focused.is_some() && !modifiers.modified());
+        let page_key = matches!(key, "home" | "end" | "pageup" | "pagedown");
+        if letter.is_none() && !page_key && !matches!(key, "left" | "right" | "up" | "down") {
+            return;
+        }
         let Some(list) = focused.or_else(|| self.page_list(window)) else {
             return;
         };
         let focused = focused.is_some();
+        let pick = |index: Option<usize>,
+                    names: Option<&[&str]>,
+                    len: usize,
+                    columns: usize,
+                    scroll: &UniformListScrollHandle| match letter {
+            Some(letter) => {
+                next_with_letter(names?.iter().copied(), index, letter.to_ascii_lowercase())
+            }
+            None => {
+                let page = page_rows(scroll, len.div_ceil(columns));
+                target(focused, index, len, columns, page, key)
+            }
+        };
         match list {
             List::Albums => {
                 let columns = if self.settings.album_grid {
@@ -117,15 +168,28 @@ impl Soliton {
                     .focused(window)
                     .or(self.album_focus.last)
                     .or(self.selected);
-                let index = current.and_then(|id| {
-                    self.visible
-                        .iter()
-                        .position(|&album| self.snapshot.albums[album].id == id)
-                });
-                let Some(target) = target(focused, index, self.visible.len(), columns, key) else {
+                let albums: Vec<_> = self
+                    .visible
+                    .iter()
+                    .map(|&album| &self.snapshot.albums[album])
+                    .collect();
+                let index = current.and_then(|id| albums.iter().position(|a| a.id == id));
+                // Letters follow the sorted name.
+                let names: Option<Vec<&str>> = match self.settings.album_sort {
+                    AlbumSort::Artist => Some(albums.iter().map(|a| a.artist.as_str()).collect()),
+                    AlbumSort::Title => Some(albums.iter().map(|a| a.title.as_str()).collect()),
+                    _ => None,
+                };
+                let Some(target) = pick(
+                    index,
+                    names.as_deref(),
+                    albums.len(),
+                    columns,
+                    &self.album_scroll,
+                ) else {
                     return;
                 };
-                let id = self.snapshot.albums[self.visible[target]].id;
+                let id = albums[target].id;
                 self.album_focus.focus(id, window, cx);
                 self.album_scroll
                     .scroll_to_item(target / columns, ScrollStrategy::Center);
@@ -149,7 +213,10 @@ impl Soliton {
                     .focused(window)
                     .or_else(|| self.artist_focus.last.clone());
                 let index = current.and_then(|name| names.iter().position(|n| *n == name));
-                let Some(target) = target(focused, index, names.len(), columns, key) else {
+                let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+                let Some(target) =
+                    pick(index, Some(&refs), names.len(), columns, &self.facet_scroll)
+                else {
                     return;
                 };
                 self.artist_focus.focus(names[target].clone(), window, cx);
@@ -157,26 +224,34 @@ impl Soliton {
                     .scroll_to_item(target / columns, ScrollStrategy::Center);
             }
             // Rows only move vertically.
-            List::Tracks if matches!(key, "up" | "down") => {
+            List::Tracks | List::Playlists if matches!(key, "left" | "right") => return,
+            List::Tracks => {
                 let Some((rows, scroll)) = self.track_rows() else {
                     return;
                 };
                 let current = self.track_focus.focused(window).or(self.track_focus.last);
                 let index = current.and_then(|row| rows.iter().position(|r| *r == row));
-                let Some(target) = target(focused, index, rows.len(), 1, key) else {
+                let Some(target) = pick(index, None, rows.len(), 1, &scroll) else {
                     return;
                 };
                 self.track_focus.focus(rows[target], window, cx);
                 scroll.scroll_to_item(target, ScrollStrategy::Center);
             }
-            List::Playlists if matches!(key, "up" | "down") => {
+            List::Playlists => {
                 let ids: Vec<_> = self.playlists.lists.iter().map(|p| p.id).collect();
+                let names: Vec<&str> = self
+                    .playlists
+                    .lists
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect();
                 let current = self
                     .playlist_focus
                     .focused(window)
                     .or(self.playlist_focus.last);
                 let index = current.and_then(|id| ids.iter().position(|i| *i == id));
-                let Some(target) = target(focused, index, ids.len(), 1, key) else {
+                let Some(target) = pick(index, Some(&names), ids.len(), 1, &self.playlists.scroll)
+                else {
                     return;
                 };
                 self.playlist_focus.focus(ids[target], window, cx);
@@ -184,23 +259,23 @@ impl Soliton {
                     .scroll
                     .scroll_to_item(target, ScrollStrategy::Center);
             }
-            List::Tracks | List::Playlists => return,
         }
         cx.notify();
     }
 }
 
-/// Item an arrow key focuses: the next one from a focused item, otherwise the
-/// item where the list was left, or its first item.
+/// Item a navigation key focuses: the next one from a focused item, otherwise
+/// the item where the list was left, or its first item.
 fn target(
     focused: bool,
     index: Option<usize>,
     len: usize,
     columns: usize,
+    page: usize,
     key: &str,
 ) -> Option<usize> {
     match index {
-        Some(index) if focused => moved(index, len, columns, key),
+        Some(index) if focused => moved(index, len, columns, page, key),
         Some(index) if index < len => Some(index),
         _ => (len > 0).then_some(0),
     }

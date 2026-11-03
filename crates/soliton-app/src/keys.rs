@@ -14,14 +14,22 @@ impl Soliton {
         let key = event.keystroke.key.as_str();
         let control = event.keystroke.modifiers.control;
         if key == "tab" {
+            // Dialogs, and menus holding the focus, keep Tab within them.
+            let trap = if self.confirm_close || self.playlists.dialog.is_some() {
+                Some(self.modal_focus.clone())
+            } else {
+                Some(self.menu_focus.clone())
+                    .filter(|menu| self.menu_open() && menu.contains_focused(window, cx))
+            };
             for _ in 0..512 {
                 if event.keystroke.modifiers.shift {
                     window.focus_prev();
                 } else {
                     window.focus_next();
                 }
-                if !(self.confirm_close || self.playlists.dialog.is_some())
-                    || self.modal_focus.contains_focused(window, cx)
+                if trap
+                    .as_ref()
+                    .is_none_or(|trap| trap.contains_focused(window, cx))
                 {
                     break;
                 }
@@ -94,17 +102,17 @@ impl Soliton {
                 self.set_ui_rem_size(self.settings.ui_rem_size.saturating_sub(1), cx);
                 return;
             }
-            "0" if control => {
+            _ if control && digit(key) == Some(0) => {
                 self.set_ui_rem_size(soliton_core::config::Settings::DEFAULT_REM_SIZE, cx);
                 return;
             }
             // Sections in the order of the navigation bar.
-            "1" | "2" | "3" | "4" | "5" if control && !listening => {
-                let section = match key {
-                    "1" => Section::Artists,
-                    "2" => Section::Albums,
-                    "3" => Section::Playlists,
-                    "4" => Section::Queue,
+            _ if control && !listening && matches!(digit(key), Some(1..=5)) => {
+                let section = match digit(key) {
+                    Some(1) => Section::Artists,
+                    Some(2) => Section::Albums,
+                    Some(3) => Section::Playlists,
+                    Some(4) => Section::Queue,
                     _ => Section::Settings,
                 };
                 if section == Section::Playlists {
@@ -153,7 +161,9 @@ impl Soliton {
         match key {
             "space" if root => return self.play_pause(cx),
             "m" if root && !control => return self.toggle_mute(cx),
-            "left" | "right" if control && event.keystroke.modifiers.shift => {
+            "s" if root && !control => return self.set_shuffle(!self.playback.shuffle, cx),
+            "r" if root && !control => return self.cycle_repeat(cx),
+            "left" | "right" if control && !event.keystroke.modifiers.shift => {
                 let command = if key == "left" {
                     Command::Previous
                 } else {
@@ -185,7 +195,21 @@ impl Soliton {
             _ => {}
         }
         if !listening {
-            self.list_key(key, window, cx);
+            self.list_key(&event.keystroke, window, cx);
         }
     }
 }
+
+/// Digit of a key on the main row or the keypad. Windows names main row keys
+/// after the layout's unshifted character, as on AZERTY.
+fn digit(key: &str) -> Option<u8> {
+    const AZERTY: [&str; 10] = ["à", "&", "é", "\"", "'", "(", "-", "è", "_", "ç"];
+    key.parse()
+        .ok()
+        .filter(|&digit| digit < 10)
+        .or_else(|| AZERTY.iter().position(|&k| k == key).map(|d| d as u8))
+}
+
+#[cfg(test)]
+#[path = "tests/keys.rs"]
+mod tests;

@@ -290,6 +290,25 @@ pub fn icon_button(
     with_tooltip(icon_control(id, name, active, theme), label.into(), theme)
 }
 
+/// [`icon_button`] whose tooltip shows its keyboard shortcut beside the label.
+pub fn shortcut_icon_button(
+    id: impl Into<ElementId>,
+    name: &'static str,
+    label: impl Into<SharedString>,
+    keys: &'static str,
+    active: bool,
+    theme: Theme,
+) -> Stateful<Div> {
+    let label = label.into();
+    tooltip(
+        icon_control(id, name, active, theme),
+        Rc::new(move |_| label.clone()),
+        None,
+        Some(keys),
+        theme,
+    )
+}
+
 /// [`icon_button`] whose tooltip adds an explanation below its label.
 pub fn detailed_icon_button(
     id: impl Into<ElementId>,
@@ -307,6 +326,7 @@ pub fn accent_icon_button(
     id: impl Into<ElementId>,
     name: &'static str,
     label: impl Fn(&App) -> SharedString + 'static,
+    keys: Option<&'static str>,
     theme: Theme,
 ) -> Stateful<Div> {
     let accent = Theme {
@@ -318,10 +338,16 @@ pub fn accent_icon_button(
         ..theme
     };
     // The tooltip keeps the regular colours: on_accent text is unreadable on a panel.
-    with_live_tooltip(icon_control(id, name, true, accent), label, theme)
-        .rounded_full()
-        .border_1()
-        .border_color(theme.accent)
+    tooltip(
+        icon_control(id, name, true, accent),
+        Rc::new(label),
+        None,
+        keys,
+        theme,
+    )
+    .rounded_full()
+    .border_1()
+    .border_color(theme.accent)
 }
 
 fn icon_control(
@@ -745,6 +771,8 @@ const TIP_MAX_WIDTH: f32 = 18.;
 struct Tip {
     label: Rc<dyn Fn(&App) -> SharedString>,
     detail: Option<SharedString>,
+    /// Keyboard shortcut, dimmed beside the label.
+    keys: Option<&'static str>,
     theme: Theme,
 }
 impl Render for Tip {
@@ -766,7 +794,13 @@ impl Render for Tip {
             .font_family(UI_FONT)
             .text_size(TEXT_SMALL)
             .whitespace_nowrap()
-            .child(label)
+            .child(
+                div()
+                    .flex()
+                    .gap(rems(0.5))
+                    .child(label)
+                    .children(self.keys.map(|keys| div().opacity(0.65).child(keys))),
+            )
             .when_some(detail, |tip, detail| {
                 // Tooltips are laid out at their minimum size: a measured width lets
                 // short text keep one line and long text wrap within the window.
@@ -798,6 +832,7 @@ pub fn with_detailed_tooltip(
         element,
         Rc::new(move |_| label.clone()),
         Some(detail),
+        None,
         theme,
     )
 }
@@ -807,19 +842,21 @@ pub fn with_live_tooltip(
     label: impl Fn(&App) -> SharedString + 'static,
     theme: Theme,
 ) -> Stateful<Div> {
-    tooltip(element, Rc::new(label), None, theme)
+    tooltip(element, Rc::new(label), None, None, theme)
 }
 
 fn tooltip(
     element: Stateful<Div>,
     label: Rc<dyn Fn(&App) -> SharedString>,
     detail: Option<SharedString>,
+    keys: Option<&'static str>,
     theme: Theme,
 ) -> Stateful<Div> {
     element.tooltip(move |_, cx| {
         cx.new(|_| Tip {
             label: label.clone(),
             detail: detail.clone(),
+            keys,
             theme,
         })
         .into()

@@ -70,6 +70,18 @@ fn plan_move<T: Copy + Eq + Hash>(rows: &[T], moved: &[T], start: usize) -> Opti
     (order != rows).then_some(before)
 }
 
+/// Block position among the other rows after moving it one row up or down,
+/// or `None` at the edge of the list.
+fn block_step<T: Copy + Eq + Hash>(rows: &[T], moved: &[T], up: bool) -> Option<usize> {
+    let first = rows.iter().position(|r| moved.contains(r))?;
+    let others = rows.len() - moved.len();
+    if up {
+        first.checked_sub(1)
+    } else {
+        Some(first + 1).filter(|&start| start <= others)
+    }
+}
+
 /// Block position keeping the grabbed row under a pointer `y` relative to the list's top edge.
 fn start_at(y: f32, offset: f32, row_height: f32, grab: usize, others: usize) -> usize {
     let row = ((y - offset) / row_height).floor().max(0.) as usize;
@@ -474,6 +486,95 @@ impl Soliton {
                 );
             }
             _ => {}
+        }
+    }
+
+    /// Arrow and Delete keys on a focused queue or playlist row: Alt moves the
+    /// row, or its selected block, Shift extends the selection and Delete
+    /// removes the row. Returns whether the key was used.
+    pub(crate) fn reorder_key(
+        &mut self,
+        row: Selection,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if matches!(row, Selection::Album { .. }) || self.reorder.drag.is_some() {
+            return false;
+        }
+        let rows = self.list_rows(row);
+        let Some(index) = rows.iter().position(|&r| r == row) else {
+            return false;
+        };
+        let modifiers = keystroke.modifiers;
+        let up = keystroke.key == "up";
+        match keystroke.key.as_str() {
+            "up" | "down" if modifiers.alt => {
+                let moved = if self.reorder.marked.contains(&row) {
+                    rows.iter()
+                        .copied()
+                        .filter(|r| self.reorder.marked.contains(r))
+                        .collect()
+                } else {
+                    vec![row]
+                };
+                if let Some(start) = block_step(&rows, &moved, up)
+                    && let Some(before) = plan_move(&rows, &moved, start)
+                {
+                    self.apply_move(&moved, before, cx);
+                    self.show_order(&rows, &preview(&rows, &moved, start));
+                    let at = start + moved.iter().position(|&r| r == row).unwrap_or(0);
+                    self.list_scroll(row)
+                        .scroll_to_item(at, ScrollStrategy::Center);
+                    cx.notify();
+                }
+                true
+            }
+            "up" | "down" if modifiers.shift => {
+                let target = if up {
+                    index.saturating_sub(1)
+                } else {
+                    (index + 1).min(rows.len() - 1)
+                };
+                let anchor = *self.reorder.anchor.get_or_insert(row);
+                self.reorder.marked = range_between(&rows, anchor, rows[target]);
+                self.track_focus.focus(rows[target], window, cx);
+                self.list_scroll(row)
+                    .scroll_to_item(target, ScrollStrategy::Center);
+                cx.notify();
+                true
+            }
+            "delete" => {
+                match row {
+                    Selection::Queue(id) if self.playback.queue.current != Some(id) => {
+                        self.audio_command(Command::RemoveQueued(id), cx);
+                    }
+                    Selection::Playlist { list, entry } => {
+                        if !self.change_playlist(PlaylistChange::Remove { id: list, entry }, cx) {
+                            return true;
+                        }
+                    }
+                    _ => return true,
+                }
+                // Focus stays in the list, on the row taking the removed one's place.
+                let next = rows
+                    .get(index + 1)
+                    .or(index.checked_sub(1).map(|i| &rows[i]));
+                match next {
+                    Some(&next) => self.track_focus.focus(next, window, cx),
+                    None => self.focus.focus(window),
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn list_scroll(&self, row: Selection) -> UniformListScrollHandle {
+        match row {
+            Selection::Queue(_) => self.queue_scroll.clone(),
+            Selection::Playlist { .. } => self.playlists.scroll.clone(),
+            Selection::Album { .. } => self.track_scroll.clone(),
         }
     }
 

@@ -10,7 +10,7 @@ fn original_order_regroups_albums_by_first_appearance() {
     assert_eq!(super::original_order(&entries), [4, 1, 5, 2, 3]);
 }
 
-use super::{plan_move, preview, range_between, run_edges, start_at, toggled};
+use super::{block_step, plan_move, preview, range_between, run_edges, start_at, toggled};
 
 #[test]
 fn ctrl_adds_and_removes_single_rows() {
@@ -66,4 +66,15 @@ fn start_keeps_the_grabbed_row_under_the_pointer() {
     assert_eq!(start_at(5., 0., 10., 1, 3), 0);
     assert_eq!(start_at(5., -20., 10., 0, 3), 2);
     assert_eq!(start_at(500., 0., 10., 0, 3), 3);
+}
+
+#[test]
+fn block_step_moves_one_row_and_stops_at_edges() {
+    let rows = [1, 2, 3, 4];
+    assert_eq!(block_step(&rows, &[2], true), Some(0));
+    assert_eq!(block_step(&rows, &[2], false), Some(2));
+    assert_eq!(block_step(&rows, &[1], true), None);
+    assert_eq!(block_step(&rows, &[4], false), None);
+    assert_eq!(block_step(&rows, &[2, 3], false), Some(2));
+    assert_eq!(block_step(&rows, &[3, 4], false), None);
 }

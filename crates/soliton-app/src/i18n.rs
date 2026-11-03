@@ -203,6 +203,8 @@ pub enum Text {
     Larger,
     DefaultSize,
     StreamFormat,
+    KeyboardShortcuts,
+    Show,
 }
 
 pub fn text(language: Language, key: Text) -> &'static str {
@@ -531,6 +533,8 @@ pub fn text(language: Language, key: Text) -> &'static str {
         Text::Larger => ("Agrandir", "Larger"),
         Text::DefaultSize => ("Par défaut", "Default"),
         Text::StreamFormat => ("Format envoyé", "Stream format"),
+        Text::KeyboardShortcuts => ("Raccourcis clavier", "Keyboard shortcuts"),
+        Text::Show => ("Afficher", "Show"),
     };
     match language {
         Language::French => fr,

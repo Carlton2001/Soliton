@@ -103,6 +103,7 @@ impl AssetSource for Assets {
             "maximize-2",
             "minimize-2",
             "chevron-down",
+            "chevron-up",
             "volume-x",
             "volume-1",
             "repeat-1",
