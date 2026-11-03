@@ -150,9 +150,6 @@ impl Soliton {
                     self.visible = view.visible;
                     self.facets = view.facets;
                     self.filter_options = view.options;
-                    self.keyboard_index = self
-                        .keyboard_index
-                        .min(self.visible.len().saturating_sub(1));
                 }
                 Ok(_) => {}
                 Err(error) => {

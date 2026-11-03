@@ -272,6 +272,11 @@ impl Soliton {
             "albums",
             rows,
             cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
+                let entry = this.album_focus.left_elsewhere(
+                    this.visible
+                        .iter()
+                        .map(|&album| &this.snapshot.albums[album].id),
+                );
                 range
                     .map(|row| {
                         div()
@@ -282,8 +287,9 @@ impl Soliton {
                             .gap(rems(TILE_GAP))
                             .when(grid, |row| row.py(GRID_ROW_PADDING))
                             .children(
-                                (row * columns..((row + 1) * columns).min(this.visible.len()))
-                                    .map(|index| this.album_tile(index, side, cx)),
+                                (row * columns..((row + 1) * columns).min(this.visible.len())).map(
+                                    |index| this.album_tile(index, side, entry && index == 0, cx),
+                                ),
                             )
                     })
                     .collect()
@@ -296,24 +302,26 @@ impl Soliton {
         collection_scroll_area(list, &self.album_bar, theme)
     }
 
-    fn album_tile(&self, index: usize, side: f32, cx: &mut Context<Self>) -> AnyElement {
+    fn album_tile(
+        &self,
+        index: usize,
+        side: f32,
+        entry: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = self.theme();
         let album = &self.snapshot.albums[self.visible[index]];
         let id = album.id;
         let available = album.editions.iter().any(|e| e.available());
         let frame = div()
             .id(("album", id as usize))
-            .tab_index(0)
+            .track_focus(&self.album_focus.handle(&id, entry, cx))
             .border_2()
             .border_color(gpui::transparent_black())
             .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
             .focus(move |s| s.bg(theme.selected).border_2().border_color(theme.accent))
             .rounded(RADIUS)
             .when(Some(id) == self.selected, |view| view.bg(theme.selected))
-            .when(
-                index == self.keyboard_index && Some(id) != self.selected,
-                |view| view.bg(theme.hover),
-            )
             .when(!available, |view| view.opacity(0.55))
             .p(rems(0.5))
             .min_w_0()
@@ -321,7 +329,7 @@ impl Soliton {
             .active(move |s| s.bg(theme.pressed))
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 this.focus.focus(window);
-                this.keyboard_index = index;
+                this.album_focus.last = Some(id);
                 this.open_album(id, cx);
             }));
         if self.settings.album_grid {
@@ -479,6 +487,9 @@ impl Soliton {
             "artists",
             cards.len().div_ceil(columns),
             cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
+                let entry = this
+                    .artist_focus
+                    .left_elsewhere(cards.iter().map(|card| &card.name));
                 range
                     .map(|row| {
                         div()
@@ -495,10 +506,11 @@ impl Soliton {
                                     if !grid {
                                         return div()
                                             .id(("artist", index))
-                                            .when(index == this.keyboard_index, |v| {
-                                                v.bg(theme.hover)
-                                            })
-                                            .tab_index(0)
+                                            .track_focus(&this.artist_focus.handle(
+                                                &card.name,
+                                                entry && index == 0,
+                                                cx,
+                                            ))
                                             .border_2()
                                             .border_color(gpui::transparent_black())
                                             .capture_any_mouse_down(
@@ -534,13 +546,17 @@ impl Soliton {
                                             ))
                                             .on_click(cx.listener(move |this, _, window, cx| {
                                                 this.focus.focus(window);
+                                                this.artist_focus.last = Some(name.clone());
                                                 this.show_artist(name.clone(), cx)
                                             }));
                                     }
                                     div()
                                         .id(("artist", index))
-                                        .when(index == this.keyboard_index, |v| v.bg(theme.hover))
-                                        .tab_index(0)
+                                        .track_focus(&this.artist_focus.handle(
+                                            &card.name,
+                                            entry && index == 0,
+                                            cx,
+                                        ))
                                         .border_2()
                                         .border_color(gpui::transparent_black())
                                         .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
@@ -578,6 +594,7 @@ impl Soliton {
                                         )
                                         .on_click(cx.listener(move |this, _, window, cx| {
                                             this.focus.focus(window);
+                                            this.artist_focus.last = Some(name.clone());
                                             this.show_artist(name.clone(), cx)
                                         }))
                                 },

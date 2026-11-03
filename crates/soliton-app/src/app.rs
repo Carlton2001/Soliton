@@ -62,7 +62,10 @@ pub struct Soliton {
     pub playback: soliton_audio::Playback,
     pub focus: FocusHandle,
     pub modal_focus: FocusHandle,
-    pub keyboard_index: usize,
+    pub album_focus: crate::list_focus::ListFocus<i64>,
+    pub artist_focus: crate::list_focus::ListFocus<String>,
+    pub track_focus: crate::list_focus::ListFocus<crate::track_list::Selection>,
+    pub playlist_focus: crate::list_focus::ListFocus<i64>,
     pub album_scroll: UniformListScrollHandle,
     pub album_bar: Scrollbar,
     pub facet_scroll: UniformListScrollHandle,
@@ -220,7 +223,10 @@ impl Soliton {
             playback,
             focus: cx.focus_handle(),
             modal_focus: cx.focus_handle(),
-            keyboard_index: 0,
+            album_focus: Default::default(),
+            artist_focus: Default::default(),
+            track_focus: Default::default(),
+            playlist_focus: Default::default(),
             album_bar: bar(&lists[0]),
             album_scroll: lists[0].clone(),
             facet_scroll: lists[1].clone(),
@@ -381,7 +387,6 @@ impl Soliton {
         self.volume_popup = false;
         self.now_playing = false;
         self.section = section;
-        self.keyboard_index = 0;
         self.selected = None;
         self.track_menu = None;
         self.menu = None;

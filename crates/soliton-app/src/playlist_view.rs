@@ -232,6 +232,9 @@ impl Soliton {
                 } else {
                     crate::widgets::Density::Tight
                 };
+                let entry = this
+                    .playlist_focus
+                    .left_elsewhere(this.playlists.lists.iter().map(|p| &p.id));
                 crate::widgets::with_density(density, || {
                     range
                         .map(|i| {
@@ -244,7 +247,7 @@ impl Soliton {
                             });
                             div()
                                 .id(("playlist", id as usize))
-                                .tab_index(0)
+                                .track_focus(&this.playlist_focus.handle(&id, i == 0 && entry, cx))
                                 .border_2()
                                 .border_color(gpui::transparent_black())
                                 .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
@@ -253,6 +256,7 @@ impl Soliton {
                                 })
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.focus.focus(window);
+                                    this.playlist_focus.last = Some(id);
                                     this.open_playlist(id, cx);
                                 }))
                                 .h(rems(4.5))

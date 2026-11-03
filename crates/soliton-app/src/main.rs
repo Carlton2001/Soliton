@@ -20,6 +20,8 @@ mod icon_preferences;
 mod indexing;
 mod input;
 mod keys;
+mod list_focus;
+mod list_keys;
 mod navigation;
 mod notices;
 mod now_playing;

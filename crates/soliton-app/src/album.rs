@@ -9,7 +9,7 @@ use gpui::{prelude::*, *};
 use soliton_core::model::{Album, Edition};
 
 impl Soliton {
-    fn selected_album(&self) -> Option<(&Album, usize)> {
+    pub(crate) fn selected_album(&self) -> Option<(&Album, usize)> {
         let album = self
             .snapshot
             .albums

@@ -61,6 +61,25 @@ pub(crate) fn same_list(a: Selection, b: Selection) -> bool {
     }
 }
 
+/// Whether two rows belong to the same displayed track list.
+fn same_rows(a: Selection, b: Selection) -> bool {
+    match (a, b) {
+        (
+            Selection::Album {
+                album: a,
+                edition: x,
+                ..
+            },
+            Selection::Album {
+                album: b,
+                edition: y,
+                ..
+            },
+        ) => a == b && x == y,
+        _ => same_list(a, b),
+    }
+}
+
 impl Soliton {
     pub fn selection_row(&self, row: TrackRow<'_>, cx: &mut Context<Self>) -> AnyElement {
         self.album_selection_row(row, false, cx)
@@ -79,6 +98,12 @@ impl Soliton {
             Selection::Playlist { entry, .. } => entry as usize,
             Selection::Album { track, .. } => track as usize,
         };
+        // Rows of another list leave Tab on this list's first row.
+        let entry = row.index == 0
+            && !self
+                .track_focus
+                .last
+                .is_some_and(|last| same_rows(last, selection));
         let playing = row.current && self.playback.state == soliton_audio::PlaybackState::Playing;
         let editable = !matches!(selection, Selection::Album { .. });
         let marked = self.reorder.marked.contains(&selection);
@@ -137,6 +162,11 @@ impl Soliton {
         };
         let line = div()
             .id(("selection-row", key))
+            .track_focus(&self.track_focus.handle(&selection, entry, cx))
+            .border_2()
+            .border_color(gpui::transparent_black())
+            .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
+            .focus(move |s| s.bg(theme.selected).border_color(theme.accent))
             .relative()
             .w_full()
             .min_w_0()
@@ -168,6 +198,11 @@ impl Soliton {
                 )
             })
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                this.track_focus.last = Some(selection);
+                // Enter or Space on the focused row plays it.
+                if event.is_keyboard() {
+                    return this.selection_action(selection, Action::Play, window, cx);
+                }
                 if editable && !this.reorder_click(selection, event, cx) {
                     return;
                 }

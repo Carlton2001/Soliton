@@ -123,12 +123,13 @@ impl Soliton {
         if typing {
             return;
         }
-        // Focused controls receive GPUI's Enter/Space click on key-up.
-        if !self.focus.is_focused(window) {
+        // Focused controls and list items receive GPUI's Enter/Space click on key-up.
+        let root = self.focus.is_focused(window);
+        if !root && self.focused_list(window).is_none() {
             return;
         }
         match key {
-            "space" => return self.play_pause(cx),
+            "space" if root => return self.play_pause(cx),
             "up" | "down" if control => {
                 let delta = if key == "up" { 0.05 } else { -0.05 };
                 self.set_volume(self.settings.volume + delta, true, cx);
@@ -152,80 +153,8 @@ impl Soliton {
             }
             _ => {}
         }
-        if listening {
-            return;
+        if !listening {
+            self.list_key(key, window, cx);
         }
-        if self.section == Section::Artists
-            && !self.now_playing
-            && self.menu.is_none()
-            && matches!(key, "left" | "right" | "up" | "down" | "enter")
-        {
-            let query = soliton_core::text::fold(&self.search.read(cx).content);
-            let names: Vec<_> = crate::catalog::visible_artist_cards(
-                &self.facets.artist_cards,
-                &query,
-                self.settings.hide_unavailable,
-            )
-            .map(|card| card.name.clone())
-            .collect();
-            if names.is_empty() {
-                return;
-            }
-            let step = if self.settings.artist_grid {
-                self.columns.max(1)
-            } else {
-                1
-            };
-            let last = names.len() - 1;
-            self.keyboard_index = self.keyboard_index.min(last);
-            self.keyboard_index = match key {
-                "left" => self.keyboard_index.saturating_sub(1),
-                "right" => (self.keyboard_index + 1).min(last),
-                "up" => self.keyboard_index.saturating_sub(step),
-                "down" => (self.keyboard_index + step).min(last),
-                "enter" => {
-                    self.show_artist(names[self.keyboard_index].clone(), cx);
-                    return;
-                }
-                _ => return,
-            };
-            self.facet_scroll
-                .scroll_to_item(self.keyboard_index / step, ScrollStrategy::Center);
-            cx.notify();
-            return;
-        }
-        let browsing = self.section == Section::Albums
-            && !self.now_playing
-            && (self.selected.is_none()
-                || crate::collection::split_collection(
-                    crate::navigation::content_width(window),
-                    self.section,
-                    self.selected.is_some(),
-                ))
-            && self.menu.is_none();
-        if !browsing || self.visible.is_empty() {
-            return;
-        }
-        let step = if self.settings.album_grid {
-            self.columns
-        } else {
-            1
-        };
-        let last = self.visible.len() - 1;
-        self.keyboard_index = match key {
-            "left" => self.keyboard_index.saturating_sub(1),
-            "right" => (self.keyboard_index + 1).min(last),
-            "up" => self.keyboard_index.saturating_sub(step),
-            "down" => (self.keyboard_index + step).min(last),
-            "enter" => {
-                let id = self.snapshot.albums[self.visible[self.keyboard_index.min(last)]].id;
-                self.open_album(id, cx);
-                return;
-            }
-            _ => return,
-        };
-        self.album_scroll
-            .scroll_to_item(self.keyboard_index / step, ScrollStrategy::Center);
-        cx.notify();
     }
 }
