@@ -30,16 +30,76 @@ pub const RADIUS: Rems = Rems(0.3125);
 pub const RADIUS_LARGE: Rems = Rems(0.5);
 const ICON: Rems = Rems(1.);
 
-/// Content below a page toolbar: symmetric outer insets and one gap between blocks.
+/// Content below a page toolbar. Its scrolled list owns the vertical insets, so
+/// the scrollbar spans the whole body.
 pub fn page_body() -> Div {
+    div().flex_1().min_h_0().min_w_0().flex().flex_col()
+}
+
+/// Fixed blocks above a page's scrolled list; the list's own top inset follows.
+pub fn page_intro() -> Div {
     div()
-        .flex_1()
-        .min_h_0()
-        .min_w_0()
+        .flex_none()
         .flex()
         .flex_col()
-        .py(PAGE_SECTION_GAP)
+        .pt(PAGE_SECTION_GAP)
         .gap(PAGE_SECTION_GAP)
+}
+
+/// Side of the cover in a [`summary_band`], in pixels at the 16 px reference.
+pub const SUMMARY_COVER: f32 = 80.;
+
+/// Fixed band naming what a page lists, an album, a playlist or the current
+/// track, between its toolbar and its scrolled list: cover, then a title over
+/// secondary lines. Callers may append trailing actions.
+pub fn summary_band(
+    cover: impl IntoElement,
+    title: impl IntoElement,
+    lines: impl IntoIterator<Item = AnyElement>,
+    theme: Theme,
+) -> Div {
+    div()
+        .flex_none()
+        .px(PAGE_INSET)
+        .py(PAGE_SECTION_GAP)
+        .border_b_1()
+        .border_color(theme.border)
+        .flex()
+        .items_center()
+        .gap(PAGE_SECTION_GAP)
+        .child(cover)
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .gap(rems(0.25))
+                .child(title)
+                .children(lines),
+        )
+}
+
+/// Title of a [`summary_band`], on one line.
+pub fn summary_title() -> Div {
+    div()
+        .text_size(TEXT_TITLE)
+        .font_weight(FontWeight::MEDIUM)
+        .w_full()
+        .truncate()
+        .whitespace_normal()
+        .line_clamp(1)
+}
+
+/// Secondary line of a [`summary_band`].
+pub fn summary_line(theme: Theme) -> Div {
+    div()
+        .text_size(TEXT_SMALL)
+        .text_color(theme.muted)
+        .w_full()
+        .truncate()
+        .whitespace_normal()
+        .line_clamp(1)
 }
 
 /// First row of page actions, with one owner for its surrounding space.

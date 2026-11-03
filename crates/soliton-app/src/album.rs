@@ -55,6 +55,8 @@ impl Soliton {
         .flatten()
         .collect::<Vec<_>>()
         .join(" · ");
+        // The page title already names the artist the albums come from.
+        let artist_in_title = self.filter.artist.as_deref() == Some(album.artist.as_str());
         let information = div()
             .flex()
             .flex_col()
@@ -68,35 +70,17 @@ impl Soliton {
                     .when(album.inferred("album"), |title| title.italic())
                     .child(self.album_label(&album.title)),
             )
-            .child({
-                let artist = album.artist.clone();
-                let compilation = album.compilation && artist.is_empty();
-                div()
-                    .id("album-artist")
-                    .tab_index(0)
-                    .border_2()
-                    .border_color(gpui::transparent_black())
-                    .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
-                    .focus(move |s| s.bg(theme.selected).border_2().border_color(theme.accent))
-                    .text_size(crate::widgets::TEXT_SUBTITLE)
-                    .text_color(theme.accent)
-                    .rounded(crate::widgets::RADIUS)
-                    .hover(move |s| s.bg(theme.hover))
-                    .when(album.artist_inferred(), |artist| artist.italic())
-                    .child(self.album_artist(album))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.focus.focus(window);
-                        // Various artists name no one to open.
-                        if !compilation {
-                            this.show_artist(artist.clone(), cx);
-                        }
-                    }))
+            .when(!artist_in_title, |information| {
+                information.child(
+                    self.album_artist_link(album, cx)
+                        .text_size(crate::widgets::TEXT_SUBTITLE),
+                )
             })
             .child(
                 div()
                     .font(crate::widgets::tabular_font())
                     .text_color(theme.muted)
-                    .child(summary),
+                    .child(summary.clone()),
             )
             .child(
                 div()
@@ -110,18 +94,11 @@ impl Soliton {
             .min_w_0()
             .when(wide, |v| v.flex_col().w(rems(19.)).flex_none())
             .when(!wide, |v| v.w_full().flex_none())
-            .when(!wide && !panel, |v| v.items_center())
             // The panel keeps the cover beside its summary to leave room for tracks.
             .when(panel, |v| v.items_start().flex_none())
             .child(cover(
                 edition.cover().or(album.cover()),
-                if panel {
-                    128.
-                } else if wide {
-                    280.
-                } else {
-                    112.
-                },
+                if panel { 128. } else { 280. },
                 theme,
             ))
             .child(information);
@@ -131,11 +108,11 @@ impl Soliton {
             .min_h_0()
             .flex()
             .flex_col()
-            .gap(crate::widgets::PAGE_SECTION_GAP)
-            .when(panel, |view| view.py(crate::widgets::PAGE_SECTION_GAP))
+            // The track list starts with its own scrolled top inset.
             .when(album.editions.len() > 1, |v| {
                 v.child(
                     self.editions_view(album, edition_index, cx)
+                        .mt(crate::widgets::PAGE_SECTION_GAP)
                         .when(panel, |view| view.px(crate::widgets::PAGE_INSET)),
                 )
             })
@@ -194,7 +171,7 @@ impl Soliton {
             .min_h_0()
             .flex()
             .flex_col()
-            .gap(crate::widgets::PAGE_SECTION_GAP)
+            .child(self.collection_title(cx))
             .child(
                 div()
                     .px(crate::widgets::PAGE_INSET)
@@ -221,6 +198,31 @@ impl Soliton {
                     )
                     .child(self.panel_album_actions(album, edition_index, cx)),
             )
+            .when(!wide, |page| {
+                page.child(crate::widgets::summary_band(
+                    cover(
+                        edition.cover().or(album.cover()),
+                        crate::widgets::SUMMARY_COVER,
+                        theme,
+                    ),
+                    crate::widgets::summary_title()
+                        .when(album.inferred("album"), |title| title.italic())
+                        .child(self.album_label(&album.title)),
+                    (!artist_in_title)
+                        .then(|| self.album_artist_link(album, cx).into_any_element())
+                        .into_iter()
+                        .chain([
+                            crate::widgets::summary_line(theme)
+                                .font(crate::widgets::tabular_font())
+                                .child(summary)
+                                .into_any_element(),
+                            crate::widgets::summary_line(theme)
+                                .child(quality(first))
+                                .into_any_element(),
+                        ]),
+                    theme,
+                ))
+            })
             .child(
                 div()
                     .flex_1()
@@ -228,14 +230,44 @@ impl Soliton {
                     .min_w_0()
                     .min_h_0()
                     .flex()
-                    .gap(rems(0.75))
                     .pl(crate::widgets::PAGE_INSET)
-                    .pb(crate::widgets::PAGE_SECTION_GAP)
-                    .when(!wide, |v| v.flex_col())
-                    .child(record)
+                    .gap(rems(0.75))
+                    .when(wide, |v| {
+                        v.child(record.mt(crate::widgets::PAGE_SECTION_GAP))
+                    })
                     .child(songs),
             )
             .into_any_element()
+    }
+
+    /// Album artist in the accent color, opening their albums.
+    fn album_artist_link(&self, album: &Album, cx: &mut Context<Self>) -> Stateful<Div> {
+        let theme = self.theme();
+        let artist = album.artist.clone();
+        let compilation = album.compilation && artist.is_empty();
+        div()
+            .id("album-artist")
+            .min_w_0()
+            .truncate()
+            .whitespace_normal()
+            .line_clamp(1)
+            .tab_index(0)
+            .border_2()
+            .border_color(gpui::transparent_black())
+            .capture_any_mouse_down(crate::widgets::keyboard_focus_only)
+            .focus(move |s| s.bg(theme.selected).border_2().border_color(theme.accent))
+            .text_color(theme.accent)
+            .rounded(crate::widgets::RADIUS)
+            .hover(move |s| s.bg(theme.hover))
+            .when(album.artist_inferred(), |artist| artist.italic())
+            .child(self.album_artist(album))
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.focus.focus(window);
+                // Various artists name no one to open.
+                if !compilation {
+                    this.show_artist(artist.clone(), cx);
+                }
+            }))
     }
 
     /// Keep the main action visible; secondary album operations share one menu.
@@ -443,6 +475,7 @@ impl Soliton {
             }),
         )
         .when(!compact, |list| list.pr(crate::widgets::PAGE_INSET))
+        .py(crate::widgets::PAGE_SECTION_GAP)
         .track_scroll(self.track_scroll.clone())
         .flex_1()
         .min_w_0()

@@ -44,7 +44,14 @@ pub fn position<'a>(names: impl IntoIterator<Item = &'a str>, target: char) -> O
 impl Soliton {
     /// Vertical strip in a lane right of the artist list. Clicking a letter,
     /// or dragging over the strip, scrolls to its first artist.
-    pub fn alphabet_index(&self, names: Vec<String>, columns: usize, cx: &Context<Self>) -> Div {
+    /// `inset` matches the list's vertical padding, aligning the letters with its rows.
+    pub fn alphabet_index(
+        &self,
+        names: Vec<String>,
+        columns: usize,
+        inset: Rems,
+        cx: &Context<Self>,
+    ) -> Div {
         let theme = self.theme();
         let present: Vec<char> = names.iter().map(|name| letter(name)).collect();
         let shown = self.shown_artists(names.len(), columns);
@@ -53,8 +60,8 @@ impl Soliton {
         let names: std::rc::Rc<[String]> = names.into();
         div()
             .absolute()
-            .top_0()
-            .bottom_0()
+            .top(inset)
+            .bottom(inset)
             .right(rems(MARGIN))
             .w(rems(LETTERS_WIDTH))
             .flex()
@@ -113,12 +120,15 @@ impl Soliton {
         let Some(size) = state.last_item_size.filter(|_| rows > 0) else {
             return 0..0;
         };
-        let row = f32::from(size.contents.height) / rows as f32;
+        // The list's vertical padding, split evenly, is part of its contents.
+        let height = f32::from(state.base_handle.bounds().size.height);
+        let padding = height - f32::from(size.item.height);
+        let row = (f32::from(size.contents.height) - padding) / rows as f32;
         if row <= 0. {
             return 0..0;
         }
-        let top = -f32::from(state.base_handle.offset().y);
-        let bottom = top + f32::from(size.item.height);
+        let top = -f32::from(state.base_handle.offset().y) - padding / 2.;
+        let bottom = top + height;
         let first = (top / row).floor().max(0.) as usize;
         let last = (bottom / row).ceil() as usize;
         (first * columns).min(count)..(last * columns).min(count)

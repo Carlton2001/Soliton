@@ -406,9 +406,9 @@ impl Element for UniformList {
                         if item_top < scroll_top + padding.top + offset_pixels {
                             scrolled_to_top = true;
                             updated_scroll_offset.y = -(item_top) + padding.top + offset_pixels;
-                        } else if item_bottom > scroll_top + list_height - padding.bottom {
+                        } else if item_bottom > scroll_top + padding.top + list_height {
                             scrolled_to_top = true;
-                            updated_scroll_offset.y = -(item_bottom - list_height) - padding.bottom;
+                            updated_scroll_offset.y = -(item_bottom - padding.top - list_height);
                         }
 
                         if deferred_scroll.scroll_strict
@@ -416,30 +416,37 @@ impl Element for UniformList {
                                 && (item_top < scroll_top + offset_pixels
                                     || item_bottom > scroll_top + list_height))
                         {
+                            // Targets place the item inside the padded viewport.
+                            let max_scroll_top = content_height
+                                - (list_height + padding.top + padding.bottom);
                             match deferred_scroll.strategy {
                                 ScrollStrategy::Top => {
-                                    updated_scroll_offset.y = -(item_top - offset_pixels)
-                                        .max(Pixels::ZERO)
-                                        .min(content_height - list_height)
-                                        .max(Pixels::ZERO);
+                                    updated_scroll_offset.y =
+                                        -(item_top - padding.top - offset_pixels)
+                                            .max(Pixels::ZERO)
+                                            .min(max_scroll_top)
+                                            .max(Pixels::ZERO);
                                 }
                                 ScrollStrategy::Center => {
                                     let item_center = item_top + item_height / 2.0;
 
                                     let viewport_height = list_height - offset_pixels;
                                     let viewport_center = offset_pixels + viewport_height / 2.0;
-                                    let target_scroll_top = item_center - viewport_center;
+                                    let target_scroll_top =
+                                        item_center - padding.top - viewport_center;
 
                                     updated_scroll_offset.y = -target_scroll_top
                                         .max(Pixels::ZERO)
-                                        .min(content_height - list_height)
+                                        .min(max_scroll_top)
                                         .max(Pixels::ZERO);
                                 }
                                 ScrollStrategy::Bottom => {
-                                    updated_scroll_offset.y = -(item_bottom - list_height
+                                    updated_scroll_offset.y = -(item_bottom
+                                        - padding.top
+                                        - list_height
                                         + offset_pixels)
                                         .max(Pixels::ZERO)
-                                        .min(content_height - list_height)
+                                        .min(max_scroll_top)
                                         .max(Pixels::ZERO);
                                 }
                             }
@@ -449,9 +456,11 @@ impl Element for UniformList {
 
                     let first_visible_element_ix =
                         (-(scroll_offset.y + padding.top) / item_height).floor() as usize;
-                    let last_visible_element_ix = ((-scroll_offset.y + padded_bounds.size.height)
-                        / item_height)
-                        .ceil() as usize;
+                    // Rows remain visible while they cross the bottom padding.
+                    let last_visible_element_ix =
+                        ((-scroll_offset.y + padded_bounds.size.height + padding.bottom)
+                            / item_height)
+                            .ceil() as usize;
 
                     let visible_range = first_visible_element_ix
                         ..cmp::min(last_visible_element_ix, self.item_count);
@@ -476,7 +485,7 @@ impl Element for UniformList {
                                     } else {
                                         scroll_offset.x
                                     },
-                                    item_height * ix + scroll_offset.y + padding.top,
+                                    item_height * ix + scroll_offset.y,
                                 );
                             let available_width = if can_scroll_horizontally {
                                 padded_bounds.size.width + scroll_offset.x.abs()
@@ -500,7 +509,7 @@ impl Element for UniformList {
                                     } else {
                                         scroll_offset.x
                                     },
-                                    scroll_offset.y + padding.top,
+                                    scroll_offset.y,
                                 ),
                             padded_bounds.size,
                         );

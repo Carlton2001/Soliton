@@ -14,6 +14,20 @@ pub(super) fn split_collection(width_in_rems: f32, section: Section, selected: b
 }
 
 impl Soliton {
+    /// Name of the collection page, kept above an album opened from it.
+    pub(super) fn collection_title(&self, cx: &App) -> Div {
+        match (self.section, &self.filter.artist) {
+            (Section::Artists, _) => self.page_title(crate::i18n::Text::Artists, cx),
+            // Coming from an artist, the page is named after them.
+            (_, Some(artist)) => self.page_title_with(
+                crate::i18n::Text::Albums,
+                self.artist_label(artist).into(),
+                cx,
+            ),
+            (_, None) => self.page_title(crate::i18n::Text::Albums, cx),
+        }
+    }
+
     pub(super) fn collection_view(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let width = crate::navigation::content_width(window);
         let split = split_collection(width, self.section, self.selected.is_some());
@@ -32,15 +46,7 @@ impl Soliton {
                     .min_h_0()
                     .flex()
                     .flex_col()
-                    .child(match &self.filter.artist {
-                        // Coming from an artist, the page is named after them.
-                        Some(artist) => self.page_title_with(
-                            crate::i18n::Text::Albums,
-                            self.artist_label(artist).into(),
-                            cx,
-                        ),
-                        None => self.page_title(crate::i18n::Text::Albums, cx),
-                    })
+                    .child(self.collection_title(cx))
                     .child(self.measured_header(window, cx))
                     .child(self.albums_view(cx)),
             )

@@ -290,9 +290,10 @@ impl Soliton {
             }),
         )
         .track_scroll(self.album_scroll.clone())
+        .py(collection_inset(grid))
         .flex_1()
         .min_h_0();
-        collection_scroll_area(list, &self.album_bar, theme, grid)
+        collection_scroll_area(list, &self.album_bar, theme)
     }
 
     fn album_tile(&self, index: usize, side: f32, cx: &mut Context<Self>) -> AnyElement {
@@ -586,6 +587,7 @@ impl Soliton {
             }),
         )
         .track_scroll(self.facet_scroll.clone())
+        .py(collection_inset(grid))
         .flex_1()
         .min_h_0();
         // The letter index only helps when the list scrolls.
@@ -599,9 +601,9 @@ impl Soliton {
             .child(list)
             .when(scrolls, |content| content.pr(rems(crate::alphabet::LANE)))
             .when(scrolls, |content| {
-                content.child(self.alphabet_index(names, columns, cx))
+                content.child(self.alphabet_index(names, columns, collection_inset(grid), cx))
             });
-        collection_scroll_area(content, &self.facet_bar, theme, grid)
+        collection_scroll_area(content, &self.facet_bar, theme)
     }
 
     /// Search text narrowing the artist, genre or year list.
@@ -656,19 +658,18 @@ impl Soliton {
     }
 }
 
-/// Keep padding outside GPUI's virtual list so it cannot shift row scroll offsets.
-fn collection_scroll_area(
-    content: impl IntoElement,
-    bar: &Scrollbar,
-    theme: Theme,
-    grid: bool,
-) -> AnyElement {
+/// Vertical padding of a collection list, scrolled with its rows. Grid rows
+/// already carry half a gap on each side.
+fn collection_inset(grid: bool) -> Rems {
+    if grid {
+        GRID_ROW_PADDING
+    } else {
+        crate::widgets::PAGE_SECTION_GAP
+    }
+}
+
+fn collection_scroll_area(content: impl IntoElement, bar: &Scrollbar, theme: Theme) -> AnyElement {
     crate::widgets::page_body()
-        .py(if grid {
-            GRID_ROW_PADDING
-        } else {
-            crate::widgets::PAGE_SECTION_GAP
-        })
         .child(scroll_area(content, bar, theme))
         .into_any_element()
 }

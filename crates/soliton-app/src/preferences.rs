@@ -119,7 +119,6 @@ impl Soliton {
             .size_full()
             .overflow_y_scroll()
             .track_scroll(&self.settings_bar.handle)
-            .child(self.page_title(Text::Settings, cx))
             .child(
                 // Block flow measures sections at their final width and includes
                 // their full height in the scrollable content.
@@ -144,7 +143,21 @@ impl Soliton {
                     .child(self.sources_section(theme, cx))
                     .child(self.update_preferences(cx)),
             );
-        scroll_area(content, &self.settings_bar, theme)
+        // The title stays above the scrolled sections, as on the other pages.
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(
+                // Without a toolbar, the title closes the header like one.
+                self.page_title(Text::Settings, cx)
+                    .pb(crate::widgets::PAGE_SECTION_GAP)
+                    .border_b_1()
+                    .border_color(theme.border),
+            )
+            .child(scroll_area(content, &self.settings_bar, theme))
+            .into_any_element()
     }
 
     /// Scrolls the settings so the Audio output section starts at the top once

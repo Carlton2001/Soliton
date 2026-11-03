@@ -77,6 +77,7 @@ impl Soliton {
                 }),
             )
             .track_scroll(self.playlists.scroll.clone())
+            .py(crate::widgets::PAGE_SECTION_GAP)
             .flex_1()
             .min_h_0();
             let labels = [
@@ -168,53 +169,34 @@ impl Soliton {
                 .flex_col()
                 .child(self.page_title_with(Text::Playlists, list.name.clone().into(), cx))
                 .child(toolbar)
+                .child(crate::widgets::summary_band(
+                    cover(
+                        self.playlist_cover(list),
+                        crate::widgets::SUMMARY_COVER,
+                        theme,
+                    ),
+                    crate::widgets::summary_title().child(list.name.clone()),
+                    [crate::widgets::summary_line(theme)
+                        .font(crate::widgets::tabular_font())
+                        .child(format!(
+                            "{count} {} · {}",
+                            self.t(Text::Tracks),
+                            time(duration)
+                        ))
+                        .into_any_element()],
+                    theme,
+                ))
                 .child(
                     crate::widgets::page_body()
-                        .child(
-                            div()
-                                .flex_none()
-                                .px(crate::widgets::PAGE_INSET)
-                                .flex()
-                                .items_center()
-                                .gap(crate::widgets::PAGE_SECTION_GAP)
-                                .child(cover(self.playlist_cover(list), 64., theme))
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .flex()
-                                        .flex_col()
-                                        .gap(rems(0.25))
-                                        .child(
-                                            div()
-                                                .text_size(crate::widgets::TEXT_TITLE)
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .w_full()
-                                                .truncate()
-                                                .whitespace_normal()
-                                                .line_clamp(1)
-                                                .child(list.name.clone()),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_size(TEXT_SMALL)
-                                                .font(crate::widgets::tabular_font())
-                                                .text_color(theme.muted)
-                                                .child(format!(
-                                                    "{count} {} · {}",
-                                                    self.t(Text::Tracks),
-                                                    time(duration)
-                                                )),
-                                        ),
-                                ),
-                        )
                         .when(count == 0, |page| {
                             page.child(
-                                div()
-                                    .px(crate::widgets::PAGE_INSET)
-                                    .text_size(TEXT_SMALL)
-                                    .text_color(theme.muted)
-                                    .child(self.t(Text::PlaylistEmpty)),
+                                crate::widgets::page_intro().child(
+                                    div()
+                                        .px(crate::widgets::PAGE_INSET)
+                                        .text_size(TEXT_SMALL)
+                                        .text_color(theme.muted)
+                                        .child(self.t(Text::PlaylistEmpty)),
+                                ),
                             )
                         })
                         .child(self.reorder_area(
@@ -275,15 +257,25 @@ impl Soliton {
                                 }))
                                 .h(rems(4.5))
                                 .w_full()
+                                .relative()
                                 .pl(rems(0.5))
+                                // The separator lies on the row's outer edge, under the
+                                // focus border, so content stays centered between lines.
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .left(rems(0.5))
+                                        .right_0()
+                                        .bottom(px(-2.))
+                                        .h(px(1.))
+                                        .bg(theme.border),
+                                )
                                 .child(
                                     div()
                                         .h_full()
                                         .flex()
                                         .items_center()
                                         .gap(rems(0.75))
-                                        .border_b_1()
-                                        .border_color(theme.border)
                                         .child(
                                             icon_button(
                                                 ("playlist-row-play", id as usize),
@@ -386,6 +378,7 @@ impl Soliton {
         )
         .track_scroll(self.playlists.scroll.clone())
         .px(crate::widgets::PAGE_INSET)
+        .py(crate::widgets::PAGE_SECTION_GAP)
         .flex_1()
         .min_h_0();
         div()
@@ -405,21 +398,23 @@ impl Soliton {
                 crate::widgets::page_body()
                     .when(count == 0, |v| {
                         v.child(
-                            div()
-                                .px(crate::widgets::PAGE_INSET)
-                                .flex()
-                                .flex_col()
-                                .gap(rems(0.5))
-                                .child(
-                                    div()
-                                        .text_size(crate::widgets::TEXT_TITLE)
-                                        .child(self.t(Text::NoPlaylists)),
-                                )
-                                .child(
-                                    div()
-                                        .text_color(theme.muted)
-                                        .child(self.t(Text::NoPlaylistsHint)),
-                                ),
+                            crate::widgets::page_intro().child(
+                                div()
+                                    .px(crate::widgets::PAGE_INSET)
+                                    .flex()
+                                    .flex_col()
+                                    .gap(rems(0.5))
+                                    .child(
+                                        div()
+                                            .text_size(crate::widgets::TEXT_TITLE)
+                                            .child(self.t(Text::NoPlaylists)),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(theme.muted)
+                                            .child(self.t(Text::NoPlaylistsHint)),
+                                    ),
+                            ),
                         )
                     })
                     .child(crate::views::scroll_area(rows, &self.playlists.bar, theme)),

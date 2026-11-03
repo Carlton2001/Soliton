@@ -34,6 +34,11 @@ Source: https://crates.io/crates/gpui/0.2.2
   `AnyTooltip::anchor` places an element's tooltip from that element's bottom left
   corner, above it when there is no room below and always inside the window, rather
   than at the pointer.
+- `src/elements/uniform_list.rs`: vertical padding scrolls with the rows. Rows
+  start below the top padding once instead of twice, rows crossing the bottom
+  padding stay rendered, and `scroll_to_item` places rows inside the padded
+  viewport and stops at the real end of the content. Without padding the behavior
+  is unchanged.
 
 No global log filter, no disabled debug assertions and no cursor change are applied.
 

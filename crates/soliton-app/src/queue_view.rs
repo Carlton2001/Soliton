@@ -4,7 +4,7 @@ use crate::{
     i18n::Text,
     playlists::Dialog,
     track_list::{Selection, TrackRow},
-    widgets::{TEXT_SMALL, button, cover, explained_button, quality},
+    widgets::{button, cover, explained_button, quality},
 };
 use gpui::{prelude::*, *};
 use soliton_audio::Command;
@@ -63,11 +63,11 @@ impl Soliton {
             }),
         )
         .track_scroll(self.queue_scroll.clone())
+        .py(crate::widgets::PAGE_SECTION_GAP)
         .flex_1()
         .min_h_0();
         let track = self.playback.track.as_ref();
         let album = self.current_album().map(|a| a.id);
-        let output = self.output_description();
         let restorable = self.original_queue_order().is_some();
         let mut labels = vec![Text::SaveQueue, Text::ClearQueue];
         if restorable {
@@ -134,93 +134,45 @@ impl Soliton {
             .flex_col()
             .child(self.page_title(Text::Queue, cx))
             .child(toolbar)
+            .when_some(track, |page, track| {
+                // Queued tracks may mix qualities: the playing one shows its own.
+                page.child(
+                    crate::widgets::summary_band(
+                        cover(track.cover.as_ref(), crate::widgets::SUMMARY_COVER, theme),
+                        crate::widgets::summary_title()
+                            .when(track.metadata.is_inferred("title"), |title| title.italic())
+                            .child(track.metadata.title.clone()),
+                        [
+                            crate::widgets::summary_line(theme)
+                                .child(self.track_subtitle(&track.metadata))
+                                .into_any_element(),
+                            crate::widgets::summary_line(theme)
+                                .child(quality(&track.metadata))
+                                .into_any_element(),
+                        ],
+                        theme,
+                    )
+                    .when_some(album, |band, id| {
+                        band.child(
+                            button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.focus.focus(window);
+                                    this.open_album(id, cx);
+                                })),
+                        )
+                    }),
+                )
+            })
             .child(
                 crate::widgets::page_body()
-                    .when_some(track, |v, track| {
-                        v.child(
-                            div()
-                                .mx(crate::widgets::PAGE_INSET)
-                                .flex()
-                                .items_center()
-                                .gap(rems(0.75))
-                                .child(crate::widgets::with_detailed_tooltip(
-                                    div().id("queue-track-details").flex_none().child(cover(
-                                        track.cover.as_ref(),
-                                        48.,
-                                        theme,
-                                    )),
-                                    self.t(Text::PlaybackDetails).into(),
-                                    output
-                                        .as_ref()
-                                        .map_or_else(
-                                            || quality(&track.metadata),
-                                            |output| {
-                                                format!(
-                                                    "{} · {}",
-                                                    quality(&track.metadata),
-                                                    self.labelled(self.t(Text::Output), output)
-                                                )
-                                            },
-                                        )
-                                        .into(),
-                                    theme,
-                                ))
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .flex()
-                                        .flex_col()
-                                        .gap(rems(0.25))
-                                        .child(
-                                            div()
-                                                .text_size(crate::widgets::TEXT_BODY)
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .w_full()
-                                                .truncate()
-                                                .whitespace_normal()
-                                                .line_clamp(1)
-                                                .when(
-                                                    track.metadata.is_inferred("title"),
-                                                    |title| title.italic(),
-                                                )
-                                                .child(track.metadata.title.clone()),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_size(TEXT_SMALL)
-                                                .text_color(theme.muted)
-                                                .w_full()
-                                                .truncate()
-                                                .whitespace_normal()
-                                                .line_clamp(1)
-                                                .child(self.track_subtitle(&track.metadata)),
-                                        ),
-                                )
-                                .when_some(album, |v, id| {
-                                    v.child(
-                                        button(
-                                            "queue-album",
-                                            "disc-3",
-                                            self.t(Text::GoToAlbum),
-                                            theme,
-                                        )
-                                        .on_click(
-                                            cx.listener(move |this, _, window, cx| {
-                                                this.focus.focus(window);
-                                                this.open_album(id, cx);
-                                            }),
-                                        ),
-                                    )
-                                }),
-                        )
-                    })
                     .when(count == 0, |v| {
                         v.child(
-                            div()
-                                .px(crate::widgets::PAGE_INSET)
-                                .text_color(theme.muted)
-                                .child(self.t(Text::QueueEmpty)),
+                            crate::widgets::page_intro().child(
+                                div()
+                                    .px(crate::widgets::PAGE_INSET)
+                                    .text_color(theme.muted)
+                                    .child(self.t(Text::QueueEmpty)),
+                            ),
                         )
                     })
                     .child(

@@ -245,8 +245,8 @@ impl Soliton {
                                 if matches!(selection, Selection::Album { .. }) {
                                     format!(
                                         "{} · {}",
-                                        quality(row.metadata),
-                                        self.artist_label(&row.metadata.artist)
+                                        self.artist_label(&row.metadata.artist),
+                                        quality(row.metadata)
                                     )
                                 } else {
                                     self.track_subtitle(row.metadata)

@@ -88,7 +88,19 @@ impl Soliton {
                                                     .map(|t| self.track_subtitle(&t.metadata))
                                                     .unwrap_or_default(),
                                             ),
-                                    ),
+                                    )
+                                    .when_some(track, |info, track| {
+                                        info.child(
+                                            div()
+                                                .w_full()
+                                                .truncate()
+                                                .whitespace_normal()
+                                                .line_clamp(1)
+                                                .text_size(TEXT_CAPTION)
+                                                .text_color(theme.muted)
+                                                .child(crate::widgets::quality(&track.metadata)),
+                                        )
+                                    }),
                             ),
                     )
                     .child(self.transport(compact, cx).flex_none())
