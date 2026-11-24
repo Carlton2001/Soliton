@@ -41,15 +41,16 @@ environment: Fedora Workstation (GNOME, Wayland, PipeWire).
   panel go through it. No URI or file outside the library is accepted. Without
   a session bus, playback continues and a warning is shown; a lost connection
   is restarted with the next state change, at most every 30 s.
-- **GPU**: at launch, Vulkan drivers of cards with no connected screen
-  (`/sys/class/drm/card*-*/status`) are excluded through
-  `VK_LOADER_DRIVERS_DISABLE` (NVIDIA, AMD or Intel by vendor), so a sleeping
-  card is not woken at startup, kept awake, or woken at exit (about 2 s
-  observed). Nothing changes if no screen is detected or if the user or desktop
-  already selects a GPU (`VK_LOADER_DRIVERS_SELECT`, `VK_LOADER_DRIVERS_DISABLE`,
-  `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `MESA_VK_DEVICE_SELECT`, `DRI_PRIME`,
-  `__NV_PRIME_RENDER_OFFLOAD`, the last one set by GNOME's "Launch using
-  Discrete Graphics Card").
+- **GPU**: at launch on hybrid systems, Soliton reads the Wayland compositor's
+  preferred GPU through linux-dmabuf feedback. It keeps Vulkan drivers for
+  that vendor and filters other detected vendors through
+  `VK_LOADER_DRIVERS_DISABLE`. This lets a session rendered on NVIDIA start
+  even when the laptop display is wired to Intel. On X11 or when Wayland
+  feedback is unavailable, a vendor is filtered only if all its cards are
+  suspended and another GPU is available. Explicit user or desktop choices
+  take precedence (`VK_LOADER_DRIVERS_SELECT`, `VK_LOADER_DRIVERS_DISABLE`,
+  `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `VK_ADD_DRIVER_FILES`,
+  `MESA_VK_DEVICE_SELECT`, `DRI_PRIME`, `__NV_PRIME_RENDER_OFFLOAD`).
 - **System accent**: read from the XDG Settings portal
   (`org.freedesktop.appearance`, `accent-color`, GNOME 47+ and KDE Plasma,
   Flatpak included) at start, then on each `SettingChanged` signal, on a thread

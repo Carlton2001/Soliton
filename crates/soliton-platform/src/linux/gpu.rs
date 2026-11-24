@@ -1,13 +1,21 @@
-//! Keep Vulkan to the GPUs that drive a screen. The loader otherwise opens
-//! every installed driver: a sleeping discrete GPU is woken at startup, kept
-//! awake while Soliton runs and woken again to release it at exit.
-use std::{collections::BTreeSet, fs, path::Path};
+//! Prefer the GPU the desktop renders with. The Vulkan loader otherwise opens
+//! every installed driver, which can wake a sleeping discrete GPU.
+//! Adapted from Oxyde-GPUI (Carlton2001, GPL-3.0-only).
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
+
+mod compositor;
+
+const DISABLED: &str = "VK_LOADER_DRIVERS_DISABLE";
 
 /// Variables through which a user, the desktop ("Launch using Discrete GPU")
 /// or a driver chooses the GPU. Any of them leaves the choice untouched.
 const USER_CHOICE: &[&str] = &[
     "VK_LOADER_DRIVERS_SELECT",
-    "VK_LOADER_DRIVERS_DISABLE",
+    DISABLED,
     "VK_DRIVER_FILES",
     "VK_ICD_FILENAMES",
     "VK_ADD_DRIVER_FILES",
@@ -26,49 +34,63 @@ fn drivers(vendor: u16) -> &'static [&'static str] {
     }
 }
 
-/// Globs of the drivers of GPU vendors with no connected screen, or `None`
-/// when nothing is known to be safe to disable. `gpus` lists each card's
-/// vendor and whether one of its connectors is connected.
-pub(super) fn idle_drivers(gpus: &[(u16, bool)]) -> Option<String> {
-    let shown: BTreeSet<u16> = gpus.iter().filter(|g| g.1).map(|g| g.0).collect();
-    // No screen seen (sysfs hidden, headless session): change nothing.
-    if shown.is_empty() {
+struct Card {
+    name: String,
+    vendor: u16,
+    device: PathBuf,
+    suspended: bool,
+}
+
+fn read_cards(drm: &Path) -> Vec<Card> {
+    let Ok(entries) = fs::read_dir(drm) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            name.strip_prefix("card")?.parse::<u32>().ok()?;
+            let device = fs::canonicalize(entry.path().join("device")).ok()?;
+            let vendor = fs::read_to_string(device.join("vendor")).ok()?;
+            let vendor = u16::from_str_radix(vendor.trim().trim_start_matches("0x"), 16).ok()?;
+            let suspended = fs::read_to_string(device.join("power/runtime_status"))
+                .is_ok_and(|status| status.trim() == "suspended");
+            Some(Card {
+                name,
+                vendor,
+                device,
+                suspended,
+            })
+        })
+        .collect()
+}
+
+/// A primary DRM node and a render node can point to the same PCI device.
+fn card_of_node<'a>(cards: &'a [Card], dev_char: &Path, node: &str) -> Option<&'a Card> {
+    let device = fs::canonicalize(dev_char.join(node).join("device")).ok()?;
+    cards.iter().find(|card| card.device == device)
+}
+
+fn idle_drivers(cards: &[Card], rendering: Option<&Card>) -> Option<String> {
+    let kept: BTreeSet<u16> = cards
+        .iter()
+        .filter(|card| rendering.map_or(!card.suspended, |chosen| card.vendor == chosen.vendor))
+        .map(|card| card.vendor)
+        .collect();
+    // Without a GPU to keep, let Vulkan pick from all available drivers.
+    if kept.is_empty() {
         return None;
     }
-    let idle: BTreeSet<u16> = gpus
+    let idle: BTreeSet<u16> = cards
         .iter()
-        .map(|g| g.0)
-        .filter(|vendor| !shown.contains(vendor))
+        .map(|card| card.vendor)
+        .filter(|vendor| !kept.contains(vendor))
         .collect();
     let globs: Vec<&str> = idle.into_iter().flat_map(drivers).copied().collect();
     (!globs.is_empty()).then(|| globs.join(","))
 }
 
-fn read_gpus(drm: &Path) -> Vec<(u16, bool)> {
-    let Ok(entries) = fs::read_dir(drm) else {
-        return Vec::new();
-    };
-    let names: Vec<String> = entries
-        .flatten()
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    names
-        .iter()
-        .filter(|name| name.starts_with("card") && !name.contains('-'))
-        .filter_map(|card| {
-            let vendor = fs::read_to_string(drm.join(card).join("device/vendor")).ok()?;
-            let vendor = u16::from_str_radix(vendor.trim().trim_start_matches("0x"), 16).ok()?;
-            let prefix = format!("{card}-");
-            let connected = names.iter().filter(|n| n.starts_with(&prefix)).any(|n| {
-                fs::read_to_string(drm.join(n).join("status"))
-                    .is_ok_and(|s| s.trim() == "connected")
-            });
-            Some((vendor, connected))
-        })
-        .collect()
-}
-
-/// Must run before any other thread exists. Returns the disabled drivers.
+/// Must run before any other thread exists. Returns the disabled drivers and why.
 pub fn prefer_display_gpu() -> Option<String> {
     if USER_CHOICE
         .iter()
@@ -76,10 +98,24 @@ pub fn prefer_display_gpu() -> Option<String> {
     {
         return None;
     }
-    let globs = idle_drivers(&read_gpus(Path::new("/sys/class/drm")))?;
+    let cards = read_cards(Path::new("/sys/class/drm"));
+    let vendors: BTreeSet<u16> = cards
+        .iter()
+        .map(|card| card.vendor)
+        .filter(|vendor| !drivers(*vendor).is_empty())
+        .collect();
+    if vendors.len() < 2 {
+        return None;
+    }
+    let rendering = compositor::main_device()
+        .and_then(|node| card_of_node(&cards, Path::new("/sys/dev/char"), &node));
+    let globs = idle_drivers(&cards, rendering)?;
     // SAFETY: called first in `main`, while the process has a single thread.
-    unsafe { std::env::set_var("VK_LOADER_DRIVERS_DISABLE", &globs) };
-    Some(globs)
+    unsafe { std::env::set_var(DISABLED, &globs) };
+    Some(match rendering {
+        Some(card) => format!("{globs} (Wayland compositor GPU: {})", card.name),
+        None => format!("{globs} (GPUs in runtime suspend)"),
+    })
 }
 
 #[cfg(test)]
