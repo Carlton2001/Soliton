@@ -3,22 +3,26 @@
 Windows packaging and update scripts were adapted from Oxyde-GPUI, Copyright
 (C) 2026 Carlton2001, GPL-3.0. See the [Linux guide](LINUX.md) for Linux packages.
 
-## Updates (Windows)
+## In-app updates
 
 The updater checks for a newer stable release at startup when enabled, and on
 demand in Settings. It defaults to `Carlton2001/Soliton`. Set
 `SOLITON_UPDATE_REPOSITORY` before building to target another repository.
 GitHub Actions sets it to the repository running the workflow.
 
-The published release's `latest.json` specifies the version, installer URL and
-base64 Minisign signature. The updater checks the signature against the compiled
-public key and requires its trusted comment to match `soliton-version:<version>`.
-WinHTTP runs on a worker, with a 64 KiB limit for the manifest and 512 MiB for
-the installer.
+The published release's `latest.json` specifies the version and a URL and base64
+Minisign signature for each asset, the Windows Setup and Linux user archive.
+The updater checks the signature against the compiled public key and requires its
+trusted comment to match `soliton-version:<version>`. WinHTTP on Windows and
+`curl` on Linux run on a worker with a 64 KiB limit for the manifest and 512 MiB
+for the update asset.
 
-Installation starts when the user clicks the update notice. Setup waits for
-Soliton to exit, replaces the program files and relaunches it. On failure,
-Soliton stays open and can retry. Portable mode opens the download page.
+Installation starts when the user clicks the update notice. On Windows, Setup
+waits for Soliton to exit, replaces the program files and relaunches it. Portable
+mode opens the download page. On Linux, the updater recognizes the executable
+and launcher installed by `install.sh`, runs the verified archive's installer
+and relaunches Soliton after it saves the session and exits. If installation
+fails, Soliton stays open so the user can retry.
 
 ## Build on Windows x64
 
@@ -56,12 +60,12 @@ scenarios are in the [development guide](DEVELOPMENT.md#manual-hardware-scenario
 
 ## Signing
 
-Windows builds use Minisign for the updater. SmartScreen can still display a
-warning on first launch.
+The updater uses Minisign on Windows and Linux. Windows SmartScreen can display
+a warning on first launch.
 
 | Key | Public (repository) | Signs |
 |---|---|---|
-| Minisign | `installer/signing/soliton-update.pub` | the Windows installer, checked by the updater |
+| Minisign | `installer/signing/soliton-update.pub` | the Windows installer and Linux archive, checked by the updater |
 | GPG ed25519 `7BFC00A65179DAEDD7CD26298EED1CC9F8CE693B` | `installer/signing/soliton-packages.asc` | the RPM (embedded signature) and `SHA256SUMS` (detached `SHA256SUMS.asc`), which lists every package |
 
 Private keys stay outside the repository. The
@@ -72,7 +76,8 @@ the repository public keys and replaces individual checksums with
 The release workflow uses these values.
 
 - Repository variable `SOLITON_UPDATE_PUBLIC_KEY` is the `base64 -w0` output for
-  `soliton-update.pub`. Set the same value for local builds that use the updater.
+  `soliton-update.pub`. Set the same value for local Windows builds that use the
+  updater. Linux builds default to the key checked into the repository.
 - The `release` environment uses `SOLITON_UPDATE_PRIVATE_KEY` (content of
   `update.key`), `SOLITON_UPDATE_PRIVATE_KEY_PASSWORD`, `SOLITON_GPG_PRIVATE_KEY`
   (`gpg --armor --export-secret-keys`) and `SOLITON_GPG_PASSPHRASE`.

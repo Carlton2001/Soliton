@@ -16,11 +16,13 @@ en place. Confirmez ce choix dans le menu ou lancez ./install.sh --uninstall --p
 
 Prérequis : session Wayland ou X11 avec Vulkan, PipeWire 0.3.49 ou plus récent
 (PulseAudio seul n'est pas pris en charge), portail XDG pour le choix des
-dossiers. install.sh avertit si Vulkan est absent.
+dossiers et flock (util-linux). install.sh avertit si Vulkan est absent.
 
 Utilisation : ajoutez vos dossiers de musique dans Paramètres. Vos fichiers,
-tags et pochettes ne sont jamais modifiés. Les mises à jour s'installent en
-relançant install.sh depuis une archive plus récente.
+tags et pochettes ne sont jamais modifiés. Dans Paramètres → À propos, vérifiez
+les mises à jour puis cliquez sur « Mettre à jour Soliton ». Soliton vérifie la
+signature et redémarre après l'installation. Cette fonction utilise curl, les
+certificats du système et tar avec gzip.
 Le binaire est construit sur Fedora 44 x86_64 ; les distributions plus
 anciennes peuvent manquer de la version de glibc requise.
 
@@ -37,11 +39,14 @@ and cache from the native data directory. Other files remain in place.
 Confirm the choice in the menu or run ./install.sh --uninstall --purge.
 
 Requirements: Wayland or X11 session with Vulkan, PipeWire 0.3.49 or later
-(PulseAudio alone is not supported), and an XDG portal for folder selection.
+(PulseAudio alone is not supported), an XDG portal for folder selection and
+flock (util-linux).
 install.sh warns when Vulkan is missing.
 
 Usage: add your music folders in Settings. Your files, tags and artwork are
-never modified. Update by running install.sh from a newer archive.
+never modified. In Settings → About, check for updates and click “Update
+Soliton”. Soliton verifies the signature and restarts after installation.
+This feature uses curl, system CA certificates and tar with gzip support.
 The binary is built on Fedora 44 x86_64; older distributions may lack the
 required glibc version.
 

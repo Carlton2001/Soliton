@@ -8,10 +8,12 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 
-use soliton_core::updates::{LIMIT, Release, parse, valid_repository};
+use soliton_core::updates::{LIMIT, Release, Target, parse, valid_repository};
+use soliton_platform::updater;
 
 #[derive(Default)]
 pub struct Updates {
+    target: Option<Target>,
     checking: bool,
     checked: bool,
     failed: bool,
@@ -31,6 +33,21 @@ fn repository() -> Option<&'static str> {
 }
 
 impl Soliton {
+    pub fn start_updates(&mut self, cx: &mut Context<Self>) {
+        let detect = cx.background_executor().spawn(async { updater::target() });
+        cx.spawn(async move |this, cx| {
+            let target = detect.await;
+            let _ = this.update(cx, |this, cx| {
+                this.updates.target = target;
+                if this.settings.check_updates {
+                    this.check_for_updates(cx);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     pub fn update_tooltip(&self) -> Text {
         if self.updates.installing {
             Text::InstallingUpdate
@@ -40,19 +57,21 @@ impl Soliton {
     }
 
     pub fn install_update(&mut self, cx: &mut Context<Self>) {
-        if !soliton_platform::updater::SUPPORTED || self.updates.installing || self.quitting {
+        if self.updates.checking || self.updates.installing || self.quitting {
             return;
         }
-        let Some(release) = self.updates.available.clone() else {
+        let (Some(target), Some(release)) = (self.updates.target, self.updates.available.clone())
+        else {
             return;
         };
-        let key = option_env!("SOLITON_UPDATE_PUBLIC_KEY").unwrap_or("");
+        let key = updater::signing_key();
+        let missing_key = key.is_none();
         self.updates.installing = true;
         let task = cx.background_executor().spawn(async move {
-            if soliton_platform::updater::is_portable().map_err(|e| e.to_string())? {
+            if updater::is_portable().map_err(|e| e.to_string())? {
                 return Ok(None);
             }
-            soliton_platform::updater::prepare(&release, key).map(Some)
+            updater::prepare(&release, key.as_deref().unwrap_or_default(), target).map(Some)
         });
         cx.spawn(async move |this, cx| {
             let result = task.await;
@@ -88,7 +107,7 @@ impl Soliton {
                         cx.notify();
                     }
                     Err(error) => {
-                        if key.trim().is_empty() {
+                        if missing_key {
                             this.updates.installing = false;
                             this.report_warning(this.t(Text::UpdateKeyMissing));
                             cx.notify();
@@ -111,13 +130,10 @@ impl Soliton {
     }
 
     pub fn check_for_updates(&mut self, cx: &mut Context<Self>) {
-        if !soliton_platform::updater::SUPPORTED {
-            return;
-        }
-        let Some(repository) = repository() else {
+        let (Some(target), Some(repository)) = (self.updates.target, repository()) else {
             return;
         };
-        if self.updates.checking || self.updates.installing {
+        if self.updates.checking || self.updates.installing || self.quitting {
             return;
         }
         self.updates.checking = true;
@@ -127,7 +143,7 @@ impl Soliton {
                 format!("https://github.com/{repository}/releases/latest/download/latest.json");
             soliton_platform::download_https(&url, LIMIT)
                 .map_err(|e| e.to_string())
-                .and_then(|bytes| parse(&bytes, env!("CARGO_PKG_VERSION"), repository))
+                .and_then(|bytes| parse(&bytes, env!("CARGO_PKG_VERSION"), repository, target))
         });
         cx.spawn(async move |this, cx| {
             let result = query.await;
@@ -156,7 +172,7 @@ impl Soliton {
             format!("Soliton {}", env!("CARGO_PKG_VERSION")),
             theme,
         );
-        if !soliton_platform::updater::SUPPORTED {
+        if self.updates.target.is_none() {
             return section(
                 self.t(Text::About),
                 None,

@@ -1,14 +1,21 @@
 # Soliton on Linux
 
 Soliton uses Vulkan on Wayland and X11, PipeWire for playback, and MPRIS for
-desktop media controls. Use the package manager, Flatpak or a newer archive to
-update the corresponding installation.
+desktop media controls. Archive installations can update from Soliton. Use the
+package manager or Flatpak to update the corresponding packages.
 
 ## Install from the archive
 
-Extract the downloaded archive and run `./install.sh` from its directory. The
-terminal menu offers install, update, reinstall and uninstall. For direct
-execution, use `./install.sh --install` or `./install.sh --uninstall`.
+Extract the downloaded archive and run `./install.sh` from its directory. For
+later versions, open **Settings → About**, check for updates and click **Update
+Soliton**. The sidebar also shows when an update is available. Soliton verifies
+the archive signature, installs it without `sudo`, saves the session and
+restarts. The archive installer uses `flock` from util-linux. The in-app updater
+also uses `curl`, CA certificates and `tar` with gzip support.
+
+Run `./install.sh` from a newer archive to bring an older installation without
+the updater up to date. The terminal menu also offers reinstall and uninstall.
+For direct execution, use `./install.sh --install` or `./install.sh --uninstall`.
 `./uninstall.sh` also removes the per-user installation.
 
 The archive is built on Fedora 44 x86_64 and requires a compatible glibc,

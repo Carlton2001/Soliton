@@ -25,6 +25,8 @@ jobs:
           rustup-init -y --default-toolchain 1.100.0 --profile minimal --no-modify-path
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Build the archive and the RPM
+        env:
+          SOLITON_UPDATE_REPOSITORY: ${{ github.repository }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           sh scripts/build-rpm.sh

@@ -51,7 +51,7 @@ fn icon_file(data: &Path) -> PathBuf {
         .join(format!("{}.svg", crate::APP_ID))
 }
 
-fn installed_by_script(data: &Path) -> Result<bool> {
+pub(super) fn installed_by_script(data: &Path) -> Result<bool> {
     let entry = data
         .join("applications")
         .join(format!("{}.desktop", crate::APP_ID));

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs Soliton for the current user, without root, from the extracted archive.
-# Run it again to update, or use --uninstall to remove the installation.
+# The in-app updater invokes --update with the running Soliton PID.
 set -eu
 
 APP_ID=io.github.Carlton2001.Soliton
@@ -21,13 +21,16 @@ usage() {
         "Usage: $0 [--install | --uninstall [--purge] | --help]"
 }
 
-if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && { [ "$1" != --uninstall ] || [ "$2" != --purge ]; }; }; then
+if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ -z "$2" ]; }; then
     usage >&2
     exit 2
 fi
-case ${1-} in
-    --help) usage; exit 0 ;;
-    ''|--install|--uninstall) ;;
+case ${1-}:${2-} in
+    --help:) usage; exit 0 ;;
+    :|--install:|--uninstall:|--uninstall:--purge) ;;
+    --update:*)
+        case ${2-} in ''|0|*[!0-9]*) exit 2 ;; esac
+        ;;
     *) usage >&2; exit 2 ;;
 esac
 
@@ -38,7 +41,7 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 action=${1-}
-purge=${2-}
+option=${2-}
 if [ -z "$action" ] && [ -t 0 ] && [ -t 1 ]; then
     entry=$data/applications/$APP_ID.desktop
     installed=false
@@ -75,7 +78,7 @@ if [ -z "$action" ] && [ -t 0 ] && [ -t 1 ]; then
                             o|O|y|Y) ;;
                             *) exit 0 ;;
                         esac
-                        purge=--purge
+                        option=--purge
                     fi
                     action=--uninstall
                     break
@@ -87,7 +90,7 @@ if [ -z "$action" ] && [ -t 0 ] && [ -t 1 ]; then
     done
 fi
 if [ "$action" = --uninstall ]; then
-    if [ -n "$purge" ]; then
+    if [ "$option" = --purge ]; then
         exec sh "$here/uninstall.sh" --purge
     fi
     exec sh "$here/uninstall.sh"
@@ -101,6 +104,11 @@ for file in bin/soliton "share/applications/$APP_ID.desktop" \
         exit 1
     fi
 done
+if [ ! -d "$here/licenses" ]; then
+    say "Archive incomplète. Les licences sont manquantes." \
+        "The archive is incomplete. The licenses are missing." >&2
+    exit 1
+fi
 
 # GPUI renders through Vulkan; the loader is a system package.
 vulkan=
@@ -115,12 +123,38 @@ if [ -z "$vulkan" ]; then
     echo "Install vulkan-loader and mesa-vulkan-drivers (Fedora) or libvulkan1 and mesa-vulkan-drivers (Debian, Ubuntu)." >&2
 fi
 
-install -Dm755 "$here/bin/soliton" "$bin/soliton"
+mkdir -p "$bin"
+# Serialize archive installations without leaving a lock file behind.
+exec 9<"$bin"
+if ! flock -n -x 9; then
+    say "Impossible de verrouiller l’installation de Soliton." \
+        "Could not lock the Soliton installation." >&2
+    exit 1
+fi
+check_update_target() {
+    if [ "$action" = --update ] && {
+        ! grep -qx 'X-Soliton-Install=user' "$data/applications/$APP_ID.desktop" ||
+            [ -L "$bin/soliton" ] || [ ! "$bin/soliton" -ef "/proc/$option/exe" ];
+    }; then
+        say "L’installation de Soliton a changé. Relancez l’application." \
+            "The Soliton installation changed. Relaunch the application." >&2
+        exit 1
+    fi
+}
+check_update_target
+
 # Exec takes one quoted argument: escape " ` $ \ for the quoting, then \ again
 # for the string value, and double % (Desktop Entry specification).
 exec_line=$(printf '%s' "$bin/soliton" | sed -e 's/[\\"`$]/\\&/g' -e 's/\\/\\\\/g' -e 's/%/%%/g')
 entry=$(mktemp)
-trap 'rm -f "$entry"' EXIT
+executable=
+license_stage=
+trap 'rm -f "$entry" ${executable:+"$executable"}; if [ -n "$license_stage" ]; then rm -rf "$license_stage"; fi' EXIT
+executable=$(mktemp "$bin/.soliton.XXXXXXXX")
+install -m755 "$here/bin/soliton" "$executable"
+mkdir -p "$doc"
+license_stage=$(mktemp -d "$doc/.licenses.XXXXXXXX")
+cp -R "$here/licenses" "$license_stage/licenses"
 while IFS= read -r line || [ -n "$line" ]; do
     if [ "$line" = "Exec=@EXEC@" ]; then
         printf 'Exec="%s"\n' "$exec_line"
@@ -128,22 +162,25 @@ while IFS= read -r line || [ -n "$line" ]; do
         printf '%s\n' "$line"
     fi
 done < "$here/share/applications/$APP_ID.desktop" > "$entry"
-install -Dm644 "$entry" "$data/applications/$APP_ID.desktop"
-install -Dm644 "$here/share/metainfo/$APP_ID.metainfo.xml" "$data/metainfo/$APP_ID.metainfo.xml"
+install -DTm644 "$entry" "$data/applications/$APP_ID.desktop"
+install -DTm644 "$here/share/metainfo/$APP_ID.metainfo.xml" "$data/metainfo/$APP_ID.metainfo.xml"
 # Soliton replaces this icon with the palette chosen in its settings.
 if [ ! -f "$data/icons/hicolor/scalable/apps/$APP_ID.svg" ]; then
-    install -Dm644 "$here/share/icons/hicolor/scalable/apps/$APP_ID.svg" \
+    install -DTm644 "$here/share/icons/hicolor/scalable/apps/$APP_ID.svg" \
         "$data/icons/hicolor/scalable/apps/$APP_ID.svg"
 fi
 touch "$data/icons/hicolor"
-install -Dm644 "$here/LICENSE" "$doc/LICENSE"
+install -DTm644 "$here/LICENSE" "$doc/LICENSE"
 rm -rf "$doc/licenses"
-mkdir -p "$doc"
-cp -R "$here/licenses" "$doc/licenses"
+mv -T "$license_stage/licenses" "$doc/licenses"
 
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database -q "$data/applications" || true
 fi
+
+# Keep the old executable usable if installing any resources fails.
+check_update_target
+mv -fT "$executable" "$bin/soliton"
 
 echo "Soliton is installed: $bin/soliton"
 echo "It appears in the applications overview. Remove it with uninstall.sh."

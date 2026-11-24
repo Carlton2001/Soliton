@@ -250,8 +250,8 @@ pub fn text(language: Language, key: Text) -> &'static str {
             "The update repository is not configured yet.",
         ),
         Text::UpdatesUnsupported => (
-            "Les mises à jour intégrées ne sont pas disponibles sur cette plateforme.",
-            "Built-in updates are not available on this platform.",
+            "Les mises à jour intégrées ne sont pas disponibles pour cette installation.",
+            "Built-in updates are not available for this installation.",
         ),
         Text::Actions => ("Actions", "Actions"),
         Text::Playlists => ("Playlists", "Playlists"),

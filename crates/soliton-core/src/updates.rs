@@ -2,6 +2,28 @@
 //! No UI, network requests or installer execution.
 pub const LIMIT: usize = 64 * 1024;
 
+#[derive(Clone, Copy)]
+pub enum Target {
+    Windows,
+    LinuxArchive,
+}
+
+impl Target {
+    fn manifest_key(self) -> &'static str {
+        match self {
+            Self::Windows => "windows-x86_64",
+            Self::LinuxArchive => "linux-x86_64",
+        }
+    }
+
+    pub fn filename(self, version: &str) -> String {
+        match self {
+            Self::Windows => format!("Soliton_{version}_x64-setup.exe"),
+            Self::LinuxArchive => format!("Soliton-{version}-x86_64-linux.tar.gz"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Release {
     pub version: String,
@@ -54,7 +76,12 @@ fn version(value: &str) -> Result<[u64; 3], String> {
         .map_err(|_| "Expected major.minor.patch".to_owned())
 }
 
-pub fn parse(bytes: &[u8], current: &str, repository: &str) -> Result<Option<Release>, String> {
+pub fn parse(
+    bytes: &[u8],
+    current: &str,
+    repository: &str,
+    target: Target,
+) -> Result<Option<Release>, String> {
     if bytes.len() > LIMIT || !valid_repository(repository) {
         return Err("Invalid update manifest".into());
     }
@@ -66,10 +93,11 @@ pub fn parse(bytes: &[u8], current: &str, repository: &str) -> Result<Option<Rel
     let version = candidate.map(|part| part.to_string()).join(".");
     let asset = manifest
         .platforms
-        .get("windows-x86_64")
-        .ok_or("Missing Windows installer")?;
+        .get(target.manifest_key())
+        .ok_or("Missing update asset for this installation")?;
     let expected = format!(
-        "https://github.com/{repository}/releases/download/v{version}/Soliton_{version}_x64-setup.exe"
+        "https://github.com/{repository}/releases/download/v{version}/{}",
+        target.filename(&version)
     );
     if asset.url != expected || asset.signature.trim().is_empty() {
         return Err("Invalid installer location or missing signature".into());

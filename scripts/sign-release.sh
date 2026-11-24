@@ -1,6 +1,6 @@
 #!/bin/sh
-# Signs the release files in place: Minisign for the Windows installer read by
-# the updater, an embedded GPG signature for the RPM, then one SHA256SUMS file
+# Signs the release files in place: Minisign for both self-update assets,
+# an embedded GPG signature for the RPM, then one SHA256SUMS file
 # listing every package with its detached GPG signature (SHA256SUMS.asc). The
 # per-package .sha256 files are replaced by SHA256SUMS. Each signature is checked against the public keys
 # committed in installer/signing before the script succeeds.
@@ -45,12 +45,14 @@ gpg() { command gpg --batch --pinentry-mode loopback --passphrase-file "$work/pa
 
 # The updater reads the Minisign signature as base64 text from latest.json, and
 # only accepts a trusted comment naming the version it offers.
-setup=$dir/Soliton_${version}_x64-setup.exe
-printf '%s\n' "$SOLITON_UPDATE_PRIVATE_KEY_PASSWORD" |
-    minisign -S -s "$work/update.key" -m "$setup" -x "$work/setup.minisig" \
-        -t "soliton-version:$version" >/dev/null
-minisign -Vq -p "$keys/soliton-update.pub" -m "$setup" -x "$work/setup.minisig"
-base64 -w0 "$work/setup.minisig" > "$setup.sig"
+for asset in "$dir/Soliton_${version}_x64-setup.exe" "$dir/Soliton-$version-x86_64-linux.tar.gz"; do
+    printf '%s\n' "$SOLITON_UPDATE_PRIVATE_KEY_PASSWORD" |
+        minisign -S -s "$work/update.key" -m "$asset" -x "$work/update.minisig" \
+            -t "soliton-version:$version" >/dev/null
+    minisign -Vq -p "$keys/soliton-update.pub" -m "$asset" -x "$work/update.minisig"
+    base64 -w0 "$work/update.minisig" > "$asset.sig"
+    rm -f "$work/update.minisig"
+done
 
 for rpm in "$dir"/*.rpm; do
     rpmsign --addsign --define "__gpg /usr/bin/gpg" --define "_gpg_name $fingerprint" \

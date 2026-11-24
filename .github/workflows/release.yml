@@ -71,7 +71,8 @@ jobs:
           RELEASE_VERSION: ${{ needs.version.outputs.version }}
         run: |
           $setup = "target/distribution/output/Soliton_$($env:RELEASE_VERSION)_x64-setup.exe"
-          ./scripts/write-update-manifest.ps1 -Version $env:RELEASE_VERSION -Setup $setup -Repository $env:GITHUB_REPOSITORY -Destination target/distribution/output/latest.json
+          $archive = "target/distribution/output/Soliton-$($env:RELEASE_VERSION)-x86_64-linux.tar.gz"
+          ./scripts/write-update-manifest.ps1 -Version $env:RELEASE_VERSION -Setup $setup -LinuxArchive $archive -Repository $env:GITHUB_REPOSITORY -Destination target/distribution/output/latest.json
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

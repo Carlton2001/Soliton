@@ -30,12 +30,19 @@ pub fn download_https(url: &str, limit: usize) -> std::io::Result<Vec<u8>> {
     {
         windows_download::download(url, limit)
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        linux::updates::download(url, limit)
+    }
+    #[cfg(not(any(
+        target_os = "windows",
+        all(target_os = "linux", target_arch = "x86_64")
+    )))]
     {
         let _ = (url, limit);
         Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
-            "Update checks require Windows",
+            "Update checks are unavailable on this platform",
         ))
     }
 }

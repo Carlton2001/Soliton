@@ -4,30 +4,40 @@ fn manifest(version: &str) -> Vec<u8> {
     let numeric = version.strip_prefix('v').unwrap_or(version);
     serde_json::to_vec(&serde_json::json!({
         "version": version,
-        "platforms": { "windows-x86_64": {
-            "url": format!("https://github.com/owner/Soliton/releases/download/v{numeric}/Soliton_{numeric}_x64-setup.exe"),
-            "signature": "signed-asset"
-        }}
+        "platforms": {
+            "windows-x86_64": {
+                "url": format!("https://github.com/owner/Soliton/releases/download/v{numeric}/Soliton_{numeric}_x64-setup.exe"),
+                "signature": "signed-asset"
+            },
+            "linux-x86_64": {
+                "url": format!("https://github.com/owner/Soliton/releases/download/v{numeric}/Soliton-{numeric}-x86_64-linux.tar.gz"),
+                "signature": "signed-archive"
+            }
+        }
     })).unwrap()
+}
+
+fn parse_windows(bytes: &[u8], current: &str, repository: &str) -> Result<Option<Release>, String> {
+    parse(bytes, current, repository, Target::Windows)
 }
 
 #[test]
 fn versions_are_compared_numerically_and_never_downgrade() {
     let manifest = manifest("0.10.0");
     assert_eq!(
-        parse(&manifest, "0.9.9", "owner/Soliton")
+        parse_windows(&manifest, "0.9.9", "owner/Soliton")
             .unwrap()
             .unwrap()
             .version,
         "0.10.0"
     );
     assert!(
-        parse(&manifest, "0.10.0", "owner/Soliton")
+        parse_windows(&manifest, "0.10.0", "owner/Soliton")
             .unwrap()
             .is_none()
     );
     assert!(
-        parse(&manifest, "1.0.0", "owner/Soliton")
+        parse_windows(&manifest, "1.0.0", "owner/Soliton")
             .unwrap()
             .is_none()
     );
@@ -35,7 +45,7 @@ fn versions_are_compared_numerically_and_never_downgrade() {
 
 #[test]
 fn only_a_release_page_in_the_configured_repository_can_be_opened() {
-    let release = parse(&manifest("v1.2.3"), "0.1.0", "owner/Soliton")
+    let release = parse_windows(&manifest("v1.2.3"), "0.1.0", "owner/Soliton")
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -66,7 +76,7 @@ fn unsigned_foreign_or_mismatched_installers_are_rejected() {
         text.replace("windows-x86_64", "linux-x86_64"),
         r#"{"version":"1.2.3"}"#.to_owned(),
     ] {
-        assert!(parse(altered.as_bytes(), "0.1.0", "owner/Soliton").is_err());
+        assert!(parse_windows(altered.as_bytes(), "0.1.0", "owner/Soliton").is_err());
     }
 }
 
@@ -79,7 +89,34 @@ fn malformed_or_oversized_manifests_and_prereleases_are_rejected() {
         br#"{"version":"1.0.+2"}"#,
         b"not JSON",
     ] {
-        assert!(parse(manifest, "0.1.0", "owner/Soliton").is_err());
+        assert!(parse_windows(manifest, "0.1.0", "owner/Soliton").is_err());
     }
-    assert!(parse(&vec![b' '; LIMIT + 1], "0.1.0", "owner/Soliton").is_err());
+    assert!(parse_windows(&vec![b' '; LIMIT + 1], "0.1.0", "owner/Soliton").is_err());
+}
+
+#[test]
+fn linux_uses_only_the_signed_archive_for_the_same_version() {
+    let manifest = String::from_utf8(manifest("1.2.3")).unwrap();
+    let parse_linux = |bytes: &str| {
+        parse(
+            bytes.as_bytes(),
+            "1.2.2",
+            "owner/Soliton",
+            Target::LinuxArchive,
+        )
+    };
+    let release = parse_linux(&manifest).unwrap().unwrap();
+    assert_eq!(release.signature, "signed-archive");
+    assert!(
+        release
+            .setup
+            .ends_with("/v1.2.3/Soliton-1.2.3-x86_64-linux.tar.gz")
+    );
+    for altered in [
+        manifest.replace("linux-x86_64\"", "linux-x86_64-rpm\""),
+        manifest.replace("1.2.3-x86_64-linux.tar.gz", "1.2.2-x86_64-linux.tar.gz"),
+        manifest.replace("signed-archive", ""),
+    ] {
+        assert!(parse_linux(&altered).is_err());
+    }
 }

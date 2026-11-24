@@ -1,12 +1,43 @@
 //! Signed installer staging, adapted from Oxyde-GPUI (Carlton2001, GPL-3.0).
 use base64::Engine;
-use soliton_core::updates::Release;
-use std::{io, path::PathBuf};
+use soliton_core::updates::{Release, Target};
+use std::{borrow::Cow, io, path::PathBuf};
 
-const SETUP_LIMIT: usize = 512 * 1024 * 1024;
+const ASSET_LIMIT: usize = 512 * 1024 * 1024;
 
-/// The signed installer and release manifest currently target Windows only.
-pub const SUPPORTED: bool = cfg!(target_os = "windows");
+/// Detect the installation on a worker before checking for updates.
+pub fn target() -> Option<Target> {
+    #[cfg(target_os = "windows")]
+    {
+        Some(Target::Windows)
+    }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        crate::linux::updates::installed_executable().map(|_| Target::LinuxArchive)
+    }
+    #[cfg(not(any(
+        target_os = "windows",
+        all(target_os = "linux", target_arch = "x86_64")
+    )))]
+    None
+}
+
+pub fn signing_key() -> Option<Cow<'static, str>> {
+    if let Some(key) = option_env!("SOLITON_UPDATE_PUBLIC_KEY").filter(|key| !key.trim().is_empty())
+    {
+        return Some(Cow::Borrowed(key));
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Some(Cow::Owned(
+            base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+                "../../../installer/signing/soliton-update.pub"
+            )),
+        ))
+    }
+    #[cfg(not(target_os = "linux"))]
+    None
+}
 
 pub struct PreparedUpdate {
     directory: tempfile::TempDir,
@@ -25,12 +56,22 @@ pub fn is_portable() -> io::Result<bool> {
 }
 
 /// Call on a worker. No file is written before the signature is verified.
-pub fn prepare(release: &Release, public_key: &str) -> Result<PreparedUpdate, String> {
+pub fn prepare(
+    release: &Release,
+    public_key: &str,
+    target: Target,
+) -> Result<PreparedUpdate, String> {
     if public_key.trim().is_empty() {
         return Err("Missing Soliton update signing key".into());
     }
-    let bytes = crate::download_https(&release.setup, SETUP_LIMIT).map_err(|e| e.to_string())?;
-    stage(&bytes, &release.signature, public_key, &release.version)
+    let bytes = crate::download_https(&release.setup, ASSET_LIMIT).map_err(|e| e.to_string())?;
+    stage(
+        &bytes,
+        &release.signature,
+        public_key,
+        &release.version,
+        target,
+    )
 }
 
 fn stage(
@@ -38,13 +79,14 @@ fn stage(
     signature: &str,
     public_key: &str,
     version: &str,
+    target: Target,
 ) -> Result<PreparedUpdate, String> {
     verify(bytes, signature, public_key, version)?;
     let directory = tempfile::Builder::new()
         .prefix("soliton-update-")
         .tempdir()
         .map_err(|e| e.to_string())?;
-    let setup = directory.path().join("soliton-setup.exe");
+    let setup = directory.path().join(target.filename(version));
     std::fs::write(&setup, bytes).map_err(|e| e.to_string())?;
     Ok(PreparedUpdate { directory, setup })
 }
@@ -100,12 +142,19 @@ impl PreparedUpdate {
             let _ = self.directory.keep();
             Ok(())
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        {
+            crate::linux::updates::install(&self.setup, self.directory.path())
+        }
+        #[cfg(not(any(
+            target_os = "windows",
+            all(target_os = "linux", target_arch = "x86_64")
+        )))]
         {
             let _ = (&self.setup, &self.directory);
             Err(io::Error::new(
                 io::ErrorKind::Unsupported,
-                "Installer updates require Windows",
+                "Installer updates are unavailable on this platform",
             ))
         }
     }

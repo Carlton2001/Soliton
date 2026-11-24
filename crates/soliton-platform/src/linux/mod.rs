@@ -5,6 +5,8 @@ pub(crate) mod documents;
 pub(crate) mod gpu;
 mod launcher_icon;
 mod mpris;
+#[cfg(target_arch = "x86_64")]
+pub(super) mod updates;
 
 use crate::{DesktopEvent, MediaState};
 use anyhow::Result;

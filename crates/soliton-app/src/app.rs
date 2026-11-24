@@ -291,9 +291,7 @@ impl Soliton {
         this.start_desktop(window);
         this.watch_tray_menu(cx);
         this.scan(Vec::new(), cx);
-        if this.settings.check_updates {
-            this.check_for_updates(cx);
-        }
+        this.start_updates(cx);
         cx.spawn_in(window, async move |this, cx| {
             let mut last_refresh = Instant::now();
             let mut interval = Duration::from_millis(60);

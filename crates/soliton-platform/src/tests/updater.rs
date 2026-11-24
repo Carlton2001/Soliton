@@ -17,22 +17,32 @@ fn encode(text: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(text)
 }
 
+fn stage_installer(
+    bytes: &[u8],
+    signature: &str,
+    key: &str,
+    version: &str,
+) -> Result<PreparedUpdate, String> {
+    stage(bytes, signature, key, version, Target::Windows)
+}
+
 #[test]
 fn only_verified_bytes_are_staged_and_dropped_preparations_clean_up() {
-    let prepared = stage(b"test", &encode(VERSIONED), &encode(TEST_KEY), "1.2.3").unwrap();
+    let prepared =
+        stage_installer(b"test", &encode(VERSIONED), &encode(TEST_KEY), "1.2.3").unwrap();
     assert_eq!(std::fs::read(&prepared.setup).unwrap(), b"test");
     let directory = prepared.directory.path().to_owned();
     drop(prepared);
     assert!(!directory.exists());
-    assert!(stage(b"Test", &encode(VERSIONED), &encode(TEST_KEY), "1.2.3").is_err());
+    assert!(stage_installer(b"Test", &encode(VERSIONED), &encode(TEST_KEY), "1.2.3").is_err());
 }
 
 #[test]
 fn a_valid_signature_for_another_version_is_refused() {
-    assert!(stage(b"test", &encode(VERSIONED), &encode(TEST_KEY), "1.2.4").is_err());
-    assert!(stage(b"test", &encode(VERSIONED), &encode(TEST_KEY), "1.2").is_err());
+    assert!(stage_installer(b"test", &encode(VERSIONED), &encode(TEST_KEY), "1.2.4").is_err());
+    assert!(stage_installer(b"test", &encode(VERSIONED), &encode(TEST_KEY), "1.2").is_err());
     // Correct bytes and key, but a trusted comment naming no version.
-    assert!(stage(b"test", &encode(SIGNATURE), &encode(KEY), "1.2.3").is_err());
+    assert!(stage_installer(b"test", &encode(SIGNATURE), &encode(KEY), "1.2.3").is_err());
     assert!(
         verify(b"test", &encode(SIGNATURE), &encode(KEY), "1.2.3")
             .unwrap_err()
@@ -42,7 +52,7 @@ fn a_valid_signature_for_another_version_is_refused() {
 
 #[test]
 fn invalid_keys_and_signatures_never_stage_an_installer() {
-    assert!(stage(b"test", "invalid", &encode(TEST_KEY), "1.2.3").is_err());
-    assert!(stage(b"test", &encode(VERSIONED), "invalid", "1.2.3").is_err());
-    assert!(stage(b"test", "", "", "1.2.3").is_err());
+    assert!(stage_installer(b"test", "invalid", &encode(TEST_KEY), "1.2.3").is_err());
+    assert!(stage_installer(b"test", &encode(VERSIONED), "invalid", "1.2.3").is_err());
+    assert!(stage_installer(b"test", "", "", "1.2.3").is_err());
 }
