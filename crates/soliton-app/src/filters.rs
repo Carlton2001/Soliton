@@ -427,7 +427,16 @@ fn dropdown(menu: AnyElement, align_right: bool) -> AnyElement {
             .mt(rems(0.25))
             .when(align_right, |anchor| anchor.right_0())
             .when(!align_right, |anchor| anchor.left_0())
-            .child(anchored().snap_to_window_with_margin(px(20.)).child(menu)),
+            .child(
+                anchored()
+                    .anchor(if align_right {
+                        Corner::TopRight
+                    } else {
+                        Corner::TopLeft
+                    })
+                    .snap_to_window_with_margin(px(20.))
+                    .child(menu),
+            ),
     )
     .with_priority(1)
     .into_any_element()
