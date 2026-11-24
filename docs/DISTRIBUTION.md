@@ -31,7 +31,7 @@ cargo run -p soliton-app
 
 ## Build on Windows x64
 
-Rust MSVC 1.98.1, C++ Build Tools, Windows SDK and, for the installer, Inno Setup
+Rust MSVC 1.100.0, C++ Build Tools, Windows SDK and, for the installer, Inno Setup
 6.3 or later.
 
 ```powershell

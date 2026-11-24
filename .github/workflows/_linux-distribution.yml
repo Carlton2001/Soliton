@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
       - name: Install Rust
         run: |
-          rustup-init -y --default-toolchain 1.98.1 --profile minimal --no-modify-path
+          rustup-init -y --default-toolchain 1.100.0 --profile minimal --no-modify-path
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Build the archive and the RPM
         run: |
@@ -57,7 +57,7 @@ jobs:
       - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-            | sh -s -- -y --default-toolchain 1.98.1 --profile minimal --no-modify-path
+            | sh -s -- -y --default-toolchain 1.100.0 --profile minimal --no-modify-path
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Build the .deb
         run: |

@@ -35,9 +35,9 @@ included); the app cannot be cross-built from Linux (GPUI shaders, `aws-lc-sys`)
 ## 1. Build and tests
 
 ```powershell
-cargo +1.98.1 fmt --check
-cargo +1.98.1 check --workspace --all-targets --locked
-cargo +1.98.1 test --workspace --locked
+cargo +1.100.0 fmt --check
+cargo +1.100.0 check --workspace --all-targets --locked
+cargo +1.100.0 test --workspace --locked
 ./scripts/check-third-party-licenses.ps1
 ```
 
@@ -51,7 +51,7 @@ cargo +1.98.1 test --workspace --locked
 Goes through the adapted window handle path:
 
 ```powershell
-cargo +1.98.1 test -p soliton-platform native_tray_smtc_artwork_commands_and_cleanup -- --ignored
+cargo +1.100.0 test -p soliton-platform native_tray_smtc_artwork_commands_and_cleanup -- --ignored
 ```
 
 - [ ] Passes
@@ -59,9 +59,9 @@ cargo +1.98.1 test -p soliton-platform native_tray_smtc_artwork_commands_and_cle
 Native audio tests, at zero volume:
 
 ```powershell
-cargo +1.98.1 test -p soliton-audio native_output -- --ignored
-cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
-cargo +1.98.1 test -p soliton-audio default_output_loss -- --ignored
+cargo +1.100.0 test -p soliton-audio native_output -- --ignored
+cargo +1.100.0 test -p soliton-audio unavailable_preference -- --ignored
+cargo +1.100.0 test -p soliton-audio default_output_loss -- --ignored
 ```
 
 - [ ] Pass
@@ -69,7 +69,7 @@ cargo +1.98.1 test -p soliton-audio default_output_loss -- --ignored
 ## 3. Manual app check
 
 ```powershell
-cargo +1.98.1 run -p soliton-app --bin Soliton --locked
+cargo +1.100.0 run -p soliton-app --bin Soliton --locked
 ```
 
 Window and icons:

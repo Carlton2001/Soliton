@@ -4501,7 +4501,7 @@ SOFTWARE.
 
 ## MIT License
 
-- form_urlencoded 1.2.2
+- form_urlencoded 1.2.3
 
 ```text
 Copyright (c) 2013-2016 The rust-url developers
@@ -4537,7 +4537,7 @@ DEALINGS IN THE SOFTWARE.
 - data-url 0.3.2
 - idna 1.1.0
 - percent-encoding 2.3.2
-- url 2.5.8
+- url 2.5.9
 
 ```text
 Copyright (c) 2013-2025 The rust-url developers
@@ -4791,8 +4791,8 @@ DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-- libsqlite3-sys 0.34.0
-- rusqlite 0.36.0
+- libsqlite3-sys 0.40.0
+- rusqlite 0.43.0
 
 ```text
 Copyright (c) 2014 The rusqlite developers
@@ -10537,6 +10537,35 @@ SOFTWARE.
 
 ## MIT License
 
+- sqlite-wasm-rs 0.6.3
+
+```text
+MIT License
+
+Copyright (c) 2024 Spxg
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
 - socket-pktinfo 0.4.1
 
 ```text
@@ -10648,6 +10677,7 @@ SOFTWARE.
 - pulp-wasm-simd-flag 0.1.1
 - r-efi 5.3.0
 - r-efi 6.0.0
+- rsqlite-vfs 0.2.0
 - seahash 4.1.0
 - simd_helpers 0.1.0
 - svg_fmt 0.4.5
@@ -12938,7 +12968,7 @@ SOFTWARE.
 
 ## MIT License
 
-- hashlink 0.10.0
+- hashlink 0.12.2
 
 ```text
 This work is derived in part from the `linked-hash-map` crate, Copyright (c)

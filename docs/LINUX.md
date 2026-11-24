@@ -103,43 +103,43 @@ are loaded at runtime); built on Fedora 44, it needs that glibc or newer.
 sudo dnf install gcc gcc-c++ make cmake pkgconf-pkg-config \
   pipewire-devel clang-devel libxkbcommon-devel libxkbcommon-x11-devel \
   freetype-devel fontconfig-devel libxcb-devel wayland-devel rustup
-rustup-init -y --default-toolchain 1.98.1 --profile minimal --component rustfmt
+rustup-init -y --default-toolchain 1.100.0 --profile minimal --component rustfmt
 . "$HOME/.cargo/env"
 ```
 
-With rustup already present: `rustup toolchain install 1.98.1 --profile minimal
+With rustup already present: `rustup toolchain install 1.100.0 --profile minimal
 --component rustfmt`. `clang-devel` generates the PipeWire bindings (`bindgen`).
 
 ## Build, test, run
 
 ```sh
-cargo +1.98.1 fmt --check
-cargo +1.98.1 check --workspace --all-targets --locked
-cargo +1.98.1 test --workspace --locked
+cargo +1.100.0 fmt --check
+cargo +1.100.0 check --workspace --all-targets --locked
+cargo +1.100.0 test --workspace --locked
 export SOLITON_DATA_DIR="$HOME/.local/share/Soliton-dev"
-RUST_LOG=info cargo +1.98.1 run -p soliton-app --bin Soliton --locked
+RUST_LOG=info cargo +1.100.0 run -p soliton-app --bin Soliton --locked
 ```
 
 `WAYLAND_DISPLAY= cargo run …` forces X11 (XWayland). `Soliton-index` checks
 indexing without a window:
 
 ```sh
-cargo +1.98.1 run -p soliton-app --bin Soliton-index --locked -- \
+cargo +1.100.0 run -p soliton-app --bin Soliton-index --locked -- \
   "$SOLITON_DATA_DIR" /path/to/a/test-collection
 ```
 
 Explicit tests in a desktop session (zero volume for audio):
 
 ```sh
-cargo +1.98.1 test -p soliton-audio native_output -- --ignored
-cargo +1.98.1 test -p soliton-audio unavailable_preference -- --ignored
-cargo +1.98.1 test -p soliton-audio chosen_sink -- --ignored
-cargo +1.98.1 test -p soliton-audio engine_pauses -- --ignored
-cargo +1.98.1 test -p soliton-audio default_following -- --ignored
-cargo +1.98.1 test -p soliton-audio default_output_loss -- --ignored
-cargo +1.98.1 test -p soliton-platform session_bus -- --ignored
-cargo +1.98.1 test -p soliton-library watch_limit -- --ignored
-cargo +1.98.1 test -p soliton-app remounted_source -- --ignored
+cargo +1.100.0 test -p soliton-audio native_output -- --ignored
+cargo +1.100.0 test -p soliton-audio unavailable_preference -- --ignored
+cargo +1.100.0 test -p soliton-audio chosen_sink -- --ignored
+cargo +1.100.0 test -p soliton-audio engine_pauses -- --ignored
+cargo +1.100.0 test -p soliton-audio default_following -- --ignored
+cargo +1.100.0 test -p soliton-audio default_output_loss -- --ignored
+cargo +1.100.0 test -p soliton-platform session_bus -- --ignored
+cargo +1.100.0 test -p soliton-library watch_limit -- --ignored
+cargo +1.100.0 test -p soliton-app remounted_source -- --ignored
 ```
 
 - `chosen_sink`, `engine_pauses` and `default_following` create a temporary
@@ -154,7 +154,7 @@ cargo +1.98.1 test -p soliton-app remounted_source -- --ignored
 ## Build the archive
 
 ```sh
-RUSTUP_TOOLCHAIN=1.98.1 scripts/build-linux.sh
+RUSTUP_TOOLCHAIN=1.100.0 scripts/build-linux.sh
 ```
 
 The script checks the license inventory (`scripts/check-third-party-licenses.sh`,
@@ -172,7 +172,7 @@ After a dependency change, regenerate the notices first: see
 ## Build the RPM
 
 ```sh
-RUSTUP_TOOLCHAIN=1.98.1 scripts/build-rpm.sh
+RUSTUP_TOOLCHAIN=1.100.0 scripts/build-rpm.sh
 ```
 
 Requires `sudo dnf install rpm-build desktop-file-utils appstream`. The script
@@ -207,7 +207,7 @@ scripts/build-deb.sh
 The binary is built on Ubuntu 24.04 (glibc 2.39): the package targets Ubuntu
 24.04 and later, Linux Mint 22 and Debian 13. Outside Ubuntu 24.04 the script
 reruns itself in a `podman` container built from
-`installer/linux/deb/Containerfile` (Rust 1.98.1, Debian tools), with its own
+`installer/linux/deb/Containerfile` (Rust 1.100.0, Debian tools), with its own
 `target/ubuntu-24.04` folder and a `soliton-ubuntu-cargo` volume for the crate
 cache. It produces `target/distribution/output/soliton_<version>-1_amd64.deb`
 and its SHA-256, then checks it with `lintian`.

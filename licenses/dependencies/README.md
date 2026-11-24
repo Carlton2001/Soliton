@@ -10,8 +10,8 @@ GPL-3.0 (see LICENSE at the root).
 ```
 
 ```sh
-cargo +1.98.1 install cargo-about --version 0.9.2 --locked --features cli
-RUSTUP_TOOLCHAIN=1.98.1 scripts/update-third-party-licenses.sh
+cargo +1.100.0 install cargo-about --version 0.9.2 --locked --features cli
+RUSTUP_TOOLCHAIN=1.100.0 scripts/update-third-party-licenses.sh
 scripts/check-third-party-licenses.sh
 ```
 

@@ -45,7 +45,7 @@ Tested formats include **WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, and AIFF**.
 
 ### Prerequisites
 
-The current validation baseline is Rust 1.98.1.
+The current validation baseline is Rust 1.100.0.
 
 - **Windows**: Rust with the MSVC x64 toolchain, and Visual Studio Build Tools with the Visual C++ build tools and Windows SDK.
 - **Linux**: a C/C++ toolchain, CMake, pkg-config, Clang, and the PipeWire, xkbcommon, FreeType, Fontconfig, XCB, and Wayland development packages; running requires Vulkan and a Wayland or X11 session. The [Linux guide](docs/LINUX.md#prepare-fedora-for-development) gives the Fedora command.

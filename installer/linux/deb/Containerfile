@@ -12,5 +12,5 @@ RUN apt-get update \
 ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
 # Writable: builds run as the invoking user (podman --userns=keep-id).
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-        | sh -s -- -y --default-toolchain 1.98.1 --profile minimal --no-modify-path \
+        | sh -s -- -y --default-toolchain 1.100.0 --profile minimal --no-modify-path \
     && chmod -R a+rwX /opt/cargo /opt/rustup
