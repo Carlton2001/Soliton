@@ -149,10 +149,10 @@ impl Soliton {
                 width
             };
         let density = self.header_density(width, window);
-        crate::widgets::with_density(density, || self.header(cx).into_any_element())
+        crate::widgets::with_density(density, || self.header(window, cx).into_any_element())
     }
 
-    fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn header(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let albums = self.section == Section::Albums;
         let grid = match self.section {
@@ -186,7 +186,7 @@ impl Soliton {
                         )
                     })
                     .child(self.search_field().w(rems(19.)).min_w(rems(8.)))
-                    .when(albums, |row| row.child(self.filter_button(cx)))
+                    .when(albums, |row| row.child(self.filter_button(window, cx)))
                     .when(albums, |row| row.child(self.sort_button(cx)))
                     .child(div().flex_1())
                     .when_some(grid, |row, grid| {

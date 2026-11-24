@@ -4,7 +4,9 @@ use crate::{
     app::{Section, Soliton},
     catalog::{Period, Quality},
     i18n::{Text, decade},
-    widgets::{button, menu_item, nav_item, popover, tinted_icon, toggle_button},
+    widgets::{
+        button, menu_item, nav_item, nav_item_label_clipped, popover, tinted_icon, toggle_button,
+    },
 };
 use gpui::{prelude::*, *};
 use soliton_core::{config::AlbumSort, text::fold};
@@ -12,6 +14,8 @@ use std::{
     collections::{BTreeSet, HashSet},
     rc::Rc,
 };
+
+const FILTER_KINDS_WIDTH: Rems = Rems(12.);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FilterKind {
@@ -171,7 +175,7 @@ impl Soliton {
         cx.notify();
     }
 
-    pub fn filter_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn filter_button(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let open = matches!(self.menu, Some(Menu::Filters(_)));
         let kind = match self.menu {
             Some(Menu::Filters(kind)) => kind,
@@ -200,7 +204,7 @@ impl Soliton {
             .when(open, |anchor| {
                 // Menu entries keep their labels at every density.
                 let menu = crate::widgets::with_density(crate::widgets::Density::Full, || {
-                    self.filters_menu(kind, cx)
+                    self.filters_menu(kind, window, cx)
                 });
                 anchor.child(dropdown(menu, false))
             })
@@ -261,7 +265,12 @@ impl Soliton {
             .into_any_element()
     }
 
-    fn filters_menu(&self, kind: FilterKind, cx: &mut Context<Self>) -> AnyElement {
+    fn filters_menu(
+        &self,
+        kind: FilterKind,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = self.theme();
         // The values column follows its longest label, measured on all values so
         // searching does not resize the menu. Check mark, paddings and scrollbar
@@ -276,11 +285,11 @@ impl Soliton {
         let values_width = (longest as f32 * 0.5 + 4.).clamp(14., 24.);
         popover(theme)
             .track_focus(&self.menu_focus)
-            .w(rems(12. + 0.5 + values_width))
+            .w(rems(FILTER_KINDS_WIDTH.0 + 0.5 + values_width))
             .h(rems(24.))
             .flex()
             .gap(rems(0.25))
-            .child(self.kinds_column(kind, cx))
+            .child(self.kinds_column(kind, window, cx))
             .child(div().w(px(1.)).h_full().bg(theme.border))
             .child(self.values_column(kind, cx))
             .into_any_element()
@@ -308,10 +317,15 @@ impl Soliton {
         )
     }
 
-    fn kinds_column(&self, selected: FilterKind, cx: &mut Context<Self>) -> impl IntoElement {
+    fn kinds_column(
+        &self,
+        selected: FilterKind,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = self.theme();
         div()
-            .w(rems(12.))
+            .w(FILTER_KINDS_WIDTH)
             .flex_shrink_0()
             .flex()
             .flex_col()
@@ -322,12 +336,14 @@ impl Soliton {
                     Some(value) => self.labelled(self.t(kind.label()), value),
                     None => self.t(kind.label()).into(),
                 };
+                let clipped = nav_item_label_clipped(&label, FILTER_KINDS_WIDTH, window);
                 nav_item(
                     ("filter-kind", kind as usize),
                     if current.is_some() { "check" } else { "tag" },
                     label,
                     kind == selected,
                     theme,
+                    clipped,
                 )
                 .h(rems(2.))
                 .min_w_0()

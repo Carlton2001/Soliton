@@ -204,11 +204,11 @@ fn styled_button(
     primary: bool,
 ) -> Stateful<Div> {
     let label = label.into();
-    with_tooltip(
-        button_control(id, name, label.clone(), theme, primary),
-        label,
-        theme,
-    )
+    let show_label = adaptive::shows_label(&label, primary);
+    button_control(id, name, label.clone(), theme, primary)
+        .when(!show_label && !label.is_empty(), |control| {
+            with_tooltip(control, label, theme)
+        })
 }
 
 fn button_control(
@@ -273,9 +273,9 @@ fn button_control(
         })
         .child(adaptive::Content {
             icon: name,
+            show_label: adaptive::shows_label(&label, primary),
             label,
             color: theme.text,
-            primary,
         })
 }
 
@@ -455,6 +455,7 @@ pub fn ghost(
     theme: Theme,
 ) -> Stateful<Div> {
     let label = label.into();
+    let show_label = adaptive::shows_label(&label, false);
     let control = div()
         .id(id)
         .tab_index(0)
@@ -479,9 +480,11 @@ pub fn ghost(
             icon: name,
             label: label.clone(),
             color: theme.muted,
-            primary: false,
+            show_label,
         });
-    with_tooltip(control, label, theme)
+    control.when(!show_label && !label.is_empty(), |control| {
+        with_tooltip(control, label, theme)
+    })
 }
 
 /// Icon-only navigation entry of the section rail; its label and optional
@@ -524,6 +527,18 @@ pub fn nav_icon(
     )
 }
 
+const NAV_ITEM_PADDING: Rems = Rems(0.75);
+const NAV_ITEM_GAP: Rems = Rems(0.625);
+
+pub fn nav_item_label_clipped(label: &str, width: Rems, window: &Window) -> bool {
+    let label_space = width.0
+        - 2. * NAV_ITEM_PADDING.0
+        - NAV_ITEM_GAP.0
+        - ICON.0
+        - f32::from(px(2.)) / f32::from(window.rem_size());
+    label.contains('\n') || label_width(label, window) > label_space
+}
+
 /// Navigation entry; selection uses a tinted background and body foreground.
 pub fn nav_item(
     id: impl Into<ElementId>,
@@ -531,6 +546,7 @@ pub fn nav_item(
     label: impl Into<SharedString>,
     selected: bool,
     theme: Theme,
+    clipped: bool,
 ) -> Stateful<Div> {
     let label = label.into();
     let entry = div()
@@ -546,8 +562,8 @@ pub fn nav_item(
         .flex_none()
         .min_w(rems(2.5))
         .items_center()
-        .gap(rems(0.625))
-        .px(rems(0.75))
+        .gap(NAV_ITEM_GAP)
+        .px(NAV_ITEM_PADDING)
         .rounded(RADIUS)
         .active(move |style| style.bg(theme.pressed))
         .whitespace_nowrap();
@@ -558,13 +574,10 @@ pub fn nav_item(
         entry.hover(move |style| style.bg(theme.hover))
     };
     // Menu entries keep their label at every density.
-    with_tooltip(
-        entry
-            .child(tinted_icon(name, color))
-            .child(div().min_w_0().truncate().child(label.clone())),
-        label,
-        theme,
-    )
+    entry
+        .child(tinted_icon(name, color))
+        .child(div().min_w_0().truncate().child(label.clone()))
+        .when(clipped, |entry| with_tooltip(entry, label, theme))
 }
 /// Mutually exclusive options drawn as one bordered control.
 pub fn segments(options: impl IntoIterator<Item = Stateful<Div>>, theme: Theme) -> Div {
@@ -611,18 +624,17 @@ pub fn segment(
         .whitespace_nowrap()
         .min_w_0();
     let option = if let Some(name) = name {
+        let show_label = adaptive::shows_label(&label, false);
         let content = option.min_w(rems(2.25)).child(adaptive::Content {
             icon: name,
             label: label.clone(),
             color,
-            primary: false,
+            show_label,
         });
         // Icon-only steppers supply their meaningful tooltip at the call site.
-        if label.is_empty() {
-            content
-        } else {
+        content.when(!show_label && !label.is_empty(), |content| {
             with_tooltip(content, label, theme)
-        }
+        })
     } else {
         option.child(label)
     };

@@ -120,6 +120,7 @@ These rules apply to every change.
 - Tooltips: anchored at the bottom left corner of their element, not the pointer,
   and kept inside the window. They always name the command; any explanation
   follows below at reduced opacity, wrapping when long.
+  Buttons with a fully visible label only show a tooltip when it adds an explanation.
 - Player: progress on top; artwork and metadata left; Shuffle, Previous,
   Play/Pause (centered), Next, Repeat, Queue; volume right, in a popover on narrow
   windows. Now Playing through the Expand button, which becomes Collapse to close

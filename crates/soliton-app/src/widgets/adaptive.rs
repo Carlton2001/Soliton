@@ -60,19 +60,21 @@ pub(super) struct Content {
     pub icon: &'static str,
     pub label: SharedString,
     pub color: Rgba,
-    /// Main actions, such as Play, are the last to lose their label.
-    pub primary: bool,
+    pub show_label: bool,
+}
+
+pub(super) fn shows_label(label: &str, primary: bool) -> bool {
+    !label.is_empty()
+        && match DENSITY.with(Cell::get) {
+            Density::Full => true,
+            Density::Compact => primary,
+            Density::Tight => false,
+        }
 }
 
 impl IntoElement for Content {
     type Element = Div;
     fn into_element(self) -> Div {
-        let show_label = !self.label.is_empty()
-            && match DENSITY.with(Cell::get) {
-                Density::Full => true,
-                Density::Compact => self.primary,
-                Density::Tight => false,
-            };
         div()
             .flex()
             .items_center()
@@ -80,6 +82,6 @@ impl IntoElement for Content {
             .gap(rems(0.5))
             .whitespace_nowrap()
             .child(super::tinted_icon(self.icon, self.color))
-            .when(show_label, |view| view.child(self.label))
+            .when(self.show_label, |view| view.child(self.label))
     }
 }
