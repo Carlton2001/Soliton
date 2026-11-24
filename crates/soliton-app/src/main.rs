@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
-    if let Some(drivers) = disabled_drivers {
+    if let Some(drivers) = &disabled_drivers {
         tracing::info!("Vulkan drivers disabled: {drivers}");
     }
     let paths = match std::env::var_os("SOLITON_DATA_DIR") {
@@ -75,7 +75,7 @@ fn main() -> anyhow::Result<()> {
     // Covers of files played without indexing only live for one session.
     let _ = std::fs::remove_dir_all(paths.covers.join("loose"));
     tracing::info!("Soliton starting");
-    Application::new()
+    soliton_platform::initialize_display(disabled_drivers.is_some(), Application::new)?
         .with_assets(assets::Assets)
         .run(move |cx| {
             assets::Assets::load_fonts(cx).expect("Cannot load the bundled fonts");

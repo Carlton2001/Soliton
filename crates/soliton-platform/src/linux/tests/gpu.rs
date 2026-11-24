@@ -1,4 +1,7 @@
-use super::{card_of_node, idle_drivers, read_cards};
+use super::{
+    DISABLED, UNFILTERED, card_of_node, gpu_initialization_failed, idle_drivers,
+    initialize_display, prefer_display_gpu, read_cards,
+};
 use std::{fs, os::unix::fs::symlink};
 
 fn sysfs(cards: &[(u16, Option<&str>)]) -> tempfile::TempDir {
@@ -77,4 +80,58 @@ fn without_a_gpu_to_keep_all_drivers_remain_available() {
     let root = sysfs(&[(0x8086, Some("suspended")), (0x10de, Some("suspended"))]);
     let cards = read_cards(&root.path().join("drm"));
     assert_eq!(idle_drivers(&cards, None), None);
+}
+
+#[test]
+fn only_vulkan_initialization_panics_request_an_unfiltered_start() {
+    use anyhow::Context as _;
+
+    fn wayland(result: anyhow::Result<()>) {
+        result.expect("Unable to init GPU context");
+    }
+
+    fn x11(result: anyhow::Result<()>) {
+        result.context("Failed to initialize X11 client.").unwrap();
+    }
+
+    let failed_starts: [fn(); 2] = [
+        || wayland(Err(anyhow::anyhow!("NoSupportedDeviceFound"))),
+        || x11(Err(anyhow::anyhow!("NoSupportedDeviceFound")).context("Unable to init GPU context")),
+    ];
+    for start in failed_starts {
+        let panic = std::panic::catch_unwind(start).unwrap_err();
+        assert!(gpu_initialization_failed(panic.as_ref()));
+    }
+
+    let panic = std::panic::catch_unwind(|| x11(Err(anyhow::anyhow!("X11 connection closed"))))
+        .unwrap_err();
+    assert!(!gpu_initialization_failed(panic.as_ref()));
+}
+
+#[test]
+fn a_failed_filtered_start_reexecutes_without_the_filter() {
+    const CHILD: &str = "SOLITON_TEST_VULKAN_RESTART";
+    if std::env::var_os(CHILD).is_some() {
+        if std::env::var_os(UNFILTERED).is_some() {
+            assert!(std::env::var_os(DISABLED).is_none());
+            assert!(prefer_display_gpu().is_none());
+            println!("Vulkan fallback completed");
+            return;
+        }
+        initialize_display(true, || panic!("Unable to init GPU context: test failure")).unwrap();
+        unreachable!("The process should have restarted");
+    }
+
+    let retry = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "a_failed_filtered_start_reexecutes_without_the_filter",
+            "--nocapture",
+        ])
+        .env(CHILD, "1")
+        .env(DISABLED, "*nvidia*")
+        .env_remove(UNFILTERED)
+        .output()
+        .unwrap();
+    assert!(retry.status.success(), "{:?}", retry);
+    assert!(String::from_utf8_lossy(&retry.stdout).contains("Vulkan fallback completed"));
 }

@@ -93,6 +93,7 @@ impl Library {
 
     /// Scans directories of a source, or the whole source when `dirs` is empty.
     /// Missing directories are replaced by their nearest existing ancestor.
+    /// Reports initial progress once the source is available, before traversal.
     pub fn scan_scope(
         &mut self,
         source_id: i64,
@@ -118,11 +119,14 @@ impl Library {
                 return Err(failure.about(source.path.display()).into());
             }
         }
-        let dirs = resolve_scope(&source.path, dirs);
         self.connection.execute(
             "UPDATE sources SET available=1,generation=generation+1 WHERE id=?1",
             [source_id],
         )?;
+        // The reader can see the source online while traversal is still pending.
+        let mut report = ScanReport::default();
+        progress(&report.progress);
+        let dirs = resolve_scope(&source.path, dirs);
         let generation: i64 = self.connection.query_row(
             "SELECT generation FROM sources WHERE id=?1",
             [source_id],
@@ -130,7 +134,6 @@ impl Library {
         )?;
         let covers = self.covers.clone();
         let root = source.path.clone();
-        let mut report = ScanReport::default();
         let mut traversal_failed = false;
         let mut unreadable = Vec::new();
         std::thread::scope(|scope| -> Result<()> {

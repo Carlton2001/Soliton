@@ -11,7 +11,7 @@ use soliton_library::{
     Cancellation, Coalescer, Interlude, Library, Prober, ScanProgress, SourceWatcher, WatchEvent,
 };
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -45,6 +45,7 @@ struct Worker {
     changes: Coalescer,
     prober: Prober,
     silence: Silence,
+    timed_out: HashSet<i64>,
     /// Background work stops when the application closes.
     background: Cancellation,
     next_probe: Instant,
@@ -88,6 +89,7 @@ pub fn run(root: &Path, work: Receiver<Work>, events: Sender<Event>, background:
         watcher,
         changes: Coalescer::new(QUIET, LONGEST),
         silence: Silence::default(),
+        timed_out: HashSet::new(),
         background,
         next_probe: now + PROBE_INTERVAL,
         next_return_probe: now + RETURN_PROBE_INTERVAL,
@@ -154,6 +156,7 @@ impl Worker {
                 if let Err(error) = self.library.remove_source(id) {
                     self.error(&error);
                 } else {
+                    self.timed_out.remove(&id);
                     self.send(Event::SourceAlertResolved(id));
                 }
                 self.sync_watcher();
@@ -196,12 +199,20 @@ impl Worker {
                 break;
             }
             let mut last = Instant::now() - Duration::from_secs(1);
+            let mut reached = false;
             let events = self.events.clone();
+            let timed_out = &mut self.timed_out;
             let result = self.library.scan_scope(
                 id,
                 &[],
                 cancellation,
                 |progress| {
+                    if !reached {
+                        reached = true;
+                        timed_out.remove(&id);
+                        let _ = events.send(Event::SourceAlertResolved(id));
+                        let _ = events.send(Event::Changed);
+                    }
                     if last.elapsed() > Duration::from_millis(100) {
                         let _ = events.try_send(Event::Progress(progress.clone()));
                         last = Instant::now();
@@ -215,20 +226,12 @@ impl Worker {
             );
             match result {
                 Ok(report) => {
-                    self.send(Event::SourceAlertResolved(id));
                     self.send(Event::Progress(report.progress));
                     for detail in report.diagnostics {
                         self.send(Event::Warning(detail));
                     }
                 }
-                Err(error) if Failure::of(&error).kind == Kind::SourceInaccessible => {
-                    if let Some(source) = self.sources().into_iter().find(|s| s.id == id) {
-                        self.send(Event::SourceUnavailable(id, source.path));
-                    } else {
-                        self.error(&error);
-                    }
-                }
-                Err(error) => self.error(&error),
+                Err(error) => self.report_source_scan_failure(id, Failure::of(&error)),
             }
         }
         if everything {
@@ -239,13 +242,37 @@ impl Worker {
         self.send(Event::Finished(cancellation.is_cancelled()));
     }
 
+    fn report_source_scan_failure(&mut self, id: i64, failure: Failure) {
+        match failure.kind {
+            Kind::SourceInaccessible => {
+                if let Some(source) = self.sources().into_iter().find(|source| source.id == id) {
+                    self.source_unavailable(id, source.path);
+                    return;
+                }
+            }
+            Kind::SourceNotResponding => {
+                self.timed_out.insert(id);
+                self.send(Event::SourceTimedOut(id, failure));
+                return;
+            }
+            _ => {}
+        }
+        self.send(Event::Error(failure));
+    }
+
+    fn source_unavailable(&mut self, id: i64, path: PathBuf) {
+        self.timed_out.remove(&id);
+        self.send(Event::SourceUnavailable(id, path));
+    }
+
     /// Scans without progress display; the interface only refreshes its view.
     fn quiet_scan(&mut self, id: i64, dirs: &[PathBuf]) {
         let was_available = self.sources().iter().any(|s| s.id == id && s.available);
         let mut last = Instant::now();
         let mut shown = 0;
-        let mut announced = was_available;
+        let mut announced = was_available && !self.timed_out.contains(&id);
         let events = self.events.clone();
+        let timed_out = &mut self.timed_out;
         let result = self.library.scan_scope(
             id,
             dirs,
@@ -254,7 +281,9 @@ impl Worker {
                 // A returning source is shown available before its scan ends.
                 if !announced {
                     announced = true;
-                    let _ = events.try_send(Event::Changed);
+                    timed_out.remove(&id);
+                    let _ = events.send(Event::SourceAlertResolved(id));
+                    let _ = events.send(Event::Changed);
                 }
                 if progress.indexed > shown && last.elapsed() > Duration::from_secs(1) {
                     shown = progress.indexed;
@@ -273,7 +302,7 @@ impl Worker {
             Err(error) => {
                 match self.sources().into_iter().find(|s| s.id == id) {
                     Some(source) if was_available && !source.available => {
-                        self.send(Event::SourceUnavailable(id, source.path));
+                        self.source_unavailable(id, source.path);
                     }
                     // A slow source is left to the availability probes.
                     _ if Failure::of(&error).kind == Kind::SourceNotResponding => {}
@@ -284,9 +313,6 @@ impl Worker {
                 return;
             }
         };
-        if !was_available {
-            self.send(Event::SourceAlertResolved(id));
-        }
         for detail in report.diagnostics.iter().cloned() {
             self.send(Event::Warning(detail));
         }
@@ -362,17 +388,22 @@ impl Worker {
                     changed = true;
                     self.quiet_scan(source.id, &[]);
                 }
-            } else if self
-                .silence
-                .unreachable(source.id, answer, Instant::now(), SILENCE_LIMIT)
-            {
-                match self.library.set_source_available(source.id, false) {
-                    Ok(true) => {
-                        changed = true;
-                        self.send(Event::SourceUnavailable(source.id, source.path));
+            } else {
+                if answer == Some(true) && self.timed_out.remove(&source.id) {
+                    self.send(Event::SourceAlertResolved(source.id));
+                }
+                if self
+                    .silence
+                    .unreachable(source.id, answer, Instant::now(), SILENCE_LIMIT)
+                {
+                    match self.library.set_source_available(source.id, false) {
+                        Ok(true) => {
+                            changed = true;
+                            self.source_unavailable(source.id, source.path);
+                        }
+                        Ok(false) => {}
+                        Err(error) => self.error(&error),
                     }
-                    Ok(false) => {}
-                    Err(error) => self.error(&error),
                 }
             }
         }

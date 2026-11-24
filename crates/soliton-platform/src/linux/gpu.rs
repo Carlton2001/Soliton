@@ -2,14 +2,19 @@
 //! every installed driver, which can wake a sleeping discrete GPU.
 //! Adapted from Oxyde-GPUI (Carlton2001, GPL-3.0-only).
 use std::{
+    any::Any,
     collections::BTreeSet,
     fs,
+    os::unix::process::CommandExt,
+    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
     path::{Path, PathBuf},
+    process::Command,
 };
 
 mod compositor;
 
 const DISABLED: &str = "VK_LOADER_DRIVERS_DISABLE";
+const UNFILTERED: &str = "SOLITON_UNFILTERED_VULKAN";
 
 /// Variables through which a user, the desktop ("Launch using Discrete GPU")
 /// or a driver chooses the GPU. Any of them leaves the choice untouched.
@@ -22,6 +27,7 @@ const USER_CHOICE: &[&str] = &[
     "MESA_VK_DEVICE_SELECT",
     "DRI_PRIME",
     "__NV_PRIME_RENDER_OFFLOAD",
+    "ZED_DEVICE_ID",
 ];
 
 /// Vulkan driver manifests of each PCI vendor, as loader globs.
@@ -92,9 +98,10 @@ fn idle_drivers(cards: &[Card], rendering: Option<&Card>) -> Option<String> {
 
 /// Must run before any other thread exists. Returns the disabled drivers and why.
 pub fn prefer_display_gpu() -> Option<String> {
-    if USER_CHOICE
-        .iter()
-        .any(|name| std::env::var_os(name).is_some())
+    if std::env::var_os(UNFILTERED).is_some()
+        // GPUI consumes an inherited Wayland socket, which cannot be reopened on retry.
+        || std::env::var_os("WAYLAND_SOCKET").is_some()
+        || USER_CHOICE.iter().any(|name| std::env::var_os(name).is_some())
     {
         return None;
     }
@@ -115,6 +122,43 @@ pub fn prefer_display_gpu() -> Option<String> {
     Some(match rendering {
         Some(card) => format!("{globs} (Wayland compositor GPU: {})", card.name),
         None => format!("{globs} (GPUs in runtime suspend)"),
+    })
+}
+
+pub fn initialize_display<T>(filtered: bool, initialize: impl FnOnce() -> T) -> anyhow::Result<T> {
+    if !filtered {
+        return Ok(initialize());
+    }
+    match catch_unwind(AssertUnwindSafe(initialize)) {
+        Ok(display) => Ok(display),
+        Err(panic) if gpu_initialization_failed(panic.as_ref()) => {
+            // GPUI may already have started worker threads. Apply the environment
+            // change through exec so neither they nor the Vulkan loader are reused.
+            eprintln!("Retrying Vulkan initialization with all drivers available");
+            let error = Command::new(std::env::current_exe()?)
+                .args(std::env::args_os().skip(1))
+                .env_remove(DISABLED)
+                .env(UNFILTERED, "1")
+                .exec();
+            Err(anyhow::Error::new(error)
+                .context("Cannot restart Soliton without Vulkan filtering"))
+        }
+        Err(panic) => resume_unwind(panic),
+    }
+}
+
+fn gpu_initialization_failed(panic: &(dyn Any + Send)) -> bool {
+    let message = panic
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| panic.downcast_ref::<&str>().copied());
+    // GPUI 0.2.2 reports the same Blade error via expect on Wayland and an
+    // anyhow context inside unwrap on X11. Other startup panics must propagate.
+    message.is_some_and(|message| {
+        message.starts_with("Unable to init GPU context:")
+            || (message.starts_with(
+                "called `Result::unwrap()` on an `Err` value: Failed to initialize X11 client.",
+            ) && message.contains("Unable to init GPU context"))
     })
 }
 

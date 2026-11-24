@@ -1,7 +1,8 @@
-use super::{Silence, run};
+use super::{LONGEST, QUIET, Silence, Worker, run};
 use crate::service::{Event, Work};
 use crossbeam_channel::{Receiver, bounded, unbounded};
-use soliton_library::{Cancellation, Library};
+use soliton_core::failure::{Failure, Kind};
+use soliton_library::{Cancellation, Coalescer, Library};
 use std::{
     path::Path,
     time::{Duration, Instant},
@@ -78,6 +79,46 @@ fn a_remounted_source_returns_without_a_manual_scan() {
     background.cancel();
     drop(work);
     worker.join().unwrap();
+}
+
+#[test]
+fn a_probe_clears_the_timeout_of_a_source_that_was_still_available() {
+    let dir = tempfile::tempdir().unwrap();
+    let music = dir.path().join("music");
+    std::fs::create_dir(&music).unwrap();
+    let mut library = Library::open(&dir.path().join("data")).unwrap();
+    let id = library.add_source(&music).unwrap();
+    let (_work, requests) = unbounded();
+    let (sent, events) = unbounded();
+    let now = Instant::now();
+    let mut worker = Worker {
+        prober: library.prober(),
+        library,
+        work: requests,
+        deferred: Default::default(),
+        events: sent,
+        watcher: None,
+        changes: Coalescer::new(QUIET, LONGEST),
+        silence: Silence::default(),
+        timed_out: Default::default(),
+        background: Cancellation::default(),
+        next_probe: now,
+        next_return_probe: now,
+        next_periodic: now,
+    };
+    let failure = Failure::new(Kind::SourceNotResponding).about(music.display());
+    worker.report_source_scan_failure(id, failure.clone());
+    assert!(
+        matches!(events.try_recv(), Ok(Event::SourceTimedOut(source, value))
+        if source == id && value == failure)
+    );
+    assert!(worker.library.sources().unwrap()[0].available);
+
+    worker.probe(false);
+
+    assert!(matches!(events.try_recv(), Ok(Event::SourceAlertResolved(source)) if source == id));
+    worker.probe(false);
+    assert!(events.is_empty());
 }
 
 #[test]

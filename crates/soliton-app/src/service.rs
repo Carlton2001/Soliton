@@ -31,6 +31,8 @@ pub enum Event {
     Changed,
     /// A source stopped answering; its entries are kept.
     SourceUnavailable(i64, PathBuf),
+    /// A scan timed out while reaching a source; its availability is unchanged.
+    SourceTimedOut(i64, Failure),
     /// The source is reachable again or has been removed.
     SourceAlertResolved(i64),
     /// A file could not be read; the rest of the work went on.

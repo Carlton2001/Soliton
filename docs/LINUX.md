@@ -47,10 +47,12 @@ environment: Fedora Workstation (GNOME, Wayland, PipeWire).
   `VK_LOADER_DRIVERS_DISABLE`. This lets a session rendered on NVIDIA start
   even when the laptop display is wired to Intel. On X11 or when Wayland
   feedback is unavailable, a vendor is filtered only if all its cards are
-  suspended and another GPU is available. Explicit user or desktop choices
-  take precedence (`VK_LOADER_DRIVERS_SELECT`, `VK_LOADER_DRIVERS_DISABLE`,
+  suspended and another GPU is available. If filtered Vulkan initialization
+  fails, Soliton restarts once with all drivers available. Explicit user or
+  desktop choices take precedence (`VK_LOADER_DRIVERS_SELECT`, `VK_LOADER_DRIVERS_DISABLE`,
   `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `VK_ADD_DRIVER_FILES`,
-  `MESA_VK_DEVICE_SELECT`, `DRI_PRIME`, `__NV_PRIME_RENDER_OFFLOAD`).
+  `MESA_VK_DEVICE_SELECT`, `DRI_PRIME`, `__NV_PRIME_RENDER_OFFLOAD`,
+  `ZED_DEVICE_ID`).
 - **System accent**: read from the XDG Settings portal
   (`org.freedesktop.appearance`, `accent-color`, GNOME 47+ and KDE Plasma,
   Flatpak included) at start, then on each `SettingChanged` signal, on a thread
@@ -88,10 +90,22 @@ cd Soliton-0.1.0-x86_64-linux
 ./install.sh
 ```
 
-Per-user install, without root: `~/.local/bin/soliton`, desktop entry, AppStream
-metadata, icon and licenses under `~/.local/share`. Running `install.sh` from a
-newer archive updates. `./uninstall.sh` removes these files, keeps
-`~/.local/share/Soliton`, and refuses to touch a desktop entry it did not install.
+In a terminal, the menu offers installation, or update/reinstall and removal
+when it detects a per-user installation. Use a newer archive to update.
+For direct execution, use `./install.sh --install` or `./install.sh --uninstall`.
+Without a terminal or arguments, the script installs as before.
+
+The per-user install puts the binary in `~/.local/bin/soliton` and the desktop
+entry, AppStream metadata, icon and licenses under `~/.local/share`.
+`./uninstall.sh` also removes these files, keeps `~/.local/share/Soliton`, and
+refuses to touch a desktop entry it did not install.
+
+For a complete uninstall, choose the purge option in the menu and confirm.
+It deletes the library database, playlists, settings and cache from
+`${XDG_DATA_HOME:-$HOME/.local/share}/Soliton`, the directory shared with the RPM
+and .deb. It keeps other files there and any separate test data under
+`SOLITON_DATA_DIR`. For direct execution, use
+`./install.sh --uninstall --purge` or `./uninstall.sh --purge`.
 
 Runtime requirements: Vulkan, a Wayland or X11 session, D-Bus and the XDG
 portal (folder picker), PipeWire 0.3.49 or later. The binary links

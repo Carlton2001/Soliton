@@ -37,15 +37,17 @@ impl Notices {
         self.push_notice(level, label, text.into(), None);
     }
 
-    pub fn source_unavailable(&mut self, id: i64, text: String) {
+    pub fn source_problem(&mut self, id: i64, level: Level, label: Text, text: String) {
         if let Some(notice) = self
             .items
             .iter_mut()
             .find(|item| item.source_id == Some(id))
         {
+            notice.level = level;
+            notice.label = label;
             notice.text = text;
         } else {
-            self.push_notice(Level::Warning, Text::Warning, text, Some(id));
+            self.push_notice(level, label, text, Some(id));
         }
     }
 

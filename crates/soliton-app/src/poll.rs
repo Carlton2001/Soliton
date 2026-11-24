@@ -122,8 +122,14 @@ impl Soliton {
                         Text::SourceUnavailable
                     };
                     let text = self.labelled(&path.display().to_string(), self.t(detail));
-                    self.notices.source_unavailable(id, text);
+                    self.notices
+                        .source_problem(id, Level::Warning, Text::Warning, text);
                     self.query_pending = true;
+                }
+                Event::SourceTimedOut(id, failure) => {
+                    let text = crate::i18n::describe(self.settings.language, &failure);
+                    self.notices
+                        .source_problem(id, Level::Error, service_label(&failure), text);
                 }
                 Event::SourceAlertResolved(id) => self.notices.resolve_source(id),
                 Event::Warning(failure) => {

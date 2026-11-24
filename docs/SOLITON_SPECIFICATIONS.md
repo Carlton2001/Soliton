@@ -193,8 +193,11 @@ These rules apply to every change.
   (Ubuntu 24.04+, Linux Mint 22, Debian 13), Flatpak (Flathub, Silverblue
   included, Freedesktop 26.08, offline build, minimal permissions, read-only
   Music folder and mount points, portal for other folders). Data in
-  `~/.local/share/Soliton`, kept on uninstall. Packages declare Vulkan (lavapipe
-  fallback accepted) and `install.sh` warns without `libvulkan.so.1`.
+  `~/.local/share/Soliton`, kept by default on uninstall. The archive uninstaller
+  can explicitly remove the library database, playlists, settings and cache from
+  the native application data directory. Other files in that directory are
+  kept. Packages declare Vulkan (lavapipe fallback accepted) and
+  `install.sh` warns without `libvulkan.so.1`.
 - Free signing only: Minisign for updates, GPG for Linux packages, no
   Authenticode ([DISTRIBUTION.md](DISTRIBUTION.md#signing)).
 - Short FR/EN user guide, dependency license inventory and attributions

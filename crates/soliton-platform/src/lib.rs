@@ -67,6 +67,20 @@ pub fn prefer_display_gpu() -> Option<String> {
     }
 }
 
+/// Initializes the graphical backend, retrying Linux Vulkan without the
+/// application filter if the preferred drivers fail to initialize.
+pub fn initialize_display<T>(filtered: bool, initialize: impl FnOnce() -> T) -> anyhow::Result<T> {
+    #[cfg(target_os = "linux")]
+    {
+        linux::gpu::initialize_display(filtered, initialize)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = filtered;
+        Ok(initialize())
+    }
+}
+
 mod paths;
 pub use paths::AppPaths;
 pub mod updater;

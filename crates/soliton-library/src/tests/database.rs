@@ -68,6 +68,29 @@ fn scan(library: &mut Library, id: i64) -> ScanReport {
 }
 
 #[test]
+fn the_returning_source_is_available_at_initial_scan_progress() {
+    let dir = tempfile::tempdir().unwrap();
+    let music = dir.path().join("music");
+    wav(&music.join("song.wav"));
+    let storage = dir.path().join("data");
+    let mut library = Library::open(&storage).unwrap();
+    let id = library.add_source(&music).unwrap();
+    library.set_source_available(id, false).unwrap();
+    let reader = Library::open_reader(&storage).unwrap();
+
+    let mut first = true;
+    library
+        .scan(id, &Cancellation::default(), |progress| {
+            if std::mem::take(&mut first) {
+                assert_eq!(progress.discovered, 0);
+                assert!(reader.sources().unwrap()[0].available);
+            }
+        })
+        .unwrap();
+    assert!(!first);
+}
+
+#[test]
 fn partial_album_artist_tags_form_one_edition_and_later_conflicts_split_it() {
     let dir = tempfile::tempdir().unwrap();
     let source = dir.path().join("music/Nirvana");
