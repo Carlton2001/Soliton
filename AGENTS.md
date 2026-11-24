@@ -1,41 +1,72 @@
 # Soliton: agent instructions
 
-Soliton is a high-performance Rust/GPUI audio library player for large local collections (FLAC, MP3, WAV, etc.), focused on rich metadata and fast navigation backed by a local database.
+Soliton is a Rust/GPUI player for large local music libraries, with rich
+metadata and fast navigation backed by a local database.
 
 ## References
 
-- [Specifications](docs/SOLITON_SPECIFICATIONS.md): scope, product rules, phases. Read the relevant sections before each change; do not duplicate them here. Report contradictions before implementing the affected behavior, and present high-impact architecture choices before implementing them.
-- GPUI reference: the sibling project `../Oxyde-GPUI` (components, visual conventions, `cx.listener` closures). Check compatibility with Soliton's GPUI version, reuse selectively after review, respect licenses and attributions, never depend on the Oxyde app.
-
-## Standing rules
-
-- No project warnings from `cargo check`. Search with `rg`, never `grep`.
-- Keep expensive work and file I/O off the UI thread.
-- Put OS integrations behind dedicated interfaces with target-gated implementations and dependencies; no Windows types in common code.
-- Prefer native interactions and left click for primary actions.
-- Icons: official Lucide SVGs from `lucide-icons/lucide/icons/<name>.svg`, paths unmodified. If the source is unreachable, report it.
-- Never add or change a cursor without an explicit user request; new interactions keep the default cursor.
-- Commit messages in English. **Every push to GitHub (branches and tags, any tool) needs an explicit request for that push.** A request to edit, commit or merge does not grant it, and a past approval does not cover the next push.
-- Every UI string ships in French and English from the start.
+- Use the [product decisions](docs/SOLITON_SPECIFICATIONS.md) as an optional
+  reference for behavior the request leaves open. When an explicit request
+  changes a decision, update the relevant documentation alongside the change.
+- Use the sibling project `../Oxyde-GPUI` as a reference for components, visual
+  conventions and `cx.listener` closures. Check compatibility with Soliton's
+  GPUI version before reusing code. Respect licenses and attributions and keep
+  Soliton independent of the Oxyde app.
 
 ## Invariants
 
-- Never modify, move, rename or delete library files, their tags or embedded artwork. Databases, caches and temporary files live outside source folders.
-- An unreachable source is not proof of deletion: keep its entries and mark them unavailable.
-- The audio engine stays independent of GPUI. The audio callback does no allocation, I/O, logging or blocking lock waits.
-- Indexing is cancellable; expensive reads and processing use bounded concurrency.
+- Never modify, move, rename or delete library files, their tags or embedded
+  artwork. Keep databases, caches and temporary files outside source folders.
+- Keep the entries of unreachable sources and mark them unavailable.
+- Keep expensive work and file I/O off the UI thread. Indexing must be
+  cancellable, with bounded concurrency for expensive reads and processing.
+- Keep the audio engine independent of GPUI. The audio callback must avoid
+  allocation, I/O, logging and blocking lock waits.
+
+## Interface
+
+- Prefer native interactions and left click for primary actions. Keep the
+  default cursor for new interactions and add or change a cursor only on
+  explicit request.
+- Ship every UI string in French and English from the start.
+- Use official Lucide SVGs from `lucide-icons/lucide/icons/<name>.svg` with paths
+  unchanged. Report it if the upstream icon source is unreachable.
 
 ## Code organization
 
-- Separate domain, audio engine, persistence, indexing and UI; business rules stay independent of GPUI components.
-- One identifiable responsibility per module. Facades declare and assemble; they do not accumulate traversal or rendering.
-- Guideline: 200 to 600 production lines per file, no minimum. Above 800, consider splitting before any significant extension and justify keeping it. No artificial splits; tests do not count.
-- Extract coherent sections; share a component only when several uses share presentation or behavior. Preserve minimal visibility, GPUI identifiers and lifecycles. Keep refactoring within the change.
-- New unit tests go in the module's `tests/` folder, without changing their logical Rust parent or widening visibility. When moving tests, keep scenarios, attributes and discovery.
+- Present high-impact architecture choices before implementing them.
+- Separate domain, audio engine, persistence, indexing and UI. Keep business
+  rules independent of GPUI components.
+- Isolate OS integrations behind dedicated interfaces. Gate implementations and
+  dependencies by target, with Windows types confined to Windows code.
+- Give each module one identifiable responsibility. Facades declare and
+  assemble their parts and delegate traversal and rendering.
+- Use 200 to 600 production lines per file as a guideline, with no minimum.
+  Exclude tests from the count. Above 800 lines, consider splitting before
+  extending the file significantly. Explain the decision if it stays together.
+- Split along coherent responsibilities and keep refactoring within scope.
+  Share a component only when multiple uses share presentation or behavior.
+  Keep visibility narrow and preserve GPUI identifiers and lifecycles.
+- Put new unit tests in the module's `tests/` folder while preserving their
+  logical Rust parent and visibility. Preserve scenarios, attributes and test
+  discovery when moving tests.
 
 ## Validation
 
-- After Rust changes: `cargo fmt --check`, `cargo check` and the relevant tests. State which checks were not run and why.
-- After any change to `Cargo.lock` or a `Cargo.toml`: run `scripts/update-third-party-licenses.ps1`, then `scripts/check-third-party-licenses.ps1`, and commit the regenerated `licenses/dependencies`. Then run `scripts/audit-security.ps1`; it must pass (no vulnerability, no yanked crate) before committing.
-- Prioritize critical behavior: metadata, album and edition grouping, incremental indexing, source availability, audio engine states.
-- Keep platform-specific code isolated.
+- After Rust changes, run `cargo fmt --check`, `cargo check` and the relevant
+  tests. Resolve project warnings from `cargo check`. Report skipped checks and
+  explain why they were skipped.
+- Prioritize metadata, album and edition grouping, incremental indexing, source
+  availability and audio engine states when validating behavior.
+- After changing `Cargo.lock` or any `Cargo.toml`, run
+  `scripts/update-third-party-licenses.ps1`, then
+  `scripts/check-third-party-licenses.ps1`, then `scripts/audit-security.ps1`.
+  The audit must pass before committing, with zero vulnerabilities or yanked
+  crates. Include the regenerated `licenses/dependencies` in the commit.
+
+## Contribution workflow
+
+- Use `rg` for searches.
+- Write commit messages in English.
+- **Every push to GitHub requires an explicit request for that specific push.**
+  This applies to branches and tags through any tool.

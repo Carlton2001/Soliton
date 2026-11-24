@@ -11,15 +11,10 @@
 | `soliton-platform` | System integrations behind `Desktop`; native code confined to `windows/` and `linux/`. |
 | `soliton-app` | Service assembly and GPUI interface. |
 
-SQLite stays a module of `soliton-library`. Settings, database and artwork live in
-the Soliton data folder (`SOLITON_DATA_DIR` isolates development), never in a
-source. An invalid configuration file is reported, not overwritten; each write is
-synced to disk before replacing the previous one.
-
-GPUI 0.2.2, proc-macro-error2 2.0.1 and xattr 0.2.3 are vendored with targeted
-patches: see [vendor/README.md](../vendor/README.md). Oxyde served as a reference
-(bounded pools, cancellation, fonts, `SetWindowSubclass`, `cx.listener`) without
-copying application code.
+The library uses SQLite via rusqlite and reads embedded metadata via Lofty.
+The settings writer reports an invalid configuration and preserves the file.
+Each replacement is synced to disk before it becomes active. See the
+[data locations](DEVELOPMENT.md#data) and [vendored patches](../vendor/README.md).
 
 ## Library
 
@@ -109,12 +104,13 @@ The engine owns the queue: occurrences with stable ids, deduplication by path,
 playlist origin kept, immutable snapshots shared through `Arc`. Changing what
 comes next does not reopen the current stream.
 
-**Local outputs.** One backend per target behind the same internal interface
-(`backend` in `soliton-audio`): CPAL/WASAPI outside Linux, identified by name (the
-only portable id in CPAL 0.16) and discovered every 5 s on a bounded worker;
-native PipeWire on Linux, identified by node name and tracked live through the
-registry. Ambiguous ids cannot be selected. `None` = default device, resolved at
-each open under CPAL, followed continuously by PipeWire.
+**Local outputs.** Both backends use the internal `soliton-audio` backend
+interface. Windows uses CPAL/WASAPI and identifies devices by name. Windows
+device notifications prompt the enumeration worker to refresh, with polling
+as a fallback. Linux uses PipeWire node names and registry updates. Selection
+requires an unambiguous id. A session opened with `None` follows the system
+default. Windows reopens the stream on a default change and PipeWire reroutes
+through the session manager.
 
 - A switch prepares the new session before replacing the old one; a failure keeps
   the old one.
@@ -148,6 +144,8 @@ announcing IP only, no proxy or redirect. AVTransport, RenderingControl when
 present, ConnectionManager for MIME types.
 
 **Cast.** `oxicast` and the Default Media Receiver, automatic reconnection off.
+The Cast client accepts self-signed receiver certificates for discovered
+destinations. Cast DeviceAuth is unavailable.
 Only FINISHED advances to the next track; an IDLE during LOADING stays Buffering.
 Soliton never drives or closes a session it did not open.
 

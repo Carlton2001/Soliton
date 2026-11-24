@@ -1,112 +1,104 @@
 # Distribution and updates
 
-Scripts and workflows adapted from Oxyde-GPUI, Copyright (C) 2026 Carlton2001,
-GPL-3.0, without depending on its checkout. Linux packages: [LINUX.md](LINUX.md).
+Windows packaging and update scripts were adapted from Oxyde-GPUI, Copyright
+(C) 2026 Carlton2001, GPL-3.0. See the [Linux guide](LINUX.md) for Linux packages.
 
 ## Updates (Windows)
 
-Reference repository: `Carlton2001/Soliton` (never the Oxyde one). Workflows pass
-`github.repository` through `SOLITON_UPDATE_REPOSITORY`, read **at compile time**;
-for a local build targeting another repository:
+The updater checks for a newer stable release at startup when enabled, and on
+demand in Settings. It defaults to `Carlton2001/Soliton`. Set
+`SOLITON_UPDATE_REPOSITORY` before building to target another repository.
+GitHub Actions sets it to the repository running the workflow.
 
-```powershell
-$env:SOLITON_UPDATE_REPOSITORY = 'owner/repo'
-cargo run -p soliton-app
-```
+The published release's `latest.json` specifies the version, installer URL and
+base64 Minisign signature. The updater checks the signature against the compiled
+public key and requires its trusted comment to match `soliton-version:<version>`.
+WinHTTP runs on a worker, with a 64 KiB limit for the manifest and 512 MiB for
+the installer.
 
-- Check at startup (on by default) and on demand in the settings; WinHTTP on a
-  worker, network timeouts, response capped at 64 KiB, errors visible, check can
-  be retried.
-- `latest.json`, attached to the latest published stable release: `major.minor.patch`
-  version (only newer ones are offered), exact installer URL and its Minisign
-  signature (base64 `.minisig`), whose trusted comment must be
-  `soliton-version:<version>` so that an older signed installer cannot be
-  replayed. Without a published release, nothing is offered.
-- The sidebar `info.svg` icon appears, in the accent color, only when an update
-  exists. On click: download (512 MiB max), check with the compiled public key,
-  launch Setup, which waits for Soliton to exit, replaces the files and relaunches
-  it. On failure Soliton stays open and can retry. In portable mode the click opens
-  the download page and reminds to keep `data`.
-- No built-in updates on Linux.
+Installation starts when the user clicks the update notice. Setup waits for
+Soliton to exit, replaces the program files and relaunches it. On failure,
+Soliton stays open and can retry. Portable mode opens the download page.
 
 ## Build on Windows x64
 
-Rust MSVC 1.100.0, C++ Build Tools, Windows SDK and, for the installer, Inno Setup
-6.3 or later.
+Use the [Windows development tools](DEVELOPMENT.md#run) and Inno Setup 6.3 or
+later for the installer.
 
 ```powershell
 ./scripts/install-cargo-about.ps1
 ./scripts/build-distribution.ps1               # or -PortableOnly
 ```
 
-Output in `target/distribution/output/`: portable ZIP and Setup (both with a
-bilingual `README.txt`), SHA-256 hashes (the
-release job adds the signature and `latest.json`). Licenses are regenerated and
-checked before assembly. The MSVC C runtime is statically linked; the script
-rejects any vcruntime/msvcp DLL dependency. `-SkipBuild` reassembles existing
-binaries, built with the same options and the intended update repository.
+The script regenerates and checks the license inventory, then writes the
+portable ZIP, Setup and local checksums to `target/distribution/output/`.
+`-PortableOnly` skips Setup. `-SkipBuild` repackages the existing release
+binary, which must use the intended update repository and static MSVC runtime.
 
-- **Portable**: extract the whole ZIP; the `Soliton/data` folder enables portable
-  mode (data next to the executable).
-- **Installed**: per user in `%LOCALAPPDATA%/Programs/Soliton`, no elevation, data
-  in `%LOCALAPPDATA%/Soliton`, kept on uninstall.
-- `SOLITON_DATA_DIR` still takes precedence; music stays read-only.
+- For portable mode, extract the whole ZIP. The `Soliton/data` folder keeps
+  library data next to the executable.
+- Setup installs per user in `%LOCALAPPDATA%\Programs\Soliton` and keeps
+  `%LOCALAPPDATA%\Soliton` on uninstall.
+- `SOLITON_DATA_DIR` overrides the data location in both modes.
 
-## GitHub Actions
+## Release workflow
 
-- `linux.yml` (Fedora): license inventory, script syntax, formatting, check, tests and build, on main and pull requests.
-- `tests.yml`: formatting, check of all targets and Windows tests, on main and pull
-  requests. No implicit hardware test.
-- `security.yml`: RustSec audit for Windows x64 on dependency changes, every Monday
-  and manually; vulnerabilities and yanked crates block releases; reports kept as
-  artifacts.
-- `distribution.yml`: release cache and assembly on distribution manifest/script
-  changes, or manually.
-- `_linux-distribution.yml` (reusable): archive and RPM (Fedora 44 container), .deb
-  (Ubuntu 24.04), Flatpak bundle.
-- `release.yml`: on a `vX.Y.Z` tag, compares the tag with the workspace, tests,
-  audits, builds once (Windows and Linux), signs, then creates a **draft** release,
-  to be published manually to expose it to update checks.
+The [release workflow](../.github/workflows/release.yml) checks that the
+`vX.Y.Z` tag matches the workspace version, runs the Windows tests and
+dependency audit, builds both platforms, signs the artifacts and creates a
+draft. Publish the draft manually to make it available to the updater.
 
-Third-party actions are pinned to the revisions taken from Oxyde; permissions are
-read-only except for the final release job.
+Routine checks are defined in the [Windows tests](../.github/workflows/tests.yml),
+[Linux tests](../.github/workflows/linux.yml),
+[Windows packaging](../.github/workflows/distribution.yml) and
+[dependency audit](../.github/workflows/security.yml) workflows. Hardware
+scenarios are in the [development guide](DEVELOPMENT.md#manual-hardware-scenarios).
 
 ## Signing
 
-Free only, no Authenticode certificate (user decision): SmartScreen warns on the
-first download of the Windows executable.
+Windows builds use Minisign for the updater. SmartScreen can still display a
+warning on first launch.
 
 | Key | Public (repository) | Signs |
 |---|---|---|
 | Minisign | `installer/signing/soliton-update.pub` | the Windows installer, checked by the updater |
 | GPG ed25519 `7BFC00A65179DAEDD7CD26298EED1CC9F8CE693B` | `installer/signing/soliton-packages.asc` | the RPM (embedded signature) and `SHA256SUMS` (detached `SHA256SUMS.asc`), which lists every package |
 
-Private keys stay outside the repository (`~/.soliton-keys/update.key`, the
-author's GPG keyring), backed up off the machine. `scripts/sign-release.sh` checks
-every signature against the repository public keys before creating the release.
-GitHub setup (Actions enabled on `Carlton2001/Soliton`):
+Private keys stay outside the repository. The
+[signing script](../scripts/sign-release.sh) verifies the signatures against
+the repository public keys and replaces individual checksums with
+`SHA256SUMS` and `SHA256SUMS.asc`.
 
-- repository variable `SOLITON_UPDATE_PUBLIC_KEY`: `base64 -w0` of
-  `soliton-update.pub`, compiled into Windows builds (the script rejects a value
-  differing from the file; pass it for local builds too);
-- `release` environment secrets: `SOLITON_UPDATE_PRIVATE_KEY` (content of
+The release workflow uses these values.
+
+- Repository variable `SOLITON_UPDATE_PUBLIC_KEY` is the `base64 -w0` output for
+  `soliton-update.pub`. Set the same value for local builds that use the updater.
+- The `release` environment uses `SOLITON_UPDATE_PRIVATE_KEY` (content of
   `update.key`), `SOLITON_UPDATE_PRIVATE_KEY_PASSWORD`, `SOLITON_GPG_PRIVATE_KEY`
-  (`gpg --armor --export-secret-keys`), `SOLITON_GPG_PASSPHRASE`.
+  (`gpg --armor --export-secret-keys`) and `SOLITON_GPG_PASSPHRASE`.
 
-A Minisign key rotation must let older versions verify new installers. Verify a
-package: `gpg --import soliton-packages.asc`, `gpg --verify SHA256SUMS.asc`, then
-`sha256sum -c --ignore-missing SHA256SUMS` next to the downloaded files, or
-`sudo rpm --import soliton-packages.asc` before installing the RPM.
+A Minisign key rotation must let older versions verify new installers. Check
+the GPG key fingerprint against the table before importing it. Run these
+commands alongside the downloaded files.
+
+```sh
+gpg --import soliton-packages.asc
+gpg --verify SHA256SUMS.asc SHA256SUMS
+sha256sum -c --ignore-missing SHA256SUMS
+```
 
 ## Prepare a version
 
-On a clean tree:
+Run the version script from a clean `main` checkout with a free version number.
 
-```sh
-./scripts/bump-version.ps1 -Version 0.2.0   # Windows
-sh scripts/bump-version.sh 0.2.0            # Linux
+```powershell
+./scripts/bump-version.ps1 -Version X.Y.Z
 ```
 
-The script updates the workspace version, Cargo.lock and the AppStream metainfo
-(version and screenshot URLs), creates an English commit and a local tag, and
-pushes nothing. Every push needs an explicit user request.
+```sh
+sh scripts/bump-version.sh X.Y.Z
+```
+
+Replace `X.Y.Z` with the new version. The script updates the manifest, lockfile,
+license notices and AppStream metadata, then creates a local commit and tag.
+See [AGENTS.md](../AGENTS.md#contribution-workflow) for push authorization.

@@ -4,13 +4,15 @@ The [README](../README.md) presents Soliton, its features and shortcuts.
 
 | Document | Content |
 | --- | --- |
-| [Specifications](SOLITON_SPECIFICATIONS.md) | Scope, product rules, remaining phase |
+| [Product decisions](SOLITON_SPECIFICATIONS.md) | Product scope and intended behavior |
 | [Architecture](ARCHITECTURE.md) | Crates, threads, service contracts |
-| [Dependencies](DEPENDENCIES.md) | Technical choices and licenses |
-| [Development](DEVELOPMENT.md) | Data, checks, hardware tests, known limitations |
-| [Distribution](DISTRIBUTION.md) | Updates, Windows packages, CI, signing |
-| [Linux](LINUX.md) | Behavior, install, build, packages, validation |
-| [Windows checks](VERIFICATION_WINDOWS.md) | Pending Windows checks after the Linux port |
+| [Development](DEVELOPMENT.md) | Build from source, checks and hardware scenarios |
+| [Distribution](DISTRIBUTION.md) | Windows packages and updates, releases and signing |
+| [Linux](LINUX.md) | Installation, platform behavior, packaging and validation |
+| [Flathub](FLATHUB.md) | Prepare the Soliton files for Flathub |
 | [Scripts](../scripts/README.md) | Build, packaging, license and test scripts by platform |
 | [Dependency patches](../vendor/README.md) | Vendored crates and changes |
 | [Attributions](../assets/NOTICE.md), [licenses](../licenses/dependencies/README.md) | Assets and crate notices |
+
+See the crate manifests for direct dependencies and [Cargo.lock](../Cargo.lock)
+for resolved versions.

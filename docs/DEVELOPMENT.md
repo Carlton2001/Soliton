@@ -1,65 +1,97 @@
 # Development
 
-Features and shortcuts: [README](../README.md). Linux specifics:
-[LINUX.md](LINUX.md). Run commands from the repository root.
+Run commands from the repository root.
 
 ## Run
 
-Windows: Rust MSVC, C++ Build Tools and Windows SDK. Linux: packages from
-[LINUX.md](LINUX.md#prepare-fedora-for-development).
+Use at least the Rust version declared in [Cargo.toml](../Cargo.toml). On
+Windows, install the x64 MSVC toolchain, Visual Studio C++ Build Tools and the
+Windows SDK. Use PowerShell 7 for the project scripts. On Linux, install the
+[development packages](LINUX.md#prepare-fedora-for-development).
 
 ```sh
-cargo run -p soliton-app --bin Soliton
+cargo run -p soliton-app --bin Soliton --locked
 ```
 
 ## Data
 
-SQLite, settings and artwork: `%LOCALAPPDATA%\Soliton` or
-`~/.local/share/Soliton`, outside the sources. `SOLITON_DATA_DIR` isolates
-development. Music is opened read-only.
+Set `SOLITON_DATA_DIR` to a separate directory to isolate a development run.
+Native installs use `%LOCALAPPDATA%\Soliton` on Windows and
+`${XDG_DATA_HOME:-$HOME/.local/share}/Soliton` on Linux.
+
+`Soliton-index` inspects or indexes a test collection without opening the app.
+Pass the data directory alone to inspect an existing index.
+
+```sh
+cargo run -p soliton-app --bin Soliton-index --locked -- ./target/index-test "/path/to/test-music"
+```
 
 ## Check
 
 ```sh
 cargo fmt --check
 cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-Native and hardware tests on Windows (FFmpeg only generates the fixtures):
+Use the [script index](../scripts/README.md) for packaging and dependency
+checks. In the Windows sandbox, `$env:CARGO_INCREMENTAL = '0'` avoids the hard
+link warning.
+
+## Native tests
+
+Run these Windows tests in a desktop session at low or zero volume. FFmpeg
+generates the test fixtures.
 
 ```powershell
 ./scripts/generate-audio-fixtures.ps1
-cargo test -p soliton-audio -- --include-ignored
-cargo test -p soliton-platform -- --include-ignored
+cargo test -p soliton-audio --locked -- --ignored
+cargo test -p soliton-platform --locked -- --ignored
 ./scripts/smoke-windows.ps1
 ./scripts/smoke-icons-windows.ps1
 ```
 
 `smoke-windows.ps1` opens Soliton on synthetic data in `target/`, captures the
-window and fails on an exit code or a log error. Options:
+window and fails on a nonzero exit code or a log error. Its options include
 `-Language English -Light -List`, `-CloseScenario Early|Minimized|Hidden|Ask`,
 `-Taskbar`, `-Collections`, `-AudioOutputs [-AudioOutputRow n]`,
-`-NetworkOutputs`. Each run starts from a fresh library. Linux native tests:
-[LINUX.md](LINUX.md#build-test-run).
+`-NetworkOutputs`, `-Updates`. Each run starts from a fresh library. See the
+[Linux native tests](LINUX.md#build-test-run) for PipeWire and MPRIS coverage.
 
-Explicit hardware examples (zero or low volume, idle Cast receiver):
+Use a low volume and an idle receiver for the audio and network probes. Replace
+the sample names and paths with those of the test device and file.
 
 ```sh
-cargo run -p soliton-audio --example bluetooth_probe -- "<output name>"
+cargo run -p soliton-audio --example bluetooth_probe -- "output name"
 cargo run -p soliton-network --example discover
-cargo run -p soliton-network --example smoke_cast -- <id> <file>
-cargo run -p soliton-audio --example network_session -- <id> <file>
-cargo run -p soliton-app --bin Soliton-index -- <soliton-data-dir> [music-dir]
+cargo run -p soliton-network --example smoke_cast -- "receiver-id" "/path/to/test.flac"
+cargo run -p soliton-audio --example network_session -- "receiver-id" "/path/to/test.flac"
 ```
 
-In the Windows sandbox, `$env:CARGO_INCREMENTAL = '0'` avoids the hard link warning.
+## Manual hardware scenarios
+
+Use these scenarios when changing the relevant subsystem. See the
+[Linux validation record](LINUX.md#validation) for prior hardware coverage.
+
+- **Library:** Index a large collection on SSD and NAS. Check startup and
+  browsing after restarting. Disconnect and reconnect the NAS or source drive
+  during playback and verify availability, alerts and periodic scan recovery.
+- **Audio:** Switch outputs during playback and check that track and position
+  are kept. Test unplugging a device in system-default and explicit-output
+  modes. Check warning, resume and return behavior against the
+  [product decisions](SOLITON_SPECIFICATIONS.md#playback-and-collections).
+  Include a long listening session when changing the audio engine.
+- **Windows desktop:** Check media panel metadata and artwork, physical media
+  keys, taskbar controls, icon palette, close and restore flows, recovery after
+  restarting Explorer, and launch at login.
+- **Network:** Test a physical DLNA receiver and loss of Wi-Fi while casting.
 
 ## Known limitations
 
-- Shared output, mono/stereo sources (stereo on the front of a 5.1/7.1 output); no equalizer, exclusive mode or bit-perfect.
-- Tested formats: WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, AIFF. No Opus, WMA, APE.
-- CPAL outputs (Windows) are identified by name: a renamed output must be chosen again. The displayed format is what Soliton sends to the system.
-- Bluetooth: codec chosen by the system, neither lossless nor bit-perfect guaranteed.
-- Network: local IPv4, one active output, no transcoding or multiroom; DLNA tested only on a simulated receiver.
-- Editions merge only when artist, title and year match; the edition choice is not remembered.
+- Local playback uses shared output and accepts mono or stereo sources.
+  Exclusive mode, bit-perfect playback and equalization are unavailable. The OS
+  picks the Bluetooth codec.
+- Windows identifies outputs by name. Select a renamed device again in Settings.
+- Network playback uses local IPv4 and serves the original audio without
+  transcoding. DLNA has been exercised with a simulated receiver.

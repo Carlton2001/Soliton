@@ -4,16 +4,14 @@
   <img src="screenshots/hero.webp" alt="Soliton audio library interface" width="100%" />
 </p>
 
-Soliton is a native audio library player built in **Rust** with **GPUI**. It indexes your local music collection and presents it in a responsive desktop interface, with rich metadata, album artwork, multiple editions, and playback on local or network devices.
-
-Soliton plays the albums and tracks of its library: add your music folders as sources, and everything is browsed and played from there. It is not a standalone file player: files opened from a file manager or dropped onto the window are not played directly.
+Soliton is a native [Rust](https://www.rust-lang.org/) and [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui) player for local music libraries. Add your music folders in Settings, then browse and play the albums and tracks Soliton indexes.
 
 ## Platforms
 
 - **Windows** 10 (1809) and later, x64: per-user installer.
 - **Linux** x86_64: RPM for Fedora 44 and later, .deb for Ubuntu 24.04, Linux Mint 22, and Debian 13 and later, Flatpak for other distributions, and a per-user archive. See the [Linux guide](docs/LINUX.md) for installation and building.
 
-On Linux, Soliton plays through a native PipeWire stream (PulseAudio alone is not supported), follows the system default output or a chosen PipeWire output (Bluetooth headsets included), and integrates with the desktop media panel and media keys through MPRIS. Install new releases through your package manager, Flatpak, or a newer archive.
+Linux requires PipeWire for audio.
 
 ## Your Music, Kept Local
 
@@ -33,49 +31,25 @@ Background indexing and filesystem monitoring keep the library up to date. When 
 
 Tested formats include **WAV, FLAC, MP3, AAC-LC/M4A, ALAC, Vorbis, and AIFF**.
 
-## Technology Stack
-
-- **Application and UI**: Rust and [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui), with native GPU-accelerated rendering.
-- **Audio**: Symphonia for decoding, an audio engine independent of the interface, and native local output: WASAPI through CPAL on Windows, PipeWire on Linux.
-- **Library**: SQLite through rusqlite, Lofty for tags and artwork, and background indexing with cancellation and bounded concurrency.
-- **System Integration**: Dedicated platform interfaces with Windows and Linux (MPRIS, XDG portals, inotify) implementations.
-- **Icons**: Official [Lucide](https://lucide.dev/) SVG assets.
-
-## Getting Started
-
-### Prerequisites
-
-The current validation baseline is Rust 1.100.0.
-
-- **Windows**: Rust with the MSVC x64 toolchain, and Visual Studio Build Tools with the Visual C++ build tools and Windows SDK.
-- **Linux**: a C/C++ toolchain, CMake, pkg-config, Clang, and the PipeWire, xkbcommon, FreeType, Fontconfig, XCB, and Wayland development packages; running requires Vulkan and a Wayland or X11 session. The [Linux guide](docs/LINUX.md#prepare-fedora-for-development) gives the Fedora command.
-
-### Build and Run
-
-From the repository root:
-
-```sh
-cargo run -p soliton-app --bin Soliton
-```
-
-For release builds, Windows packaging, and update behavior, see the [distribution guide](docs/DISTRIBUTION.md); Linux packages are covered in the [Linux guide](docs/LINUX.md). Development checks, smoke tests, and hardware probes are documented in the [development guide](docs/DEVELOPMENT.md).
-
 ## Keyboard Shortcuts
 
 | Action | Shortcut |
 | --- | --- |
 | Search | Ctrl + F |
 | Play / Pause | Space |
-| Seek backward / forward 10 seconds | Ctrl + Left / Right |
+| Previous / next track | Ctrl + Left / Right |
+| Seek backward / forward 10 seconds | Ctrl + Shift + Left / Right |
 | Adjust volume | Ctrl + Up / Down |
 | Navigate history | Alt + Left / Right |
 | Full screen listening view | F11 |
 | Go back | Escape |
-| Navigate / activate controls | Tab / Enter |
+
+The full list is under **Keyboard shortcuts** in Settings.
 
 ## Documentation
 
-See the [documentation index](docs/README.md) for development and validation details, architecture, dependencies, distribution, and product specifications.
+See the [development guide](docs/DEVELOPMENT.md#run) to build from source and the
+[documentation index](docs/README.md) for architecture, distribution and product decisions.
 
 ## License
 
