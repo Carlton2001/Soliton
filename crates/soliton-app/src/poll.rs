@@ -115,16 +115,17 @@ impl Soliton {
                     self.query_pending = true;
                 }
                 Event::Removed | Event::Changed => self.query_pending = true,
-                Event::SourceUnavailable(path) => {
+                Event::SourceUnavailable(id, path) => {
                     let detail = if self.settings.hide_unavailable {
                         Text::SourceUnavailableHidden
                     } else {
                         Text::SourceUnavailable
                     };
                     let text = self.labelled(&path.display().to_string(), self.t(detail));
-                    self.report_warning(text);
+                    self.notices.source_unavailable(id, text);
                     self.query_pending = true;
                 }
+                Event::SourceAlertResolved(id) => self.notices.resolve_source(id),
                 Event::Warning(failure) => {
                     self.report_failure(Level::Warning, service_label(&failure), &failure)
                 }

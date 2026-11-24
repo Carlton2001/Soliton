@@ -30,7 +30,9 @@ pub enum Event {
     /// Background work changed the library; the view should be queried again.
     Changed,
     /// A source stopped answering; its entries are kept.
-    SourceUnavailable(PathBuf),
+    SourceUnavailable(i64, PathBuf),
+    /// The source is reachable again or has been removed.
+    SourceAlertResolved(i64),
     /// A file could not be read; the rest of the work went on.
     Warning(Failure),
     Error(Failure),

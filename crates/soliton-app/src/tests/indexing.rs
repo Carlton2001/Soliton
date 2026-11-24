@@ -61,26 +61,20 @@ fn a_remounted_source_returns_without_a_manual_scan() {
     wait_for(&events, "initial scan", |e| matches!(e, Event::Finished(_)));
     // Renaming the folder away stands for unmounting its volume.
     std::fs::rename(&music, &parked).unwrap();
-    wait_for(&events, "offline source", |e| {
-        matches!(e, Event::SourceUnavailable(_))
-    });
-    let offline = Instant::now();
+    let library = Library::open_reader(&root).unwrap();
+    let id = library.sources().unwrap()[0].id;
+    wait_for(
+        &events,
+        "offline source",
+        |e| matches!(e, Event::SourceUnavailable(source_id, _) if *source_id == id),
+    );
     std::fs::rename(&parked, &music).unwrap();
-    let available = || {
-        Library::open(&root)
-            .unwrap()
-            .sources()
-            .unwrap()
-            .iter()
-            .all(|source| source.available)
-    };
-    while !available() {
-        assert!(
-            offline.elapsed() < Duration::from_secs(15),
-            "Source did not return"
-        );
-        let _ = events.recv_timeout(Duration::from_millis(200));
-    }
+    wait_for(
+        &events,
+        "returning source",
+        |e| matches!(e, Event::SourceAlertResolved(source_id) if *source_id == id),
+    );
+    assert!(library.sources().unwrap()[0].available);
     background.cancel();
     drop(work);
     worker.join().unwrap();

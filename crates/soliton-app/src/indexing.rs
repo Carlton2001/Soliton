@@ -153,6 +153,8 @@ impl Worker {
             Work::RemoveSource(id) => {
                 if let Err(error) = self.library.remove_source(id) {
                     self.error(&error);
+                } else {
+                    self.send(Event::SourceAlertResolved(id));
                 }
                 self.sync_watcher();
                 self.send(Event::Removed);
@@ -213,9 +215,17 @@ impl Worker {
             );
             match result {
                 Ok(report) => {
+                    self.send(Event::SourceAlertResolved(id));
                     self.send(Event::Progress(report.progress));
                     for detail in report.diagnostics {
                         self.send(Event::Warning(detail));
+                    }
+                }
+                Err(error) if Failure::of(&error).kind == Kind::SourceInaccessible => {
+                    if let Some(source) = self.sources().into_iter().find(|s| s.id == id) {
+                        self.send(Event::SourceUnavailable(id, source.path));
+                    } else {
+                        self.error(&error);
                     }
                 }
                 Err(error) => self.error(&error),
@@ -263,7 +273,7 @@ impl Worker {
             Err(error) => {
                 match self.sources().into_iter().find(|s| s.id == id) {
                     Some(source) if was_available && !source.available => {
-                        self.send(Event::SourceUnavailable(source.path));
+                        self.send(Event::SourceUnavailable(id, source.path));
                     }
                     // A slow source is left to the availability probes.
                     _ if Failure::of(&error).kind == Kind::SourceNotResponding => {}
@@ -274,6 +284,9 @@ impl Worker {
                 return;
             }
         };
+        if !was_available {
+            self.send(Event::SourceAlertResolved(id));
+        }
         for detail in report.diagnostics.iter().cloned() {
             self.send(Event::Warning(detail));
         }
@@ -356,7 +369,7 @@ impl Worker {
                 match self.library.set_source_available(source.id, false) {
                     Ok(true) => {
                         changed = true;
-                        self.send(Event::SourceUnavailable(source.path));
+                        self.send(Event::SourceUnavailable(source.id, source.path));
                     }
                     Ok(false) => {}
                     Err(error) => self.error(&error),

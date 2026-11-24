@@ -17,6 +17,7 @@ pub enum Level {
 }
 
 pub struct Notice {
+    source_id: Option<i64>,
     pub level: Level,
     /// Where it happened: playback, library, an output…
     pub label: Text,
@@ -33,16 +34,37 @@ pub struct Notices {
 
 impl Notices {
     pub fn push(&mut self, level: Level, label: Text, text: impl Into<String>) {
-        let text = text.into();
-        // Repeated messages, such as a failing action retried, are shown once.
-        if self
+        self.push_notice(level, label, text.into(), None);
+    }
+
+    pub fn source_unavailable(&mut self, id: i64, text: String) {
+        if let Some(notice) = self
             .items
-            .last()
-            .is_some_and(|last| last.label == label && last.text == text)
+            .iter_mut()
+            .find(|item| item.source_id == Some(id))
         {
+            notice.text = text;
+        } else {
+            self.push_notice(Level::Warning, Text::Warning, text, Some(id));
+        }
+    }
+
+    pub fn resolve_source(&mut self, id: i64) {
+        self.items.retain(|item| item.source_id != Some(id));
+        if self.items.len() < 2 {
+            self.expanded = false;
+        }
+    }
+
+    fn push_notice(&mut self, level: Level, label: Text, text: String, source_id: Option<i64>) {
+        // Repeated messages, such as a failing action retried, are shown once.
+        if self.items.last().is_some_and(|last| {
+            last.source_id == source_id && last.label == label && last.text == text
+        }) {
             return;
         }
         self.items.push(Notice {
+            source_id,
             level,
             label,
             text,
@@ -81,6 +103,7 @@ impl Soliton {
         });
         let reason = crate::i18n::describe(self.settings.language, failure);
         Some(Notice {
+            source_id: None,
             level: Level::Warning,
             label: Text::PlaybackPaused,
             text: reason,
@@ -209,3 +232,7 @@ impl Soliton {
         )
     }
 }
+
+#[cfg(test)]
+#[path = "tests/notices.rs"]
+mod tests;
