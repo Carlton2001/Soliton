@@ -20,7 +20,12 @@ For direct execution, use `./install.sh --install` or `./install.sh --uninstall`
 
 The archive is built on Fedora 44 x86_64 and requires a compatible glibc,
 Vulkan, a Wayland or X11 session, PipeWire 0.3.49 or newer, D-Bus and the
-XDG folder picker portal. The installer warns if it cannot find Vulkan.
+XDG folder picker portal. The archive installer lists missing required and
+recommended components and prints the package manager command for Debian and
+Ubuntu, Fedora (including rpm-ostree systems), Arch Linux, and openSUSE. In a
+terminal, it can run the command after confirmation. If `flock` is still
+missing, install it and run the script again. In-app updates skip the system
+component checks and require `flock` to be present.
 
 The binary is installed in `~/.local/bin`. The desktop entry, AppStream
 metadata, icon and licenses are installed under

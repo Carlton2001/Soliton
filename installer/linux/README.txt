@@ -16,7 +16,10 @@ en place. Confirmez ce choix dans le menu ou lancez ./install.sh --uninstall --p
 
 Prérequis : session Wayland ou X11 avec Vulkan, PipeWire 0.3.49 ou plus récent
 (PulseAudio seul n'est pas pris en charge), portail XDG pour le choix des
-dossiers et flock (util-linux). install.sh avertit si Vulkan est absent.
+dossiers et flock (util-linux). install.sh signale les dépendances système
+manquantes et affiche une commande adaptée à la distribution lorsqu'elle est
+reconnue. Dans un terminal, vous pouvez confirmer l'exécution de cette commande.
+Si flock manque toujours, installez-le puis relancez le script.
 
 Utilisation : ajoutez vos dossiers de musique dans Paramètres. Vos fichiers,
 tags et pochettes ne sont jamais modifiés. Dans Paramètres → À propos, vérifiez
@@ -41,7 +44,9 @@ Confirm the choice in the menu or run ./install.sh --uninstall --purge.
 Requirements: Wayland or X11 session with Vulkan, PipeWire 0.3.49 or later
 (PulseAudio alone is not supported), an XDG portal for folder selection and
 flock (util-linux).
-install.sh warns when Vulkan is missing.
+install.sh reports missing system dependencies and prints a command for
+recognized distributions. In a terminal, you can confirm running the command.
+If flock is still missing, install it and rerun the script.
 
 Usage: add your music folders in Settings. Your files, tags and artwork are
 never modified. In Settings → About, check for updates and click “Update
