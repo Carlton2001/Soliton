@@ -677,7 +677,7 @@ impl Soliton {
                         .px(rems(CONTENT_PADDING))
                         .py(rems(0.375))
                         .gap(rems(0.75))
-                        .bg(theme.panel)
+                        .bg(gpui::replacing_background(theme.panel))
                         .text_size(TEXT_SMALL)
                         .flex()
                         .items_center()

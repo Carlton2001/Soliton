@@ -23,6 +23,7 @@ pub type OnChange = Rc<dyn Fn(f32, bool, &mut Window, &mut App)>;
 #[derive(Clone, Default)]
 pub struct Slider {
     dragging: Rc<Cell<bool>>,
+    visible_thumb: bool,
 }
 
 #[cfg(test)]
@@ -30,6 +31,13 @@ pub struct Slider {
 mod tests;
 
 impl Slider {
+    pub(super) fn with_visible_thumb() -> Self {
+        Self {
+            visible_thumb: true,
+            ..Self::default()
+        }
+    }
+
     pub fn is_dragging(&self) -> bool {
         self.dragging.get()
     }
@@ -45,6 +53,7 @@ impl Slider {
         on_change: OnChange,
     ) -> Canvas<Hitbox> {
         let dragging = self.dragging.clone();
+        let visible_thumb = self.visible_thumb;
         canvas(
             |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
             move |bounds, hitbox, window, _| {
@@ -79,7 +88,7 @@ impl Slider {
                     marker_color.a = 0.4;
                     window.paint_quad(fill(marker, marker_color));
                 }
-                if active {
+                if active || visible_thumb {
                     let thumb = Bounds::new(
                         point(
                             bounds.origin.x + filled - px(knob / 2.),

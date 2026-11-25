@@ -53,7 +53,6 @@ impl Soliton {
             .items_center()
             .justify_center()
             .gap(rems(0.25))
-            .bg(theme.background)
             .child(
                 nav_entry(
                     "navigation-brand",

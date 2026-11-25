@@ -161,7 +161,7 @@ impl Soliton {
                 .flex()
                 .flex_col()
                 .flex_shrink_0()
-                .bg(theme.panel)
+                .bg(gpui::replacing_background(theme.panel))
                 .border_t_1()
                 .border_color(theme.border)
                 .when_some(interruption.as_ref(), |view, notice| {

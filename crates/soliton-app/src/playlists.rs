@@ -217,7 +217,7 @@ impl Soliton {
             .max_w_full()
             .p(rems(0.75))
             .rounded(RADIUS_LARGE)
-            .bg(theme.panel)
+            .bg(gpui::replacing_background(theme.panel))
             .border_1()
             .border_color(theme.border)
             .flex()

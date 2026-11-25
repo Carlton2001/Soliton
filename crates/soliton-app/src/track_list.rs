@@ -134,7 +134,7 @@ impl Soliton {
             .flex()
             .flex_col()
             .gap(rems(0.25))
-            .bg(theme.panel)
+            .bg(gpui::replacing_background(theme.panel))
             .border_1()
             .border_color(theme.control_border)
             .rounded(crate::widgets::RADIUS_LARGE)

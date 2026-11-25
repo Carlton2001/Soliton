@@ -39,6 +39,10 @@ invariants, the [README](../README.md) for features and shortcuts, and the
 - Keep page titles and toolbars on the common window background and align them
   to the left edge of their content panel. Use one secondary surface and the
   button corner radius for page content, with color separating the major zones.
+- Display preferences adjust the main window, panel and card background opacity
+  together from 0% to 100%. The visible surface determines the opacity in each
+  region, including where backgrounds overlap. Below 100%, Soliton requests
+  system backdrop blur where the window compositor supports it.
 - Album details open beside the collection on wide windows and on a dedicated
   page on narrow windows. The album's close or return button shows the album
   collection with its current filters.

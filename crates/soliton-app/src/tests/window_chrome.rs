@@ -1,5 +1,26 @@
-use super::{resize_edge, rounded_corners};
-use gpui::{ResizeEdge, Tiling, point, px, size};
+use super::{background_appearance, resize_edge, rounded_corners};
+use gpui::{ResizeEdge, Tiling, WindowBackgroundAppearance, point, px, size};
+use soliton_core::config::Settings;
+
+#[test]
+fn backdrop_blur_is_requested_only_below_full_opacity() {
+    let full_opacity = if cfg!(target_os = "linux") {
+        WindowBackgroundAppearance::Transparent
+    } else {
+        WindowBackgroundAppearance::Opaque
+    };
+    for (background_opacity, expected) in [
+        (0, WindowBackgroundAppearance::Blurred),
+        (99, WindowBackgroundAppearance::Blurred),
+        (100, full_opacity),
+    ] {
+        let settings = Settings {
+            background_opacity,
+            ..Settings::default()
+        };
+        assert_eq!(background_appearance(&settings), expected);
+    }
+}
 
 #[test]
 fn resize_border_distinguishes_edges_corners_and_content() {

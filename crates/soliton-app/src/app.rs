@@ -112,6 +112,8 @@ pub struct Soliton {
     pub menu: Option<Menu>,
     pub seek_slider: Slider,
     pub volume_slider: Slider,
+    pub(crate) background_opacity_slider: Slider,
+    pub(crate) background_opacity_focus: FocusHandle,
     /// Position shown while the seek slider is dragged; sent on release.
     pub seek_preview: Option<f32>,
     /// Volume restored when sound is turned back on.
@@ -274,6 +276,8 @@ impl Soliton {
             menu: None,
             seek_slider: Slider::default(),
             volume_slider: Slider::default(),
+            background_opacity_slider: Slider::with_visible_thumb(),
+            background_opacity_focus: cx.focus_handle().tab_index(0).tab_stop(true),
             seek_preview: None,
             muted_volume: None,
             volume_scroll: 0.,
@@ -326,6 +330,7 @@ impl Soliton {
     }
     pub fn theme(&self) -> Theme {
         Theme::with_system_accent(self.dark(), self.settings.accent, self.system_accent)
+            .with_background_opacity(f32::from(self.settings.background_opacity) / 100.)
     }
     /// Queries the catalogue again with the current filter and display settings.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
@@ -667,7 +672,7 @@ impl Render for Soliton {
             .size_full()
             .flex()
             .flex_col()
-            .bg(theme.background)
+            .bg(gpui::replacing_background(theme.background))
             .text_color(theme.text)
             .font_family(crate::widgets::UI_FONT)
             .text_size(crate::widgets::TEXT_BODY)

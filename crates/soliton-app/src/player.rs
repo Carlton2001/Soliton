@@ -26,7 +26,6 @@ impl Soliton {
             .flex_col()
             .gap(rems(0.25))
             .py(rems(0.5))
-            .bg(theme.background)
             .child(self.progress_row(cx).w_full().px(rems(0.75)))
             .child(
                 div()
@@ -496,7 +495,7 @@ fn slider_bubble(
             .rounded(rems(0.3125))
             .border_1()
             .border_color(theme.control_border)
-            .bg(theme.panel)
+            .bg(gpui::replacing_background(theme.panel))
             .occlude()
             .shadow_sm()
             .text_center()

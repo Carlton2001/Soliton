@@ -87,7 +87,8 @@ fn main() -> anyhow::Result<()> {
             })
             .detach();
             let window_bounds = placement::restore(settings.window, cx);
-            cx.open_window(window_chrome::options(window_bounds), |window, cx| {
+            let options = window_chrome::options(window_bounds, &settings);
+            cx.open_window(options, |window, cx| {
                 window_chrome::restore_maximized(window_bounds, window);
                 let app = cx.new(|cx| app::Soliton::new(settings, paths, window, cx));
                 let owner = app.downgrade();

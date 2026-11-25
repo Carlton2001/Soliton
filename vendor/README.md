@@ -20,6 +20,10 @@ Source: https://crates.io/crates/gpui/0.2.2
 - `src/platform/windows/window.rs` and `events.rs`: `show_window_menu` posts a
   message that opens the system menu at the pointer outside event dispatch, items
   enabled for the window state; a chosen command is sent as `WM_SYSCOMMAND`.
+- `src/platform/windows/transitions.rs`: render the window surfaces opaque for
+  the estimated duration of a native minimize, maximize or restore animation.
+  Fade back to the configured opacity over 150 ms. The fade applies to the
+  rendered surfaces without changing the saved setting.
 - `src/platform/windows/events.rs`: `WM_DESTROY` marks the window destroyed,
   removes its callbacks and revokes drag and drop before the HWND is lost.
 - `src/platform/windows/window.rs`: the destructor removes callbacks to the dropped

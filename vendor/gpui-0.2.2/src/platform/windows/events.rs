@@ -20,6 +20,8 @@ use windows::{
 
 use crate::*;
 
+use super::transitions::{OPACITY_TIMER_ID, post_window_state_command};
+
 pub(crate) const WM_GPUI_CURSOR_STYLE_CHANGED: u32 = WM_USER + 1;
 pub(crate) const WM_GPUI_CLOSE_ONE_WINDOW: u32 = WM_USER + 2;
 pub(crate) const WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD: u32 = WM_USER + 3;
@@ -44,7 +46,11 @@ impl WindowsWindowInner {
             WM_ACTIVATE => self.handle_activate_msg(wparam),
             WM_CREATE => self.handle_create_msg(handle),
             WM_MOVE => self.handle_move_msg(handle, lparam),
-            WM_SIZE => self.handle_size_msg(wparam, lparam),
+            WM_SIZE => self.handle_size_msg(handle, wparam, lparam),
+            WM_QUERYOPEN => {
+                self.start_opaque_transition(handle);
+                None
+            }
             WM_GETMINMAXINFO => self.handle_get_min_max_info_msg(lparam),
             WM_ENTERSIZEMOVE | WM_ENTERMENULOOP => self.handle_size_move_loop(handle),
             WM_EXITSIZEMOVE | WM_EXITMENULOOP => self.handle_size_move_loop_exit(handle),
@@ -96,7 +102,7 @@ impl WindowsWindowInner {
             WM_MOUSEHWHEEL => self.handle_mouse_horizontal_wheel_msg(handle, wparam, lparam),
             WM_SYSKEYDOWN => self.handle_syskeydown_msg(handle, wparam, lparam),
             WM_SYSKEYUP => self.handle_syskeyup_msg(handle, wparam, lparam),
-            WM_SYSCOMMAND => self.handle_system_command(wparam),
+            WM_SYSCOMMAND => self.handle_system_command(handle, wparam),
             WM_KEYDOWN => self.handle_keydown_msg(handle, wparam, lparam),
             WM_KEYUP => self.handle_keyup_msg(handle, wparam, lparam),
             WM_CHAR => self.handle_char_msg(wparam),
@@ -170,13 +176,15 @@ impl WindowsWindowInner {
         Some(0)
     }
 
-    fn handle_size_msg(&self, wparam: WPARAM, lparam: LPARAM) -> Option<isize> {
+    fn handle_size_msg(&self, handle: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<isize> {
         let mut lock = self.state.borrow_mut();
 
         // Don't resize the renderer when the window is minimized, but record that it was minimized so
         // that on restore the swap chain can be recreated via `update_drawable_size_even_if_unchanged`.
         if wparam.0 == SIZE_MINIMIZED as usize {
             lock.restore_from_minimized = lock.callbacks.request_frame.take();
+            drop(lock);
+            self.transition_size_changed(handle, SIZE_MINIMIZED);
             return Some(0);
         }
 
@@ -194,6 +202,7 @@ impl WindowsWindowInner {
         drop(lock);
 
         self.handle_size_change(new_size, scale_factor, should_resize_renderer);
+        self.transition_size_changed(handle, wparam.0 as u32);
         Some(0)
     }
 
@@ -242,7 +251,10 @@ impl WindowsWindowInner {
     }
 
     fn handle_timer_msg(&self, handle: HWND, wparam: WPARAM) -> Option<isize> {
-        if wparam.0 == SIZE_MOVE_LOOP_TIMER_ID {
+        if wparam.0 == OPACITY_TIMER_ID {
+            self.advance_opacity_transition(handle);
+            Some(0)
+        } else if wparam.0 == SIZE_MOVE_LOOP_TIMER_ID {
             for runnable in self.main_receiver.drain() {
                 runnable.run();
             }
@@ -1044,15 +1056,16 @@ impl WindowsWindowInner {
         {
             let handled = match (wparam.0 as u32, last_pressed) {
                 (HTMINBUTTON, HTMINBUTTON) => {
-                    unsafe { ShowWindowAsync(handle, SW_MINIMIZE).ok().log_err() };
+                    post_window_state_command(handle, SC_MINIMIZE);
                     true
                 }
                 (HTMAXBUTTON, HTMAXBUTTON) => {
-                    if self.state.borrow().is_maximized() {
-                        unsafe { ShowWindowAsync(handle, SW_NORMAL).ok().log_err() };
+                    let command = if self.state.borrow().is_maximized() {
+                        SC_RESTORE
                     } else {
-                        unsafe { ShowWindowAsync(handle, SW_MAXIMIZE).ok().log_err() };
-                    }
+                        SC_MAXIMIZE
+                    };
+                    post_window_state_command(handle, command);
                     true
                 }
                 (HTCLOSE, HTCLOSE) => {
@@ -1135,7 +1148,14 @@ impl WindowsWindowInner {
         Some(0)
     }
 
-    fn handle_system_command(&self, wparam: WPARAM) -> Option<isize> {
+    fn handle_system_command(&self, handle: HWND, wparam: WPARAM) -> Option<isize> {
+        if matches!(wparam.0 as u32 & 0xfff0, SC_MINIMIZE | SC_MAXIMIZE | SC_RESTORE)
+            && self.start_opaque_transition(handle)
+            && !unsafe { IsIconic(handle) }.as_bool()
+        {
+            // Submit the solid frame before passing the system command to DWM.
+            self.draw_window(handle, true);
+        }
         if wparam.0 == SC_KEYMENU as usize {
             let mut lock = self.state.borrow_mut();
             if lock.system_key_handled {
@@ -1243,15 +1263,27 @@ impl WindowsWindowInner {
     }
 
     #[inline]
-    fn draw_window(&self, handle: HWND, force_render: bool) -> Option<isize> {
-        let mut request_frame = self.state.borrow_mut().callbacks.request_frame.take()?;
-        request_frame(RequestFrameOptions {
+    pub(super) fn draw_window(&self, handle: HWND, force_render: bool) -> Option<isize> {
+        self.request_window_frame(RequestFrameOptions {
             require_presentation: false,
             force_render,
-        });
-        self.state.borrow_mut().callbacks.request_frame = Some(request_frame);
+        })?;
         unsafe { ValidateRect(Some(handle), None).ok().log_err() };
         Some(0)
+    }
+
+    pub(super) fn present_window_frame(&self) {
+        self.request_window_frame(RequestFrameOptions {
+            require_presentation: true,
+            force_render: false,
+        });
+    }
+
+    fn request_window_frame(&self, options: RequestFrameOptions) -> Option<()> {
+        let mut request_frame = self.state.borrow_mut().callbacks.request_frame.take()?;
+        request_frame(options);
+        self.state.borrow_mut().callbacks.request_frame = Some(request_frame);
+        Some(())
     }
 
     #[inline]

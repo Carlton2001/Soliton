@@ -693,7 +693,8 @@ pub struct Background {
     pub(crate) solid: Hsla,
     pub(crate) gradient_angle_or_pattern_height: f32,
     pub(crate) colors: [LinearColorStop; 2],
-    /// Padding for alignment for repr(C) layout.
+    /// Renderer metadata stored in the GPU layout's reserved padding.
+    #[serde(skip)]
     pad: u32,
 }
 
@@ -753,6 +754,14 @@ pub fn solid_background(color: impl Into<Hsla>) -> Background {
         solid: color.into(),
         ..Default::default()
     }
+}
+
+/// Paints a solid surface with its own alpha, replacing the surface behind it.
+/// Rounded edges still blend with the pixels they partially cover.
+pub fn replacing_background(color: impl Into<Hsla>) -> Background {
+    let mut background = solid_background(color);
+    background.pad = u32::from(background.solid.a < 1.);
+    background
 }
 
 /// Creates a LinearGradient background color.
@@ -834,6 +843,10 @@ impl Background {
             BackgroundTag::LinearGradient => self.colors.iter().all(|c| c.color.is_transparent()),
             BackgroundTag::PatternSlash => self.solid.is_transparent(),
         }
+    }
+
+    pub(crate) fn replaces_destination(&self) -> bool {
+        self.pad != 0
     }
 }
 

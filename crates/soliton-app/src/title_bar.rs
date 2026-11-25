@@ -60,7 +60,6 @@ impl Soliton {
             .flex()
             .flex_none()
             .items_center()
-            .bg(theme.background)
             .child(drag)
             // Windows handles these clicks natively through their control areas.
             .child(

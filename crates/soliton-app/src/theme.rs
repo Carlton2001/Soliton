@@ -104,6 +104,13 @@ impl Theme {
             }
         }
     }
+
+    pub fn with_background_opacity(mut self, opacity: f32) -> Self {
+        self.background.a = opacity;
+        self.panel.a = opacity;
+        self.card.a = opacity;
+        self
+    }
 }
 
 /// Stable swatch colors from the Windows personalization palette.

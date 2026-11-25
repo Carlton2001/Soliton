@@ -322,12 +322,19 @@ impl<'a> Iterator for BatchIterator<'a> {
                 let quads_start = self.quads_start;
                 let mut quads_end = quads_start + 1;
                 self.quads_iter.next();
-                while self
-                    .quads_iter
-                    .next_if(|quad| (quad.order, batch_kind) < max_order_and_kind)
-                    .is_some()
-                {
-                    quads_end += 1;
+                // Replacement clears and paints each quad before the next one,
+                // including when their bounds overlap.
+                if !self.quads[quads_start].background.replaces_destination() {
+                    while self
+                        .quads_iter
+                        .next_if(|quad| {
+                            (quad.order, batch_kind) < max_order_and_kind
+                                && !quad.background.replaces_destination()
+                        })
+                        .is_some()
+                    {
+                        quads_end += 1;
+                    }
                 }
                 self.quads_start = quads_end;
                 Some(PrimitiveBatch::Quads(&self.quads[quads_start..quads_end]))
@@ -459,6 +466,16 @@ pub(crate) struct Quad {
     pub border_color: Hsla,
     pub corner_radii: Corners<ScaledPixels>,
     pub border_widths: Edges<ScaledPixels>,
+}
+
+impl Quad {
+    /// The erase pass uses shape coverage alone. The additive pass then writes
+    /// the quad's actual color and alpha over the uncovered destination pixels.
+    pub(crate) fn opaque_coverage(&self) -> Self {
+        let mut quad = self.clone();
+        quad.background.solid.a = 1.;
+        quad
+    }
 }
 
 impl From<Quad> for Primitive {

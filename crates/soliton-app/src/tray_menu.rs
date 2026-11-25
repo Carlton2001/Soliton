@@ -209,7 +209,7 @@ impl Render for TrayMenu {
             return div();
         };
         let app = owner.read(cx);
-        let theme = app.theme();
+        let theme = app.theme().with_background_opacity(1.);
         let playing = app.playback.state == PlaybackState::Playing;
         let track = app.playback.track.as_ref();
         let title: SharedString = track

@@ -109,7 +109,7 @@ impl Soliton {
             .p(rems(BAND_PADDING))
             // GPUI clips children to a rectangle: the band rounds its own corners.
             .rounded_t(RADIUS_LARGE)
-            .bg(theme.card)
+            .bg(gpui::replacing_background(theme.card))
             .child(cover(
                 track.and_then(|t| t.cover.as_ref()),
                 side * 16.,
@@ -209,7 +209,7 @@ impl Soliton {
                     .rounded(RADIUS_LARGE)
                     .border_1()
                     .border_color(theme.border)
-                    .bg(theme.panel)
+                    .bg(gpui::replacing_background(theme.panel))
                     // Lifted off the page: a close contact shadow under a diffuse one.
                     .shadow(vec![
                         BoxShadow {

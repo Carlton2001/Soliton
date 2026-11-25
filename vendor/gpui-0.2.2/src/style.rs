@@ -627,7 +627,9 @@ impl Style {
         window.paint_shadows(bounds, corner_radii, &self.box_shadow);
 
         let background_color = self.background.as_ref().and_then(Fill::color);
-        if background_color.is_some_and(|color| !color.is_transparent()) {
+        if background_color
+            .is_some_and(|color| color.replaces_destination() || !color.is_transparent())
+        {
             let mut border_color = match background_color {
                 Some(color) => match color.tag {
                     BackgroundTag::Solid => color.solid,

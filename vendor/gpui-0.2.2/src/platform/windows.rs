@@ -10,6 +10,7 @@ mod events;
 mod keyboard;
 mod platform;
 mod system_settings;
+mod transitions;
 mod util;
 mod vsync;
 mod window;

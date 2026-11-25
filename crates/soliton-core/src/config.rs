@@ -171,6 +171,7 @@ pub struct Settings {
     pub check_updates: bool,
     pub language: Language,
     pub appearance: Appearance,
+    pub background_opacity: u8,
     pub accent: Accent,
     pub app_icon: AppIcon,
     pub album_grid: bool,
@@ -193,6 +194,7 @@ pub struct Settings {
 }
 
 impl Settings {
+    pub const MAX_BACKGROUND_OPACITY: u8 = 100;
     pub const DEFAULT_REM_SIZE: u32 = 16;
     pub const MIN_REM_SIZE: u32 = 12;
     pub const MAX_REM_SIZE: u32 = 24;
@@ -208,6 +210,7 @@ impl Default for Settings {
             check_updates: true,
             language: Language::French,
             appearance: Appearance::System,
+            background_opacity: Self::MAX_BACKGROUND_OPACITY,
             accent: Accent::Teal,
             app_icon: AppIcon::default(),
             album_grid: true,
@@ -249,6 +252,9 @@ impl Settings {
                     };
                 }
                 settings.volume = settings.volume.clamp(0.0, 1.0);
+                settings.background_opacity = settings
+                    .background_opacity
+                    .min(Self::MAX_BACKGROUND_OPACITY);
                 settings.ui_rem_size = Self::clamp_rem_size(settings.ui_rem_size);
                 Ok(settings)
             }

@@ -12,6 +12,8 @@ use crate::{
 use gpui::{prelude::*, *};
 use soliton_core::config::{Accent, Appearance, CoverSize, Language, Settings};
 
+mod background;
+
 /// Section title with an optional action aligned on the right, above its content.
 pub fn section(
     title: impl IntoElement,
@@ -346,6 +348,7 @@ impl Soliton {
                 [
                     setting_row(self.t(Text::Theme), None, appearance, theme),
                     setting_row(self.t(Text::AccentColor), None, accents, theme),
+                    self.background_opacity_preference(theme, cx),
                     self.icon_preferences(cx),
                     setting_row(self.t(Text::CoverSize), None, cover_size, theme),
                     hide.into_any_element(),

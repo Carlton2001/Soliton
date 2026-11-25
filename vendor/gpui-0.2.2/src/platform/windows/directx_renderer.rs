@@ -78,6 +78,8 @@ struct DirectXResources {
 struct DirectXRenderPipelines {
     shadow_pipeline: PipelineState<Shadow>,
     quad_pipeline: PipelineState<Quad>,
+    quad_erase_blend: ID3D11BlendState,
+    quad_add_blend: ID3D11BlendState,
     path_rasterization_pipeline: PipelineState<PathRasterizationSprite>,
     path_sprite_pipeline: PipelineState<PathSprite>,
     underline_pipeline: PipelineState<Underline>,
@@ -283,12 +285,12 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    pub(crate) fn draw(&mut self, scene: &Scene) -> Result<()> {
+    pub(crate) fn draw(&mut self, scene: &Scene, opacity_override: f32) -> Result<()> {
         self.pre_draw()?;
         for batch in scene.batches() {
             match batch {
                 PrimitiveBatch::Shadows(shadows) => self.draw_shadows(shadows),
-                PrimitiveBatch::Quads(quads) => self.draw_quads(quads),
+                PrimitiveBatch::Quads(quads) => self.draw_quads(quads, opacity_override),
                 PrimitiveBatch::Paths(paths) => {
                     self.draw_paths_to_intermediate(paths)?;
                     self.draw_paths_from_intermediate(paths)
@@ -376,23 +378,56 @@ impl DirectXRenderer {
         )
     }
 
-    fn draw_quads(&mut self, quads: &[Quad]) -> Result<()> {
-        if quads.is_empty() {
-            return Ok(());
+    fn draw_quads(&mut self, quads: &[Quad], opacity_override: f32) -> Result<()> {
+        let pipeline = &mut self.pipelines.quad_pipeline;
+        let mut draw = |quads: &[Quad], blend_state: Option<&ID3D11BlendState>| -> Result<()> {
+            pipeline.update_buffer(&self.devices.device, &self.devices.device_context, quads)?;
+            set_pipeline_state(
+                &self.devices.device_context,
+                &pipeline.view,
+                D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+                &self.resources.viewport,
+                &pipeline.vertex,
+                &pipeline.fragment,
+                &self.globals.global_params_buffer,
+                blend_state.unwrap_or(&pipeline.blend_state),
+            );
+            unsafe {
+                self.devices
+                    .device_context
+                    .DrawInstanced(4, quads.len() as u32, 0, 0);
+            }
+            Ok(())
+        };
+        if let [quad] = quads
+            && quad.background.replaces_destination()
+        {
+            if opacity_override == 1. {
+                return draw(&[quad.opaque_coverage()], None);
+            }
+            let mut blended_quad;
+            let quad = if opacity_override > 0. {
+                blended_quad = quad.clone();
+                let alpha = &mut blended_quad.background.solid.a;
+                *alpha += (1. - *alpha) * opacity_override;
+                &blended_quad
+            } else {
+                quad
+            };
+            draw(
+                &[quad.opaque_coverage()],
+                Some(&self.pipelines.quad_erase_blend),
+            )?;
+            if !quad.background.is_transparent() {
+                draw(
+                    std::slice::from_ref(quad),
+                    Some(&self.pipelines.quad_add_blend),
+                )?;
+            }
+        } else {
+            draw(quads, None)?;
         }
-        self.pipelines.quad_pipeline.update_buffer(
-            &self.devices.device,
-            &self.devices.device_context,
-            quads,
-        )?;
-        self.pipelines.quad_pipeline.draw(
-            &self.devices.device_context,
-            &self.resources.viewport,
-            &self.globals.global_params_buffer,
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
-            4,
-            quads.len() as u32,
-        )
+        Ok(())
     }
 
     fn draw_paths_to_intermediate(&mut self, paths: &[Path<ScaledPixels>]) -> Result<()> {
@@ -778,6 +813,8 @@ impl DirectXRenderPipelines {
         Ok(Self {
             shadow_pipeline,
             quad_pipeline,
+            quad_erase_blend: create_quad_replacement_blend_state(device, true)?,
+            quad_add_blend: create_quad_replacement_blend_state(device, false)?,
             path_rasterization_pipeline,
             path_sprite_pipeline,
             underline_pipeline,
@@ -1244,6 +1281,34 @@ fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
     desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
+    unsafe {
+        let mut state = None;
+        device.CreateBlendState(&desc, Some(&mut state))?;
+        Ok(state.unwrap())
+    }
+}
+
+fn create_quad_replacement_blend_state(
+    device: &ID3D11Device,
+    erase: bool,
+) -> Result<ID3D11BlendState> {
+    let mut desc = D3D11_BLEND_DESC::default();
+    let target = &mut desc.RenderTarget[0];
+    target.BlendEnable = true.into();
+    target.BlendOp = D3D11_BLEND_OP_ADD;
+    target.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    target.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
+    if erase {
+        target.SrcBlend = D3D11_BLEND_ZERO;
+        target.SrcBlendAlpha = D3D11_BLEND_ZERO;
+        target.DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+        target.DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+    } else {
+        target.SrcBlend = D3D11_BLEND_SRC_ALPHA;
+        target.SrcBlendAlpha = D3D11_BLEND_ONE;
+        target.DestBlend = D3D11_BLEND_ONE;
+        target.DestBlendAlpha = D3D11_BLEND_ONE;
+    }
     unsafe {
         let mut state = None;
         device.CreateBlendState(&desc, Some(&mut state))?;

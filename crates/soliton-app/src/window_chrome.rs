@@ -1,15 +1,28 @@
 //! Linux client decorations. Windows keeps GPUI's native non-client handling.
 use crate::{placement, theme::Theme};
 use gpui::{prelude::*, *};
+use soliton_core::config::Settings;
 
 /// Transparent margin holding the shadow and the resize zones.
 const RESIZE_BORDER: Pixels = px(10.);
 /// Radius of the window outline; content inside the 1px border uses one less.
 const CORNER_RADIUS: Pixels = px(10.);
 
-pub fn options(bounds: WindowBounds) -> WindowOptions {
+pub(super) fn background_appearance(settings: &Settings) -> WindowBackgroundAppearance {
+    if settings.background_opacity < Settings::MAX_BACKGROUND_OPACITY {
+        WindowBackgroundAppearance::Blurred
+    } else if cfg!(target_os = "linux") {
+        // Keep the alpha-capable swap chain. Opaque theme colors still cover the backdrop.
+        WindowBackgroundAppearance::Transparent
+    } else {
+        WindowBackgroundAppearance::Opaque
+    }
+}
+
+pub fn options(bounds: WindowBounds, settings: &Settings) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(bounds),
+        window_background: background_appearance(settings),
         window_min_size: Some(placement::MIN_SIZE),
         titlebar: Some(TitlebarOptions {
             appears_transparent: true,

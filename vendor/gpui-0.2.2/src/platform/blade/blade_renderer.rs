@@ -124,6 +124,8 @@ struct PathRasterizationVertex {
 
 struct BladePipelines {
     quads: gpu::RenderPipeline,
+    quad_erase: gpu::RenderPipeline,
+    quad_add: gpu::RenderPipeline,
     shadows: gpu::RenderPipeline,
     path_rasterization: gpu::RenderPipeline,
     paths: gpu::RenderPipeline,
@@ -166,9 +168,9 @@ impl BladePipelines {
             write_mask: gpu::ColorWrites::default(),
         }];
 
-        Self {
-            quads: gpu.create_render_pipeline(gpu::RenderPipelineDesc {
-                name: "quads",
+        let quad_pipeline = |name, blend| {
+            gpu.create_render_pipeline(gpu::RenderPipelineDesc {
+                name,
                 data_layouts: &[&ShaderQuadsData::layout()],
                 vertex: shader.at("vs_quad"),
                 vertex_fetches: &[],
@@ -178,9 +180,37 @@ impl BladePipelines {
                 },
                 depth_stencil: None,
                 fragment: Some(shader.at("fs_quad")),
-                color_targets,
+                color_targets: &[gpu::ColorTargetState {
+                    format: surface_info.format,
+                    blend: Some(blend),
+                    write_mask: gpu::ColorWrites::default(),
+                }],
                 multisample_state: gpu::MultisampleState::default(),
-            }),
+            })
+        };
+        let erase = gpu::BlendComponent {
+            src_factor: gpu::BlendFactor::Zero,
+            ..gpu::BlendComponent::OVER
+        };
+        Self {
+            quads: quad_pipeline("quads", blend_mode),
+            quad_erase: quad_pipeline(
+                "quad erase",
+                gpu::BlendState {
+                    color: erase,
+                    alpha: erase,
+                },
+            ),
+            quad_add: quad_pipeline(
+                "quad add",
+                gpu::BlendState {
+                    color: gpu::BlendComponent {
+                        src_factor: blend_mode.color.src_factor,
+                        ..gpu::BlendComponent::ADDITIVE
+                    },
+                    alpha: gpu::BlendComponent::ADDITIVE,
+                },
+            ),
             shadows: gpu.create_render_pipeline(gpu::RenderPipelineDesc {
                 name: "shadows",
                 data_layouts: &[&ShaderShadowsData::layout()],
@@ -305,6 +335,8 @@ impl BladePipelines {
 
     fn destroy(&mut self, gpu: &gpu::Context) {
         gpu.destroy_render_pipeline(&mut self.quads);
+        gpu.destroy_render_pipeline(&mut self.quad_erase);
+        gpu.destroy_render_pipeline(&mut self.quad_add);
         gpu.destroy_render_pipeline(&mut self.shadows);
         gpu.destroy_render_pipeline(&mut self.path_rasterization);
         gpu.destroy_render_pipeline(&mut self.paths);
@@ -678,16 +710,29 @@ impl BladeRenderer {
         for batch in scene.batches() {
             match batch {
                 PrimitiveBatch::Quads(quads) => {
-                    let instance_buf = unsafe { self.instance_belt.alloc_typed(quads, &self.gpu) };
-                    let mut encoder = pass.with(&self.pipelines.quads);
-                    encoder.bind(
-                        0,
-                        &ShaderQuadsData {
-                            globals,
-                            b_quads: instance_buf,
-                        },
-                    );
-                    encoder.draw(0, 4, 0, quads.len() as u32);
+                    let mut draw = |pipeline: &gpu::RenderPipeline, quads: &[Quad]| {
+                        let instance_buf =
+                            unsafe { self.instance_belt.alloc_typed(quads, &self.gpu) };
+                        let mut encoder = pass.with(pipeline);
+                        encoder.bind(
+                            0,
+                            &ShaderQuadsData {
+                                globals,
+                                b_quads: instance_buf,
+                            },
+                        );
+                        encoder.draw(0, 4, 0, quads.len() as u32);
+                    };
+                    if let [quad] = quads
+                        && quad.background.replaces_destination()
+                    {
+                        draw(&self.pipelines.quad_erase, &[quad.opaque_coverage()]);
+                        if !quad.background.is_transparent() {
+                            draw(&self.pipelines.quad_add, quads);
+                        }
+                    } else {
+                        draw(&self.pipelines.quads, quads);
+                    }
                 }
                 PrimitiveBatch::Shadows(shadows) => {
                     let instance_buf =

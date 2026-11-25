@@ -40,7 +40,7 @@ pub fn page_body(theme: Theme) -> Div {
         .flex()
         .flex_col()
         .rounded(RADIUS)
-        .bg(theme.panel)
+        .bg(gpui::replacing_background(theme.panel))
 }
 
 /// Fixed blocks above a page's scrolled list; the list's own top inset follows.
@@ -444,7 +444,7 @@ pub fn popover(theme: Theme) -> Div {
         .rounded(RADIUS_LARGE)
         .border_1()
         .border_color(theme.control_border)
-        .bg(theme.panel)
+        .bg(gpui::replacing_background(theme.panel))
         .shadow_lg()
         .occlude()
 }
@@ -606,7 +606,7 @@ pub fn segments(options: impl IntoIterator<Item = Stateful<Div>>, theme: Theme) 
         .rounded(RADIUS)
         .border_1()
         .border_color(theme.control_border)
-        .bg(theme.background)
+        .bg(gpui::replacing_background(theme.background))
         .children(options)
 }
 
@@ -784,7 +784,7 @@ pub fn list_box(rows: impl IntoIterator<Item = AnyElement>, theme: Theme) -> Div
         .rounded(RADIUS_LARGE)
         .border_1()
         .border_color(theme.control_border)
-        .bg(theme.panel)
+        .bg(gpui::replacing_background(theme.panel))
         .overflow_hidden()
         .children(rows.into_iter().enumerate().map(move |(index, row)| {
             div()
@@ -823,7 +823,7 @@ impl Render for Tip {
             .rounded(RADIUS)
             .border_1()
             .border_color(theme.control_border)
-            .bg(theme.panel)
+            .bg(gpui::replacing_background(theme.panel))
             .text_color(theme.text)
             .font_family(UI_FONT)
             .text_size(TEXT_SMALL)
@@ -903,7 +903,7 @@ pub fn cover(path: Option<&PathBuf>, side: f32, theme: Theme) -> AnyElement {
         .flex_shrink_0()
         .rounded(RADIUS)
         .overflow_hidden()
-        .bg(theme.card)
+        .bg(gpui::replacing_background(theme.card))
         .flex()
         .items_center()
         .justify_center();

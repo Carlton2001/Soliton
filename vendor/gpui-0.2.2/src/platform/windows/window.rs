@@ -29,6 +29,8 @@ use windows::{
 
 use crate::*;
 
+use super::transitions::{WindowTransition, post_window_state_command};
+
 pub(crate) struct WindowsWindow(pub Rc<WindowsWindowInner>);
 
 pub struct WindowsWindowState {
@@ -41,6 +43,8 @@ pub struct WindowsWindowState {
     pub appearance: WindowAppearance,
     pub scale_factor: f32,
     pub restore_from_minimized: Option<Box<dyn FnMut(RequestFrameOptions)>>,
+    pub(super) background_appearance: WindowBackgroundAppearance,
+    pub(super) transition: WindowTransition,
 
     pub callbacks: Callbacks,
     pub input_handler: Option<PlatformInputHandler>,
@@ -130,6 +134,8 @@ impl WindowsWindowState {
             appearance,
             scale_factor,
             restore_from_minimized,
+            background_appearance: WindowBackgroundAppearance::default(),
+            transition: WindowTransition::default(),
             min_size,
             callbacks,
             input_handler,
@@ -770,6 +776,7 @@ impl PlatformWindow for WindowsWindow {
 
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance) {
         let hwnd = self.0.hwnd;
+        self.0.state.borrow_mut().background_appearance = background_appearance;
 
         match background_appearance {
             WindowBackgroundAppearance::Opaque => {
@@ -789,13 +796,13 @@ impl PlatformWindow for WindowsWindow {
     }
 
     fn minimize(&self) {
-        unsafe { ShowWindowAsync(self.0.hwnd, SW_MINIMIZE).ok().log_err() };
+        post_window_state_command(self.0.hwnd, SC_MINIMIZE);
     }
 
     fn zoom(&self) {
         unsafe {
             if IsWindowVisible(self.0.hwnd).as_bool() {
-                ShowWindowAsync(self.0.hwnd, SW_MAXIMIZE).ok().log_err();
+                post_window_state_command(self.0.hwnd, SC_MAXIMIZE);
             } else if let Some(status) = self.0.state.borrow_mut().initial_placement.as_mut() {
                 status.state = WindowOpenState::Maximized;
             }
@@ -875,7 +882,9 @@ impl PlatformWindow for WindowsWindow {
     }
 
     fn draw(&self, scene: &Scene) {
-        self.0.state.borrow_mut().renderer.draw(scene).log_err();
+        let mut state = self.0.state.borrow_mut();
+        let opacity_override = state.transition.opacity_override();
+        state.renderer.draw(scene, opacity_override).log_err();
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {

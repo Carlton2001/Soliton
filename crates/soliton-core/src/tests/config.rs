@@ -151,6 +151,29 @@ fn interface_size_defaults_and_stays_in_range() {
 }
 
 #[test]
+fn background_opacity_defaults_clamps_and_round_trips() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    fs::write(&path, b"{}").unwrap();
+    let mut settings = Settings::load(&path).unwrap();
+    assert_eq!(settings.background_opacity, 100);
+
+    for (opacity, expected) in [(0, 0), (20, 20), (100, 100), (120, 100)] {
+        settings.background_opacity = opacity;
+        settings.save(&path).unwrap();
+        let loaded = Settings::load(&path).unwrap();
+        assert_eq!(loaded.background_opacity, expected);
+    }
+
+    fs::write(
+        &path,
+        br#"{"background_opacity":72,"background_blur":false}"#,
+    )
+    .unwrap();
+    assert_eq!(Settings::load(&path).unwrap().background_opacity, 72);
+}
+
+#[test]
 fn last_view_and_artist_layout_round_trip() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");
