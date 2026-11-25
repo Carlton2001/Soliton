@@ -15,25 +15,20 @@ When the desktop layout is unavailable, Soliton puts all three buttons on the ri
 
 ## Install from GitHub
 
-This method installs Soliton for your user on compatible Linux x86_64 systems
-and supports in-app updates. For Ubuntu 24.04, Linux Mint 22 and Debian 13, use
-the release's .deb package.
+The script installs the .deb through APT on Debian, Ubuntu and derivatives.
+Other distributions get the per-user archive, which supports in-app updates.
+An existing per-user installation continues to use the archive.
 
 Install `curl` and `minisign` with your package manager, then run:
 
-```sh
-(
-    installer=$(mktemp) || exit 1
-    trap 'rm -f -- "$installer"' EXIT
-    curl -q -fsSL --proto '=https' --proto-redir '=https' -o "$installer" \
-        https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh &&
-        test -s "$installer" && sh "$installer"
-)
+```bash
+curl -fsSL https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh | bash
 ```
 
-The script downloads the Linux x86_64 archive for its release, verifies its
-Minisign signature and opens the archive installer. Run it as your regular user.
-For a specific release, download `install.sh` from that release's assets.
+The script verifies the Minisign signature of the selected package before
+installing it. Run it as your regular user. APT can prompt for your password
+when installing a .deb. For a specific release, download `install.sh` from that
+release's assets.
 
 ## Install from the archive
 

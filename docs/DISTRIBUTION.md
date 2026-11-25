@@ -53,9 +53,10 @@ dependency audit, builds both platforms, signs the artifacts and creates a
 draft. Publish the draft manually to make it available to the updater.
 
 The release also includes a standalone Linux `install.sh` prepared from
-[`download-install.sh`](../installer/linux/download-install.sh). It downloads
-the per-user archive and signature for that release, verifies the archive with
-the embedded Minisign public key and runs the installer inside the archive.
+[`download-install.sh`](../installer/linux/download-install.sh). It selects the
+.deb for Debian-family systems and the archive for other distributions or
+existing per-user installations, verifies the download with the embedded
+Minisign public key, and runs APT or the archive installer.
 
 Routine checks are defined in the [Windows tests](../.github/workflows/tests.yml),
 [Linux tests](../.github/workflows/linux.yml),
@@ -70,7 +71,7 @@ a warning on first launch.
 
 | Key | Public (repository) | Signs |
 |---|---|---|
-| Minisign | `installer/signing/soliton-update.pub` | the Windows installer and Linux archive, checked by the updater |
+| Minisign | `installer/signing/soliton-update.pub` | the Windows installer and Linux archive, checked by the updater, and the .deb, checked by the Linux download installer |
 | GPG ed25519 `7BFC00A65179DAEDD7CD26298EED1CC9F8CE693B` | `installer/signing/soliton-packages.asc` | the RPM (embedded signature) and `SHA256SUMS` (detached `SHA256SUMS.asc`), which lists every package |
 
 Private keys stay outside the repository. The

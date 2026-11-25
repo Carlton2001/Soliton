@@ -58,8 +58,11 @@ invariants, the [README](../README.md) for features and shortcuts, and the
 - The Windows installer and the Linux per-user archive can update from the app.
   Soliton checks for updates at startup when enabled. The user starts the
   installation and Soliton restarts after installing the signed update.
-  Linux system packages use their distribution channels. Flatpak builds,
-  bundle distribution and Flathub submission are on hold.
+  The Linux download script installs the signed .deb on Debian-family systems
+  and the signed per-user archive elsewhere. Existing per-user installations
+  keep their installation method. System packages use their distribution
+  channels for updates. Flatpak builds, bundle distribution and Flathub
+  submission are on hold.
 
 ## Playback and collections
 
