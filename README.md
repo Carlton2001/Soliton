@@ -13,11 +13,18 @@ Soliton is a native [Rust](https://www.rust-lang.org/) and [GPUI](https://github
 
 Linux requires PipeWire for audio.
 
-The recommended way to install Soliton on Linux x86_64 is the GitHub release
-script. It installs Soliton for your user and enables in-app updates.
+The GitHub release script installs Soliton for your user and enables in-app
+updates on compatible Linux x86_64 systems. On Ubuntu 24.04, Linux Mint 22 and
+Debian 13, use the release's .deb package.
 
 ```sh
-curl -fsSL https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh | sh
+(
+    installer=$(mktemp) || exit 1
+    trap 'rm -f -- "$installer"' EXIT
+    curl -q -fsSL --proto '=https' --proto-redir '=https' -o "$installer" \
+        https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh &&
+        test -s "$installer" && sh "$installer"
+)
 ```
 
 The script requires `minisign` to verify the archive before installation.

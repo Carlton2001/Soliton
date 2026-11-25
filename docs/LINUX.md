@@ -8,19 +8,27 @@ Soliton's title bar uses Adwaita buttons on GNOME and Breeze buttons on KDE
 Plasma. It follows the desktop's choice of minimize, maximize and close buttons,
 including their order and placement on either side. GNOME changes apply as the
 Settings portal reports them. On Plasma, restart Soliton after changing **System
-Settings → Appearance → Window Decorations → Titlebar Buttons**. The Flatpak reads
+Settings → Appearance → Window Decorations → Titlebar Buttons**. Native installs
+read the effective KWin settings, including system defaults. The Flatpak reads
 the default Plasma configuration file at `~/.config/kwinrc` with read-only access.
 When the desktop layout is unavailable, Soliton puts all three buttons on the right.
 
 ## Install from GitHub
 
-This is the recommended installation method on Linux x86_64. It installs
-Soliton for your user and supports in-app updates.
+This method installs Soliton for your user on compatible Linux x86_64 systems
+and supports in-app updates. For Ubuntu 24.04, Linux Mint 22 and Debian 13, use
+the release's .deb package.
 
 Install `curl` and `minisign` with your package manager, then run:
 
 ```sh
-curl -fsSL https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh | sh
+(
+    installer=$(mktemp) || exit 1
+    trap 'rm -f -- "$installer"' EXIT
+    curl -q -fsSL --proto '=https' --proto-redir '=https' -o "$installer" \
+        https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh &&
+        test -s "$installer" && sh "$installer"
+)
 ```
 
 The script downloads the Linux x86_64 archive for its release, verifies its
@@ -43,7 +51,9 @@ For direct execution, use `./install.sh --install` or `./install.sh --uninstall`
 
 The archive is built on Fedora 44 x86_64 and requires a compatible glibc,
 Vulkan, a Wayland or X11 session, PipeWire 0.3.49 or newer, D-Bus and the
-XDG folder picker portal. The archive installer lists missing required and
+XDG folder picker portal. For installs and updates, the installer checks that
+the system loader can resolve the new binary's libraries before replacing it.
+The archive installer lists missing required and
 recommended components and prints the package manager command for Debian and
 Ubuntu, Fedora (including rpm-ostree systems), Arch Linux, and openSUSE. In a
 terminal, it can run the command after confirmation. If `flock` is still

@@ -119,16 +119,43 @@ has_library() {
     return 1
 }
 
+# A driver list can contain manifest files or directories, separated by colons.
+has_vulkan_manifest() (
+    IFS=:
+    set -f
+    paths=$1
+    suffix=${2-}
+    set -- $paths
+    set +f
+    for path do
+        [ -n "$path" ] || continue
+        if [ -z "$suffix" ]; then
+            case $path in
+                *.json) [ ! -f "$path" ] || exit 0 ;;
+            esac
+        fi
+        for manifest in "$path$suffix"/*.json; do
+            [ ! -f "$manifest" ] || exit 0
+        done
+    done
+    exit 1
+)
+
+has_vulkan_driver() {
+    if [ "${VK_DRIVER_FILES+x}${VK_ICD_FILENAMES+x}" ]; then
+        has_vulkan_manifest "${VK_DRIVER_FILES-${VK_ICD_FILENAMES-}}"
+        return
+    fi
+    has_vulkan_manifest "${VK_ADD_DRIVER_FILES-}" ||
+        has_vulkan_manifest "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}:/etc" /vulkan/icd.d ||
+        has_vulkan_manifest "${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" /vulkan/icd.d
+}
+
 dependency_present() {
     case $1 in
         cmd:*) command -v "${1#cmd:}" >/dev/null 2>&1 ;;
         lib:*) has_library "${1#lib:}" ;;
-        vulkan)
-            for manifest in /usr/share/vulkan/icd.d/*.json /etc/vulkan/icd.d/*.json; do
-                [ ! -f "$manifest" ] || return 0
-            done
-            return 1
-            ;;
+        vulkan) has_vulkan_driver ;;
         portal)
             [ -f /usr/share/dbus-1/services/org.freedesktop.portal.Desktop.service ]
             ;;
@@ -267,6 +294,30 @@ fi
 if ! command -v flock >/dev/null 2>&1; then
     say "Installez flock (util-linux), puis relancez ce script." \
         "Install flock (util-linux), then run this script again." >&2
+    exit 1
+fi
+
+# Resolve libraries and their symbol versions without starting the application.
+loader=/lib64/ld-linux-x86-64.so.2
+if [ ! -x "$loader" ]; then
+    say "Cette archive nécessite le chargeur glibc pour Linux x86_64." \
+        "This archive requires the glibc loader for Linux x86_64." >&2
+    exit 1
+fi
+loader_status=0
+loader_report=$(LC_ALL=C "$loader" --list "$here/bin/soliton" 2>&1) || loader_status=$?
+# The loader can report missing libraries or symbol versions while returning success.
+if [ "$loader_status" -ne 0 ] ||
+    printf '%s\n' "$loader_report" | grep -Eq ' => not found$|: version .* not found \(required by '; then
+    say "Impossible de charger le binaire de cette archive sur votre système." \
+        "This system cannot load the binary from this archive." >&2
+    printf '%s\n' "$loader_report" >&2
+    case $loader_report in
+        *'GLIBC_'*'not found'*)
+            say "Cette archive nécessite une version plus récente de glibc. Sur Debian, Ubuntu ou Linux Mint, utilisez le paquet .deb de la version si votre distribution est prise en charge." \
+                "This archive requires a newer version of glibc. On Debian, Ubuntu or Linux Mint, use the release's .deb package if your distribution is supported." >&2
+            ;;
+    esac
     exit 1
 fi
 

@@ -2,7 +2,7 @@
 
 use crate::{CaptionButton, CaptionStyle, DesktopEvent, WindowControls};
 use crossbeam_channel::Sender;
-use std::{path::PathBuf, sync::OnceLock};
+use std::{path::Path, process::Command, sync::OnceLock};
 use zbus::{
     blocking::{Connection, Proxy},
     zvariant::OwnedValue,
@@ -10,6 +10,10 @@ use zbus::{
 
 const NAMESPACE: &str = "org.gnome.desktop.wm.preferences";
 const KEY: &str = "button-layout";
+const KDE_GROUP: &str = "org.kde.kdecoration2";
+const KDE_LEFT: &str = "ButtonsOnLeft";
+const KDE_RIGHT: &str = "ButtonsOnRight";
+const KDE_DEFAULT_RIGHT: &str = "IAX";
 
 pub(crate) fn style() -> CaptionStyle {
     static STYLE: OnceLock<CaptionStyle> = OnceLock::new();
@@ -28,9 +32,7 @@ pub(crate) fn style() -> CaptionStyle {
 
 pub(super) fn watch(events: Sender<DesktopEvent>) {
     if style() == CaptionStyle::Breeze {
-        if let Some(config) = kde_config() {
-            let _ = events.try_send(DesktopEvent::WindowControls(kde_layout(&config)));
-        }
+        let _ = events.try_send(DesktopEvent::WindowControls(kde_controls()));
         return;
     }
     let _ = std::thread::Builder::new()
@@ -67,7 +69,7 @@ fn watch_gnome(events: Sender<DesktopEvent>) {
         if !publish(value) {
             return;
         }
-    } else if let Ok(output) = std::process::Command::new("gsettings")
+    } else if let Ok(output) = Command::new("gsettings")
         .args(["get", NAMESPACE, KEY])
         .output()
         && output.status.success()
@@ -105,35 +107,80 @@ fn gnome_button(value: &str) -> Option<CaptionButton> {
     }
 }
 
-fn kde_config() -> Option<String> {
-    let default_config = || dirs::home_dir().map(|home| home.join(".config"));
-    let config_home = if std::env::var_os("FLATPAK_ID").is_some() {
+fn kde_controls() -> WindowControls {
+    let read_config = |directory: &Path| std::fs::read_to_string(directory.join("kwinrc")).ok();
+    if std::env::var_os("FLATPAK_ID").is_some() {
         // The manifest exposes only this file. XDG_CONFIG_HOME is app-private.
-        default_config()?
-    } else {
-        std::env::var_os("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .filter(|path| path.is_absolute())
-            .or_else(default_config)?
-    };
-    std::fs::read_to_string(config_home.join("kwinrc")).ok()
+        let config = dirs::home_dir().and_then(|home| read_config(&home.join(".config")));
+        return kde_config_layout(config.as_deref());
+    }
+
+    for reader in ["kreadconfig6", "kreadconfig5"] {
+        if let Some(left) = kde_read_entry(reader, KDE_LEFT, "")
+            && let Some(right) = kde_read_entry(reader, KDE_RIGHT, KDE_DEFAULT_RIGHT)
+        {
+            return kde_layout(&left, &right);
+        }
+    }
+
+    let system_dirs = std::env::var_os("XDG_CONFIG_DIRS")
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "/etc/xdg".into());
+    let configs: Vec<_> = std::env::split_paths(&system_dirs)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .chain(dirs::config_dir())
+        .filter(|directory| directory.is_absolute())
+        .filter_map(|directory| read_config(&directory))
+        .collect();
+    kde_config_layout(configs.iter().map(String::as_str))
 }
 
-fn kde_layout(config: &str) -> WindowControls {
+fn kde_read_entry(reader: &str, key: &str, default: &str) -> Option<String> {
+    let output = Command::new(reader)
+        .args([
+            "--file",
+            "kwinrc",
+            "--group",
+            KDE_GROUP,
+            "--key",
+            key,
+            "--default",
+            default,
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok()
+}
+
+fn kde_config_layout<'a>(configs: impl IntoIterator<Item = &'a str>) -> WindowControls {
     let mut left = "";
-    let mut right = "IAX";
-    let mut decoration = false;
-    for line in config.lines().map(str::trim) {
-        if line.starts_with('[') {
-            decoration = line == "[org.kde.kdecoration2]";
-        } else if decoration && let Some((key, value)) = line.split_once('=') {
-            match key.trim() {
-                "ButtonsOnLeft" => left = value.trim(),
-                "ButtonsOnRight" => right = value.trim(),
-                _ => {}
+    let mut right = KDE_DEFAULT_RIGHT;
+    for config in configs {
+        let mut decoration = false;
+        for line in config.lines().map(str::trim) {
+            if line.starts_with('[') {
+                decoration = line
+                    .strip_prefix('[')
+                    .and_then(|line| line.strip_suffix(']'))
+                    == Some(KDE_GROUP);
+            } else if decoration && let Some((key, value)) = line.split_once('=') {
+                match key.trim() {
+                    KDE_LEFT => left = value.trim(),
+                    KDE_RIGHT => right = value.trim(),
+                    _ => {}
+                }
             }
         }
     }
+    kde_layout(left, right)
+}
+
+fn kde_layout(left: &str, right: &str) -> WindowControls {
     layout(
         CaptionStyle::Breeze,
         left.chars().filter_map(kde_button),

@@ -26,8 +26,10 @@ tags et pochettes ne sont jamais modifiés. Dans Paramètres → À propos, vér
 les mises à jour puis cliquez sur « Mettre à jour Soliton ». Soliton vérifie la
 signature et redémarre après l'installation. Cette fonction utilise curl, les
 certificats du système et tar avec gzip.
-Le binaire est construit sur Fedora 44 x86_64 ; les distributions plus
-anciennes peuvent manquer de la version de glibc requise.
+Le binaire est construit sur Fedora 44 x86_64. Le script vérifie que les
+bibliothèques du système, dont glibc, permettent de charger le binaire avant
+de l’installer ou de le remplacer. Pour Ubuntu 24.04, Linux Mint 22 et
+Debian 13, utilisez le paquet .deb de la version.
 
 Installation (current user, no root):
 
@@ -52,7 +54,8 @@ Usage: add your music folders in Settings. Your files, tags and artwork are
 never modified. In Settings → About, check for updates and click “Update
 Soliton”. Soliton verifies the signature and restarts after installation.
 This feature uses curl, system CA certificates and tar with gzip support.
-The binary is built on Fedora 44 x86_64; older distributions may lack the
-required glibc version.
+The binary is built on Fedora 44 x86_64. The script checks that the system
+libraries, including glibc, can load it before installing or replacing it.
+For Ubuntu 24.04, Linux Mint 22 and Debian 13, use the release's .deb package.
 
 Licence : GPL-3.0-only (LICENSE). Dependencies: licenses/dependencies.
