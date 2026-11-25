@@ -30,7 +30,7 @@ const viewLabels = () => ({
   artists: tr('Artistes', 'Artists'), albums: 'Albums', playlists: 'Playlists',
   queue: tr('File de lecture', 'Play Queue'), settings: tr('Réglages', 'Settings'),
 });
-const sectionIcons = { artists: 'users', albums: 'disc-3', playlists: 'list', queue: 'list-end', settings: 'settings' };
+const sectionIcons = { artists: 'users', albums: 'disc-3', playlists: 'list', queue: 'list-end' };
 const themes = () => ({ light: tr('Clair', 'Light'), dark: tr('Sombre', 'Dark') });
 const audioFormat = 'FLAC · 44100 Hz · 16 bits';
 const albumDuration = album => time(album.tracks.reduce((sum, track) => sum + track.seconds, 0));
@@ -52,9 +52,14 @@ function themeButtons() {
 }
 function renderNavigation() {
   byId('navigation').setAttribute('aria-label', tr('Navigation principale', 'Main navigation'));
-  byId('navigation').innerHTML = '<img src="../assets/logos/blue.svg" alt="Soliton">' +
-    Object.entries(viewLabels()).map(([value, label]) => button(label, 'navigate', {
-      value, symbol: sectionIcons[value], current: state.view === value, showLabel: true,
+  const labels = viewLabels();
+  const settings = esc(labels.settings);
+  byId('navigation').innerHTML = '<button type="button" class="rail-brand" data-action="navigate" data-value="settings"' +
+    ' aria-label="' + settings + '" title="' + settings + '"' +
+    (state.view === 'settings' ? ' aria-current="page"' : '') +
+    '><img src="../assets/logos/blue.svg" alt=""></button>' +
+    Object.entries(sectionIcons).map(([value, symbol]) => button(labels[value], 'navigate', {
+      value, symbol, current: state.view === value, showLabel: true,
     })).join('');
 }
 function option(value, label, current) {
