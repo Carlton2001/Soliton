@@ -1,7 +1,7 @@
 //! Embeds the Soliton logo as the Windows executable icon.
 //!
 //! All six palettes are rasterized from assets/logos at build time.
-//! Resource 1 is the default Graphite/Mint icon; resources 2..7 follow PALETTES.
+//! Resource 1 is the default Copper icon; resources 2..7 follow PALETTES.
 
 use std::env;
 #[cfg(windows)]
@@ -41,7 +41,7 @@ fn windows_resources() {
         let ico = out.join(format!("soliton-{palette}.ico"));
         fs::write(&ico, ico_bytes(palette)).expect("write icon");
         let ico_path = ico.display().to_string().replace('\\', "/");
-        if *palette == "graphite-mint" {
+        if *palette == "copper" {
             resources.push_str(&format!("1 ICON \"{ico_path}\"\n"));
         }
         resources.push_str(&format!("{} ICON \"{ico_path}\"\n", index + 2));

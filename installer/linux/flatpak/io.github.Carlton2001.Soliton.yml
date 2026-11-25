@@ -47,7 +47,7 @@ modules:
         installer/linux/${FLATPAK_ID}.desktop > ${FLATPAK_ID}.desktop
       - install -Dm644 ${FLATPAK_ID}.desktop /app/share/applications/${FLATPAK_ID}.desktop
       - install -Dm644 installer/linux/${FLATPAK_ID}.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml
-      - install -Dm644 assets/logos/graphite-mint.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+      - install -Dm644 assets/logos/copper.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
       - install -Dm644 LICENSE /app/share/licenses/${FLATPAK_ID}/LICENSE
       - cp -R licenses/dependencies /app/share/licenses/${FLATPAK_ID}/dependencies
     sources:

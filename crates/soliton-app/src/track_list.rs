@@ -3,7 +3,7 @@ use crate::{
     app::Soliton,
     i18n::Text,
     playlists::Dialog,
-    widgets::{button, icon_button, quality, time},
+    widgets::{Density, button, icon_button, quality, time, toggle_button, with_density},
 };
 use gpui::{prelude::*, *};
 use soliton_audio::Command;
@@ -84,13 +84,14 @@ fn same_rows(a: Selection, b: Selection) -> bool {
 
 impl Soliton {
     pub fn selection_row(&self, row: TrackRow<'_>, cx: &mut Context<Self>) -> AnyElement {
-        self.album_selection_row(row, false, cx)
+        self.album_selection_row(row, false, false, cx)
     }
 
     pub(super) fn album_selection_row(
         &self,
         row: TrackRow<'_>,
         compact: bool,
+        compact_actions: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = self.theme();
@@ -314,19 +315,29 @@ impl Soliton {
                 line.child(
                     div()
                         .relative()
-                        .flex_shrink()
-                        .min_w(rems(4.))
-                        .max_w(relative(0.24))
+                        .flex_none()
+                        .when(compact, |v| v.ml(rems(0.375)))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .child(
-                            button(
-                                ("selection-actions", key),
-                                "sliders-horizontal",
-                                self.t(Text::Actions),
-                                theme,
+                            with_density(
+                                if compact_actions {
+                                    Density::Tight
+                                } else {
+                                    Density::Full
+                                },
+                                || {
+                                    toggle_button(
+                                        ("selection-actions", key),
+                                        "sliders-horizontal",
+                                        self.t(Text::Actions),
+                                        open.is_some(),
+                                        theme,
+                                    )
+                                },
                             )
-                            .max_w_full()
-                            .child(crate::widgets::icon("chevron-down", theme))
+                            .when(!compact_actions, |v| {
+                                v.child(crate::widgets::icon("chevron-down", theme))
+                            })
                             .when(compact, |v| {
                                 v.px(rems(0.375)).text_size(crate::widgets::TEXT_CAPTION)
                             })

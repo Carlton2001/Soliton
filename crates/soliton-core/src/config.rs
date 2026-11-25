@@ -54,8 +54,8 @@ pub enum AppIcon {
     Blue,
     Teal,
     Violet,
-    Copper,
     #[default]
+    Copper,
     GraphiteMint,
     IvoryInk,
 }

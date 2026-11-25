@@ -11,10 +11,10 @@ at small sizes.
 | `blue.svg` | Electric blue | `#315EF4` | `#FFFFFF` |
 | `teal.svg` | Deep teal | `#086E75` | `#FFFFFF` |
 | `violet.svg` | Violet | `#7544D8` | `#FFFFFF` |
-| `copper.svg` | Copper | `#B65A32` | `#FFFFFF` |
-| `graphite-mint.svg` | Graphite and mint (default) | `#23272F` | `#8BE0C0` |
+| `copper.svg` | Copper (default) | `#B65A32` | `#FFFFFF` |
+| `graphite-mint.svg` | Graphite and mint | `#23272F` | `#8BE0C0` |
 | `ivory-ink.svg` | Ivory and ink | `#EEE6D7` | `#242F33` |
 
 `Settings.app_icon` is independent of the theme and accent color. Windows resource
-1 uses `graphite-mint.svg`; resources 2 to 7 follow `AppIcon::ALL`, in the order
+1 uses `copper.svg`; resources 2 to 7 follow `AppIcon::ALL`, in the order
 of this table.

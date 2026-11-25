@@ -48,6 +48,7 @@ invariants, the [README](../README.md) for features and shortcuts, and the
   narrow to fit search and the other controls together.
 - Icon-only buttons provide a tooltip. A button whose label is fully visible
   shows a tooltip only when it provides additional information.
+- Buttons retain their background and border styling when reduced to an icon.
 - The Windows installer and the Linux per-user archive can update from the app.
   Soliton checks for updates at startup when enabled. The user starts the
   installation and Soliton restarts after installing the signed update.

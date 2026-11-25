@@ -16,13 +16,10 @@ fn update_checks_default_on_and_can_be_disabled_persistently() {
 fn icon_defaults_for_older_settings_and_all_palettes_persist_independently() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("settings.json");
-    assert_eq!(
-        Settings::load(&path).unwrap().app_icon,
-        AppIcon::GraphiteMint
-    );
+    assert_eq!(Settings::load(&path).unwrap().app_icon, AppIcon::Copper);
     fs::write(&path, br#"{"accent":"Red","appearance":"Light"}"#).unwrap();
     let mut settings = Settings::load(&path).unwrap();
-    assert_eq!(settings.app_icon, AppIcon::GraphiteMint);
+    assert_eq!(settings.app_icon, AppIcon::Copper);
     for app_icon in AppIcon::ALL {
         settings.app_icon = app_icon;
         settings.save(&path).unwrap();

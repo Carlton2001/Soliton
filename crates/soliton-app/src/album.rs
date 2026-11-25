@@ -102,7 +102,16 @@ impl Soliton {
                 theme,
             ))
             .child(information);
-        let tracks = self.tracks_view(album_id, edition_index, panel, cx);
+        let content_width = crate::navigation::content_width(window);
+        let track_width = if panel {
+            crate::collection::album_panel_width(content_width)
+        } else {
+            content_width
+        };
+        // Leave room for the title, row controls and list insets before showing the label.
+        let compact_actions =
+            track_width < 34. + crate::widgets::label_width(self.t(Text::Actions), window);
+        let tracks = self.tracks_view(album_id, edition_index, panel, compact_actions, cx);
         let tracks = if panel {
             crate::widgets::page_body(theme)
                 .ml(crate::widgets::PAGE_INSET)
@@ -429,6 +438,7 @@ impl Soliton {
         album_id: i64,
         edition: usize,
         compact: bool,
+        compact_actions: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let count = self
@@ -463,6 +473,7 @@ impl Soliton {
                                     .is_some_and(|t| t.id == track.id),
                             },
                             compact,
+                            compact_actions,
                             cx,
                         )
                     })

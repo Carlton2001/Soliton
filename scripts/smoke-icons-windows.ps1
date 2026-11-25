@@ -137,7 +137,7 @@ try {
     Start-IconTest 'first'
     Assert-IconColor '#23272F'
     Open-Settings
-    Save-IconFrame 'default-graphite-mint'
+    Save-IconFrame 'default-copper'
     $palettes=@('Blue','Teal','Violet','Copper','GraphiteMint','IvoryInk')
     $colors=@('#315EF4','#086E75','#7544D8','#B65A32','#23272F','#EEE6D7')
     for($index=0;$index -lt $palettes.Count;$index++) {

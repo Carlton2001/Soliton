@@ -47,7 +47,7 @@ mkdir -p "$stage/usr/share/applications"
 sed -e 's/^Exec=@EXEC@$/Exec=soliton/' -e '/^X-Soliton-Install=user$/d' \
     "installer/linux/$APP_ID.desktop" > "$stage/usr/share/applications/$APP_ID.desktop"
 install -Dm644 "installer/linux/$APP_ID.metainfo.xml" "$stage/usr/share/metainfo/$APP_ID.metainfo.xml"
-install -Dm644 assets/logos/graphite-mint.svg "$stage/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+install -Dm644 assets/logos/copper.svg "$stage/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 install -Dm644 installer/linux/deb/copyright "$doc/copyright"
 mkdir -p "$doc"
 cp -R licenses/dependencies "$doc/dependencies"
