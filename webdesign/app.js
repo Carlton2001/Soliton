@@ -60,7 +60,7 @@ function renderNavigation() {
     '><img src="../assets/logos/blue.svg" alt=""></button>' +
     Object.entries(sectionIcons).map(([value, symbol]) => button(labels[value], 'navigate', {
       value, symbol, current: state.view === value, showLabel: true,
-    })).join('');
+    })).join('') + button(tr('Mise à jour disponible', 'Update available'), 'update', { symbol: 'info' });
 }
 function option(value, label, current) {
   return '<option value="' + esc(value) + '"' + (value === current ? ' selected' : '') + '>' + esc(label) + '</option>';
@@ -305,6 +305,9 @@ function step(direction, automatic = false) {
   state.elapsed = 0;
 }
 const actions = {
+  update() {
+    alert(tr('Mise à jour disponible (simulation)', 'Update available (simulation)'));
+  },
   navigate(value) {
     state.view = value;
     if (value === 'playlists') state.playlist = null;
