@@ -42,7 +42,9 @@ invariants, the [README](../README.md) for features and shortcuts, and the
 - Display preferences adjust the main window, panel and card background opacity
   together from 0% to 100%. The visible surface determines the opacity in each
   region, including where backgrounds overlap. Below 100%, Soliton requests
-  system backdrop blur where the window compositor supports it.
+  system backdrop blur. When blur is unavailable, the backgrounds are opaque
+  and the opacity control is hidden. The saved opacity applies again when
+  blur is available.
 - Album details open beside the collection on wide windows and on a dedicated
   page on narrow windows. The album's close or return button shows the album
   collection with its current filters.

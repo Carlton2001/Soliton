@@ -15,6 +15,12 @@ impl Soliton {
         let theme = self.theme();
         let track = self.playback.track.as_ref();
         let compact = f32::from(window.viewport_size().width) / f32::from(window.rem_size()) < 44.;
+        // The queue button sits just outside the centered transport. Reserve its
+        // space and the three fixed-width buttons before giving space to track info.
+        let queue_space = if compact { 2. } else { 2.5 };
+        let side_padding = 0.75;
+        let side_gap = 0.5;
+        let compact_side_width = queue_space + 3. * CONTROL_HEIGHT.0 + 2. * side_gap + side_padding;
         let bottom = Corners {
             bottom_left: true,
             bottom_right: true,
@@ -106,37 +112,23 @@ impl Soliton {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .pr(rems(0.75))
-                            .flex()
-                            .items_center()
-                            .justify_end()
-                            .gap(rems(0.5))
-                            .when(compact, |side| {
-                                side.child(
-                                    div()
-                                        .w_full()
-                                        .pl(rems(2.))
-                                        .flex()
-                                        .justify_end()
-                                        .gap(rems(0.5))
-                                        .child(self.compact_volume(cx))
-                                        .child(self.output_control(cx))
-                                        .child(self.now_playing_button(cx)),
-                                )
-                            })
-                            .when(!compact, |side| {
-                                side.child(
-                                    div()
-                                        .w_full()
-                                        .pl(rems(2.5))
-                                        .flex()
-                                        .justify_end()
-                                        .gap(rems(0.5))
-                                        .child(self.volume_control(120., cx).max_w_full())
-                                        .child(self.output_control(cx))
-                                        .child(self.now_playing_button(cx)),
-                                )
-                            }),
+                            .when(compact, |side| side.min_w(rems(compact_side_width)))
+                            .pr(rems(side_padding))
+                            .child(
+                                div()
+                                    .w_full()
+                                    .pl(rems(queue_space))
+                                    .flex()
+                                    .items_center()
+                                    .justify_end()
+                                    .gap(rems(side_gap))
+                                    .when(compact, |side| side.child(self.compact_volume(cx)))
+                                    .when(!compact, |side| {
+                                        side.child(self.volume_control(120., cx).max_w_full())
+                                    })
+                                    .child(self.output_control(cx))
+                                    .child(self.now_playing_button(cx)),
+                            ),
                     ),
             )
     }

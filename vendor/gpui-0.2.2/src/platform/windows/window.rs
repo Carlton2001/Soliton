@@ -774,6 +774,10 @@ impl PlatformWindow for WindowsWindow {
             .ok();
     }
 
+    fn supports_background_blur(&self) -> bool {
+        true
+    }
+
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance) {
         let hwnd = self.0.hwnd;
         self.0.state.borrow_mut().background_appearance = background_appearance;

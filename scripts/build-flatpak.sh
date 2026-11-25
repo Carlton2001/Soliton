@@ -28,7 +28,6 @@ output=$root/target/distribution/output
 mkdir -p "$work" "$output"
 flatpak install --user -y --noninteractive flathub \
     org.freedesktop.Sdk//26.08 org.freedesktop.Platform//26.08 \
-    org.freedesktop.Sdk.Extension.rust-stable//26.08 \
     org.freedesktop.Sdk.Extension.llvm22//26.08 >/dev/null
 flatpak-builder --user --force-clean \
     --state-dir="$work/state" --repo="$work/repo" "$work/build" "$MANIFEST"

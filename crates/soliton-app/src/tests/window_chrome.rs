@@ -1,4 +1,4 @@
-use super::{background_appearance, resize_edge, rounded_corners};
+use super::{background_appearance, effective_background_opacity, resize_edge, rounded_corners};
 use gpui::{ResizeEdge, Tiling, WindowBackgroundAppearance, point, px, size};
 use soliton_core::config::Settings;
 
@@ -18,7 +18,13 @@ fn backdrop_blur_is_requested_only_below_full_opacity() {
             background_opacity,
             ..Settings::default()
         };
-        assert_eq!(background_appearance(&settings), expected);
+        assert_eq!(background_appearance(&settings, true), expected);
+        assert_eq!(
+            effective_background_opacity(&settings, true),
+            background_opacity
+        );
+        assert_eq!(background_appearance(&settings, false), full_opacity);
+        assert_eq!(effective_background_opacity(&settings, false), 100);
     }
 }
 

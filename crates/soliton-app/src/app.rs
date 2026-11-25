@@ -114,6 +114,7 @@ pub struct Soliton {
     pub volume_slider: Slider,
     pub(crate) background_opacity_slider: Slider,
     pub(crate) background_opacity_focus: FocusHandle,
+    pub(crate) background_blur_supported: bool,
     /// Position shown while the seek slider is dragged; sent on release.
     pub seek_preview: Option<f32>,
     /// Volume restored when sound is turned back on.
@@ -183,6 +184,14 @@ impl Soliton {
             cx.observe(&playlist_name, |_, _, cx| cx.notify()),
             cx.observe_window_appearance(window, |this, window, cx| {
                 this.system_dark = is_dark(window.appearance());
+                let supported = window.supports_background_blur();
+                if this.background_blur_supported != supported {
+                    this.background_blur_supported = supported;
+                    window.set_background_appearance(crate::window_chrome::background_appearance(
+                        &this.settings,
+                        supported,
+                    ));
+                }
                 cx.notify();
             }),
         ];
@@ -210,6 +219,13 @@ impl Soliton {
             artist: last.artist.clone(),
             ..Default::default()
         };
+        let background_blur_supported = window.supports_background_blur();
+        if background_blur_supported != cfg!(target_os = "windows") {
+            window.set_background_appearance(crate::window_chrome::background_appearance(
+                &settings,
+                background_blur_supported,
+            ));
+        }
         let mut this = Self {
             updates: Default::default(),
             now_playing: false,
@@ -278,6 +294,7 @@ impl Soliton {
             volume_slider: Slider::default(),
             background_opacity_slider: Slider::with_visible_thumb(),
             background_opacity_focus: cx.focus_handle().tab_index(0).tab_stop(true),
+            background_blur_supported,
             seek_preview: None,
             muted_volume: None,
             volume_scroll: 0.,
@@ -330,7 +347,12 @@ impl Soliton {
     }
     pub fn theme(&self) -> Theme {
         Theme::with_system_accent(self.dark(), self.settings.accent, self.system_accent)
-            .with_background_opacity(f32::from(self.settings.background_opacity) / 100.)
+            .with_background_opacity(
+                f32::from(crate::window_chrome::effective_background_opacity(
+                    &self.settings,
+                    self.background_blur_supported,
+                )) / f32::from(Settings::MAX_BACKGROUND_OPACITY),
+            )
     }
     /// Queries the catalogue again with the current filter and display settings.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {

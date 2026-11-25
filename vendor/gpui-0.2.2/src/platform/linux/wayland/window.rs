@@ -10,6 +10,7 @@ use blade_graphics as gpu;
 use collections::HashMap;
 use futures::channel::oneshot::Receiver;
 
+use super::background_blur::BackgroundBlur;
 use raw_window_handle as rwh;
 use wayland_backend::client::ObjectId;
 use wayland_client::WEnum;
@@ -22,7 +23,6 @@ use wayland_protocols::{
     wp::fractional_scale::v1::client::wp_fractional_scale_v1,
     xdg::shell::client::xdg_toplevel::XdgToplevel,
 };
-use wayland_protocols_plasma::blur::client::org_kde_kwin_blur;
 
 use crate::{
     AnyWindowHandle, Bounds, Decorations, Globals, GpuSpecs, Modifiers, Output, Pixels,
@@ -89,7 +89,7 @@ pub struct WaylandWindowState {
     decoration: Option<zxdg_toplevel_decoration_v1::ZxdgToplevelDecorationV1>,
     app_id: Option<String>,
     appearance: WindowAppearance,
-    blur: Option<org_kde_kwin_blur::OrgKdeKwinBlur>,
+    blur: BackgroundBlur,
     toplevel: xdg_toplevel::XdgToplevel,
     viewport: Option<wp_viewport::WpViewport>,
     outputs: HashMap<ObjectId, Output>,
@@ -163,7 +163,7 @@ impl WaylandWindowState {
             surface,
             decoration,
             app_id: None,
-            blur: None,
+            blur: BackgroundBlur::default(),
             toplevel,
             viewport,
             globals,
@@ -220,6 +220,22 @@ impl WaylandWindowState {
             WindowDecorations::Client => self.client_inset.unwrap_or(px(0.0)),
         }
     }
+
+    fn surface_geometry(&self) -> Bounds<i32> {
+        inset_by_tiling(
+            self.bounds.map_origin(|_| px(0.0)),
+            self.inset(),
+            self.tiling,
+        )
+        .map(|v| v.0 as i32)
+        .map_size(|v| v.max(1))
+    }
+
+    fn update_background_blur(&mut self) {
+        let area = (self.background_appearance == WindowBackgroundAppearance::Blurred)
+            .then(|| self.surface_geometry());
+        self.blur.update(&self.globals, &self.surface, area);
+    }
 }
 
 pub(crate) struct WaylandWindow(pub WaylandWindowStatePtr);
@@ -240,9 +256,13 @@ impl Drop for WaylandWindow {
         if let Some(decoration) = &state.decoration {
             decoration.destroy();
         }
-        if let Some(blur) = &state.blur {
-            blur.release();
-        }
+        let WaylandWindowState {
+            blur,
+            globals,
+            surface,
+            ..
+        } = &mut *state;
+        blur.clear(globals, surface);
         state.toplevel.destroy();
         if let Some(viewport) = &state.viewport {
             viewport.destroy();
@@ -415,13 +435,7 @@ impl WaylandWindowStatePtr {
             let mut state = self.state.borrow_mut();
             state.xdg_surface.ack_configure(serial);
 
-            let window_geometry = inset_by_tiling(
-                state.bounds.map_origin(|_| px(0.0)),
-                state.inset(),
-                state.tiling,
-            )
-            .map(|v| v.0 as i32)
-            .map_size(|v| if v <= 0 { 1 } else { v });
+            let window_geometry = state.surface_geometry();
 
             state.xdg_surface.set_window_geometry(
                 window_geometry.origin.x,
@@ -429,6 +443,7 @@ impl WaylandWindowStatePtr {
                 window_geometry.size.width,
                 window_geometry.size.height,
             );
+            state.update_background_blur();
 
             let request_frame_callback = !state.acknowledged_first_configure;
             if request_frame_callback {
@@ -751,6 +766,10 @@ impl WaylandWindowStatePtr {
     pub fn set_appearance(&mut self, appearance: WindowAppearance) {
         self.state.borrow_mut().appearance = appearance;
 
+        self.notify_appearance_changed();
+    }
+
+    pub(super) fn notify_appearance_changed(&self) {
         let mut callbacks = self.callbacks.borrow_mut();
         if let Some(ref mut fun) = callbacks.appearance_changed {
             (fun)()
@@ -946,6 +965,10 @@ impl PlatformWindow for WaylandWindow {
         state.app_id = Some(app_id.to_owned());
     }
 
+    fn supports_background_blur(&self) -> bool {
+        self.borrow().globals.supports_background_blur()
+    }
+
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance) {
         let mut state = self.borrow_mut();
         state.background_appearance = background_appearance;
@@ -1130,21 +1153,7 @@ fn update_window(mut state: RefMut<WaylandWindowState>) {
         state.surface.set_opaque_region(None);
     }
 
-    if let Some(ref blur_manager) = state.globals.blur_manager {
-        if state.background_appearance == WindowBackgroundAppearance::Blurred {
-            if state.blur.is_none() {
-                let blur = blur_manager.create(&state.surface, &state.globals.qh, ());
-                state.blur = Some(blur);
-            }
-            state.blur.as_ref().unwrap().commit();
-        } else {
-            // It probably doesn't hurt to clear the blur for opaque windows
-            blur_manager.unset(&state.surface);
-            if let Some(b) = state.blur.take() {
-                b.release()
-            }
-        }
-    }
+    state.update_background_blur();
 
     region.destroy();
 }

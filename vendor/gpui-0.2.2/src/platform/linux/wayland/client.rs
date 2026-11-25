@@ -1,5 +1,5 @@
 use std::{
-    cell::{RefCell, RefMut},
+    cell::{Cell, RefCell, RefMut},
     hash::Hash,
     os::fd::{AsRawFd, BorrowedFd},
     path::PathBuf,
@@ -35,6 +35,9 @@ use wayland_client::{
         wl_buffer, wl_compositor, wl_keyboard, wl_pointer, wl_registry, wl_seat, wl_shm,
         wl_shm_pool, wl_surface,
     },
+};
+use wayland_protocols::ext::background_effect::v1::client::{
+    ext_background_effect_manager_v1, ext_background_effect_surface_v1,
 };
 use wayland_protocols::wp::cursor_shape::v1::client::{
     wp_cursor_shape_device_v1, wp_cursor_shape_manager_v1,
@@ -115,7 +118,10 @@ pub struct Globals {
     pub fractional_scale_manager:
         Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
     pub decoration_manager: Option<zxdg_decoration_manager_v1::ZxdgDecorationManagerV1>,
-    pub blur_manager: Option<org_kde_kwin_blur_manager::OrgKdeKwinBlurManager>,
+    pub background_effect_manager:
+        Option<ext_background_effect_manager_v1::ExtBackgroundEffectManagerV1>,
+    background_blur_supported: Rc<Cell<bool>>,
+    legacy_blur: Rc<RefCell<Option<(u32, org_kde_kwin_blur_manager::OrgKdeKwinBlurManager)>>>,
     pub text_input_manager: Option<zwp_text_input_manager_v3::ZwpTextInputManagerV3>,
     pub executor: ForegroundExecutor,
 }
@@ -127,6 +133,16 @@ impl Globals {
         qh: QueueHandle<WaylandClientStatePtr>,
         seat: wl_seat::WlSeat,
     ) -> Self {
+        let legacy_blur = globals.contents().with_list(|list| {
+            list.iter()
+                .find(|global| global.interface == "org_kde_kwin_blur_manager")
+                .map(|global| {
+                    (
+                        global.name,
+                        globals.registry().bind(global.name, 1, &qh, ()),
+                    )
+                })
+        });
         Globals {
             activation: globals.bind(&qh, 1..=1, ()).ok(),
             compositor: globals
@@ -154,11 +170,30 @@ impl Globals {
             viewporter: globals.bind(&qh, 1..=1, ()).ok(),
             fractional_scale_manager: globals.bind(&qh, 1..=1, ()).ok(),
             decoration_manager: globals.bind(&qh, 1..=1, ()).ok(),
-            blur_manager: globals.bind(&qh, 1..=1, ()).ok(),
+            background_effect_manager: globals.bind(&qh, 1..=1, ()).ok(),
+            background_blur_supported: Rc::new(Cell::new(false)),
+            legacy_blur: Rc::new(RefCell::new(legacy_blur)),
             text_input_manager: globals.bind(&qh, 1..=1, ()).ok(),
             executor,
             qh,
         }
+    }
+
+    pub(super) fn supports_background_blur(&self) -> bool {
+        if self.background_effect_manager.is_some() {
+            self.background_blur_supported.get()
+        } else {
+            self.legacy_blur.borrow().is_some()
+        }
+    }
+
+    pub(super) fn legacy_blur_manager(
+        &self,
+    ) -> Option<org_kde_kwin_blur_manager::OrgKdeKwinBlurManager> {
+        self.legacy_blur
+            .borrow()
+            .as_ref()
+            .map(|(_, manager)| manager.clone())
     }
 }
 
@@ -891,6 +926,7 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for WaylandClientStat
     ) {
         let mut client = this.get_client();
         let mut state = client.borrow_mut();
+        let blur_supported = state.globals.supports_background_blur();
 
         match event {
             wl_registry::Event::Global {
@@ -925,12 +961,28 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for WaylandClientStat
                         .in_progress_outputs
                         .insert(output.id(), InProgressOutput::default());
                 }
+                "org_kde_kwin_blur_manager" => {
+                    state
+                        .globals
+                        .legacy_blur
+                        .replace(Some((name, registry.bind(name, 1, qh, ()))));
+                }
                 _ => {}
             },
-            wl_registry::Event::GlobalRemove { name: _ } => {
-                // TODO: handle global removal
+            wl_registry::Event::GlobalRemove { name } => {
+                let mut manager = state.globals.legacy_blur.borrow_mut();
+                if manager.as_ref().is_some_and(|(id, _)| *id == name) {
+                    manager.take();
+                }
             }
             _ => {}
+        }
+        if blur_supported != state.globals.supports_background_blur() {
+            let windows = state.windows.values().cloned().collect::<Vec<_>>();
+            drop(state);
+            for window in windows {
+                window.notify_appearance_changed();
+            }
         }
     }
 }
@@ -948,10 +1000,45 @@ delegate_noop!(WaylandClientStatePtr: ignore wl_region::WlRegion);
 delegate_noop!(WaylandClientStatePtr: ignore wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1);
 delegate_noop!(WaylandClientStatePtr: ignore zxdg_decoration_manager_v1::ZxdgDecorationManagerV1);
 delegate_noop!(WaylandClientStatePtr: ignore org_kde_kwin_blur_manager::OrgKdeKwinBlurManager);
+delegate_noop!(WaylandClientStatePtr: ignore ext_background_effect_surface_v1::ExtBackgroundEffectSurfaceV1);
 delegate_noop!(WaylandClientStatePtr: ignore zwp_text_input_manager_v3::ZwpTextInputManagerV3);
 delegate_noop!(WaylandClientStatePtr: ignore org_kde_kwin_blur::OrgKdeKwinBlur);
 delegate_noop!(WaylandClientStatePtr: ignore wp_viewporter::WpViewporter);
 delegate_noop!(WaylandClientStatePtr: ignore wp_viewport::WpViewport);
+
+impl Dispatch<ext_background_effect_manager_v1::ExtBackgroundEffectManagerV1, ()>
+    for WaylandClientStatePtr
+{
+    fn event(
+        state: &mut Self,
+        _: &ext_background_effect_manager_v1::ExtBackgroundEffectManagerV1,
+        event: ext_background_effect_manager_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        use ext_background_effect_manager_v1::{Capability, Event};
+        let Event::Capabilities { flags } = event else {
+            return;
+        };
+        let capabilities = match flags {
+            WEnum::Value(capabilities) => capabilities,
+            WEnum::Unknown(bits) => Capability::from_bits_truncate(bits),
+        };
+        let supported = capabilities.contains(Capability::Blur);
+        let client = state.get_client();
+        let windows = {
+            let client = client.borrow();
+            if client.globals.background_blur_supported.replace(supported) == supported {
+                return;
+            }
+            client.windows.values().cloned().collect::<Vec<_>>()
+        };
+        for window in windows {
+            window.notify_appearance_changed();
+        }
+    }
+}
 
 impl Dispatch<WlCallback, ObjectId> for WaylandClientStatePtr {
     fn event(

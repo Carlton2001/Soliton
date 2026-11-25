@@ -8,8 +8,19 @@ const RESIZE_BORDER: Pixels = px(10.);
 /// Radius of the window outline; content inside the 1px border uses one less.
 const CORNER_RADIUS: Pixels = px(10.);
 
-pub(super) fn background_appearance(settings: &Settings) -> WindowBackgroundAppearance {
-    if settings.background_opacity < Settings::MAX_BACKGROUND_OPACITY {
+pub(super) fn effective_background_opacity(settings: &Settings, blur_supported: bool) -> u8 {
+    if blur_supported {
+        settings.background_opacity
+    } else {
+        Settings::MAX_BACKGROUND_OPACITY
+    }
+}
+
+pub(super) fn background_appearance(
+    settings: &Settings,
+    blur_supported: bool,
+) -> WindowBackgroundAppearance {
+    if effective_background_opacity(settings, blur_supported) < Settings::MAX_BACKGROUND_OPACITY {
         WindowBackgroundAppearance::Blurred
     } else if cfg!(target_os = "linux") {
         // Keep the alpha-capable swap chain. Opaque theme colors still cover the backdrop.
@@ -22,7 +33,7 @@ pub(super) fn background_appearance(settings: &Settings) -> WindowBackgroundAppe
 pub fn options(bounds: WindowBounds, settings: &Settings) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(bounds),
-        window_background: background_appearance(settings),
+        window_background: background_appearance(settings, cfg!(target_os = "windows")),
         window_min_size: Some(placement::MIN_SIZE),
         titlebar: Some(TitlebarOptions {
             appears_transparent: true,

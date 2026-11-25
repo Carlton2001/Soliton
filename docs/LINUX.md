@@ -36,7 +36,11 @@ Choose the purge option in the menu or run `./uninstall.sh --purge`.
 
 - **Window and settings:** Soliton restores window size and maximized state.
   The Wayland compositor chooses the window position. Soliton follows the system
-  accent when the desktop exposes one through the XDG Settings portal.
+  accent when the desktop exposes one through the XDG Settings portal. Below
+  100% background opacity, Soliton requests backdrop blur over Wayland's
+  background-effect protocol (supported by GNOME 51) or the older KDE protocol.
+  Without compositor blur, including under X11, the backgrounds are opaque and
+  Settings hides the opacity control.
 - **Graphics:** On hybrid systems Soliton prefers the Wayland compositor's GPU
   vendor when it can identify it. A filtered Vulkan startup failure triggers
   one retry with all drivers available. Explicit device overrides take priority.
@@ -136,8 +140,10 @@ scripts/build-flatpak.sh
 Install the native `flatpak-builder` package as well. The script installs the
 SDK and extensions declared by the
 [manifest](../installer/linux/flatpak/io.github.Carlton2001.Soliton.yml), builds
-the committed `main` sources with offline Cargo inputs, runs Flatpak lints and
-exports a bundle. See the [Flathub guide](FLATHUB.md) for release-tag manifests.
+the committed `main` sources with offline Cargo inputs and the Rust toolchain
+pinned in the manifest, runs Flatpak lints and exports a bundle. Update the
+Rust archives and their SHA-256 checksums when the release toolchain changes.
+See the [Flathub guide](FLATHUB.md) for release-tag manifests.
 
 Flatpak grants read-only access to the Music folder and standard mount points
 (`/run/media`, `/media`, `/mnt`). Other locations use the folder picker portal.

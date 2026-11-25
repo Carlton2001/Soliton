@@ -2490,7 +2490,7 @@ dependencies = [
  "wayland-backend",
  "wayland-client",
  "wayland-cursor",
- "wayland-protocols 0.31.2",
+ "wayland-protocols 0.32.13",
  "wayland-protocols-plasma",
  "windows 0.61.3",
  "windows-core 0.61.2",

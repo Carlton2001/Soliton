@@ -346,13 +346,21 @@ impl Soliton {
             None,
             list_box(
                 [
-                    setting_row(self.t(Text::Theme), None, appearance, theme),
-                    setting_row(self.t(Text::AccentColor), None, accents, theme),
-                    self.background_opacity_preference(theme, cx),
-                    self.icon_preferences(cx),
-                    setting_row(self.t(Text::CoverSize), None, cover_size, theme),
-                    hide.into_any_element(),
-                ],
+                    Some(setting_row(self.t(Text::Theme), None, appearance, theme)),
+                    Some(setting_row(self.t(Text::AccentColor), None, accents, theme)),
+                    self.background_blur_supported
+                        .then(|| self.background_opacity_preference(theme, cx)),
+                    Some(self.icon_preferences(cx)),
+                    Some(setting_row(
+                        self.t(Text::CoverSize),
+                        None,
+                        cover_size,
+                        theme,
+                    )),
+                    Some(hide.into_any_element()),
+                ]
+                .into_iter()
+                .flatten(),
                 theme,
             ),
         )

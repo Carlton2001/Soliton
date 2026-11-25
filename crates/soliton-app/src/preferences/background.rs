@@ -89,11 +89,14 @@ impl Soliton {
         window: &Window,
         cx: &mut Context<Self>,
     ) {
-        let before = background_appearance(&self.settings);
+        if !self.background_blur_supported {
+            return;
+        }
+        let before = background_appearance(&self.settings, true);
         let previous = self.settings.background_opacity;
         let percent = (fraction * PERCENT_SCALE).round() as u8;
         self.settings.background_opacity = percent;
-        let after = background_appearance(&self.settings);
+        let after = background_appearance(&self.settings, true);
         if before != after {
             window.set_background_appearance(after);
         }

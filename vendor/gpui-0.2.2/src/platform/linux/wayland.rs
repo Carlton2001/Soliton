@@ -1,3 +1,4 @@
+mod background_blur;
 mod client;
 mod clipboard;
 mod cursor;

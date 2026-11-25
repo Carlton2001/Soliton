@@ -1791,6 +1791,11 @@ impl Window {
             .set_background_appearance(background_appearance);
     }
 
+    /// Whether the window backend currently supports blurring the desktop behind it.
+    pub fn supports_background_blur(&self) -> bool {
+        self.platform_window.supports_background_blur()
+    }
+
     /// Mark the window as dirty at the platform level.
     pub fn set_window_edited(&mut self, edited: bool) {
         self.platform_window.set_edited(edited);
@@ -2142,7 +2147,10 @@ impl Window {
                 }
                 let x = cmp::max(
                     gap,
-                    cmp::min(anchor.left(), window_bounds.right() - tooltip_size.width - gap),
+                    cmp::min(
+                        anchor.left(),
+                        window_bounds.right() - tooltip_size.width - gap,
+                    ),
                 );
                 tooltip_bounds.origin = point(x, y);
             }
