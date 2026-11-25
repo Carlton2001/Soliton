@@ -24,8 +24,7 @@ button.primary:hover{filter:brightness(.94)}
 .rail button:last-child{margin-top:auto}
 .rail button span:not(.icon){display:none}
 main,aside{min-width:0;overflow:auto;scrollbar-color:var(--slider) transparent;scrollbar-width:thin}
-main{flex:1;--page-bg:var(--bg);background:var(--page-bg)}
-main[data-view=albums]{--page-bg:var(--panel)}
+main{flex:1;background:var(--panel)}
 aside{width:50%;background:var(--bg)}
 h1,h2,p{margin:0}
 h1{font-size:36px;line-height:1.15;letter-spacing:-.025em}

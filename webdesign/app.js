@@ -267,7 +267,6 @@ function render() {
   document.body.dataset.theme = state.theme;
   document.documentElement.lang = tr('fr', 'en');
   renderNavigation();
-  byId('main').dataset.view = state.view;
   byId('main').classList.toggle('split', state.view === 'albums' && state.selected !== null);
   renderMain();
   renderDetail();
