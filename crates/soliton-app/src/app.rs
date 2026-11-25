@@ -585,7 +585,7 @@ impl Render for Soliton {
         } else {
             0.
         };
-        // Only the collection header may drop labels: see `header_density`.
+        // Individual toolbars choose when to drop labels.
         crate::widgets::set_density(crate::widgets::Density::Full);
         let content = width_in_rems * f32::from(window.rem_size());
         let available = content - panel_width - reserved;

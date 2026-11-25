@@ -16,6 +16,7 @@ pub const CONTENT_PADDING: f32 = crate::widgets::PAGE_INSET.0;
 pub const TILE_GAP: f32 = 1.;
 // Equal half-gaps keep virtual grid rows uniform and their outer insets symmetric.
 const GRID_ROW_PADDING: Rems = Rems(crate::widgets::PAGE_SECTION_GAP.0 / 2.);
+const SEARCH_MIN_WIDTH: f32 = 8.;
 
 /// Side of album covers in the grid, in pixels at the 16 px reference.
 pub fn cover_side(size: CoverSize) -> f32 {
@@ -98,9 +99,8 @@ impl Soliton {
             .when(!label.is_empty(), |title| title.child(label))
     }
 
-    /// Labels kept by the collection header in `width` rems: all of them while
-    /// the row fits with the search at its minimum width, then Play all alone.
-    pub fn header_density(&self, width: f32, window: &Window) -> crate::widgets::Density {
+    /// Toolbar label density and whether search needs a separate row.
+    fn header_layout(&self, width: f32, window: &Window) -> (crate::widgets::Density, bool) {
         use crate::widgets::{Density, label_width};
         let albums = self.section == Section::Albums;
         let border = 2. / 16.;
@@ -111,7 +111,7 @@ impl Soliton {
         let option = 1.25 + border + 1. + 0.375;
         let frame = 0.375 + border + 0.125;
         let gap = crate::widgets::CONTROL_GAP.0;
-        let mut fixed = CONTENT_PADDING + 8. + 2. * option + frame;
+        let mut fixed = CONTENT_PADDING + SEARCH_MIN_WIDTH + 2. * option + frame;
         let mut labels =
             label_width(self.t(Text::Grid), window) + label_width(self.t(Text::List), window);
         let mut play = 0.;
@@ -134,11 +134,11 @@ impl Soliton {
         // Slack for rounding and the spacer between the two groups.
         let fixed = fixed + gap + 1.;
         if width >= fixed + play + labels {
-            Density::Full
+            (Density::Full, false)
         } else if width >= fixed + play {
-            Density::Compact
+            (Density::Compact, false)
         } else {
-            Density::Tight
+            (Density::Tight, width < fixed)
         }
     }
 
@@ -152,11 +152,18 @@ impl Soliton {
             } else {
                 width
             };
-        let density = self.header_density(width, window);
-        crate::widgets::with_density(density, || self.header(window, cx).into_any_element())
+        let (density, separate_search) = self.header_layout(width, window);
+        crate::widgets::with_density(density, || {
+            self.header(separate_search, window, cx).into_any_element()
+        })
     }
 
-    fn header(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn header(
+        &self,
+        separate_search: bool,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = self.theme();
         let albums = self.section == Section::Albums;
         let grid = match self.section {
@@ -173,7 +180,7 @@ impl Soliton {
             .flex_col()
             .gap(crate::widgets::PAGE_SECTION_GAP)
             .child(
-                // One row: the search narrows first, then the buttons drop their labels.
+                // The search narrows first and gets its own row if the icons need the space.
                 div()
                     .flex()
                     .items_center()
@@ -198,7 +205,13 @@ impl Soliton {
                                 .on_click(cx.listener(|this, _, _, cx| this.play_all(cx))),
                         )
                     })
-                    .child(self.search_field().w(rems(19.)).min_w(rems(8.)))
+                    .when(!separate_search, |row| {
+                        row.child(
+                            self.search_field()
+                                .w(rems(19.))
+                                .min_w(rems(SEARCH_MIN_WIDTH)),
+                        )
+                    })
                     .when(albums, |row| row.child(self.filter_button(window, cx)))
                     .when(albums, |row| row.child(self.sort_button(cx)))
                     .child(div().flex_1())
@@ -226,6 +239,9 @@ impl Soliton {
                         )
                     }),
             )
+            .when(separate_search, |header| {
+                header.child(self.search_field().w_full())
+            })
     }
     fn empty_state(
         &self,

@@ -44,6 +44,8 @@ invariants, the [README](../README.md) for features and shortcuts, and the
   collection with its current filters.
 - The artist's album collection offers a return to all albums that removes
   the artist filter while keeping search and other filters.
+- The collection toolbar moves search onto its own row when the window is too
+  narrow to fit search and the other controls together.
 - Icon-only buttons provide a tooltip. A button whose label is fully visible
   shows a tooltip only when it provides additional information.
 - The Windows installer and the Linux per-user archive can update from the app.

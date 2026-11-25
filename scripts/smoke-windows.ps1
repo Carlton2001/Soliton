@@ -34,6 +34,7 @@ $env:RUST_LOG = 'info'
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 public class SolitonNativeQa {
@@ -47,7 +48,13 @@ public class SolitonNativeQa {
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect rect);
  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out Rect rect);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int height, uint flags);
- [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint message, IntPtr w, IntPtr l);
+ [DllImport("user32.dll", SetLastError=true)] public static extern bool PostMessage(IntPtr h, uint message, IntPtr w, IntPtr l);
+ public static void PostChecked(IntPtr h, uint message, IntPtr w, IntPtr l) {
+  if (!PostMessage(h, message, w, l)) {
+   var error = new Win32Exception();
+   throw new InvalidOperationException($"Could not post message 0x{message:X} ({error.NativeErrorCode}: {error.Message})", error);
+  }
+ }
  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
  [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
@@ -120,11 +127,11 @@ try {
         $previousDpi = [SolitonNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
         try {
             $point = ([int]($y*$scale) -shl 16) -bor [int]($x*$scale)
-            if (-not [SolitonNativeQa]::PostMessage($handle,0x0200,[IntPtr]0,[IntPtr]$point)) { throw 'Mouse move message failed' }
+            [SolitonNativeQa]::PostChecked($handle,0x0200,[IntPtr]0,[IntPtr]$point)
             Start-Sleep -Milliseconds 80
-            if (-not [SolitonNativeQa]::PostMessage($handle,0x0201,[IntPtr]1,[IntPtr]$point)) { throw 'Mouse down message failed' }
+            [SolitonNativeQa]::PostChecked($handle,0x0201,[IntPtr]1,[IntPtr]$point)
             Start-Sleep -Milliseconds 80
-            if (-not [SolitonNativeQa]::PostMessage($handle,0x0202,[IntPtr]0,[IntPtr]$point)) { throw 'Mouse up message failed' }
+            [SolitonNativeQa]::PostChecked($handle,0x0202,[IntPtr]0,[IntPtr]$point)
         } finally { [SolitonNativeQa]::SetThreadDpiAwarenessContext($previousDpi) | Out-Null }
         Start-Sleep -Milliseconds 500
     }
@@ -142,17 +149,25 @@ try {
         Start-Sleep -Milliseconds 600
     }
     function Send-SolitonKey([int]$key) {
-        [SolitonNativeQa]::PostMessage($handle,0x0100,[IntPtr]$key,[IntPtr]0) | Out-Null
-        [SolitonNativeQa]::PostMessage($handle,0x0101,[IntPtr]$key,[IntPtr]0) | Out-Null
+        [SolitonNativeQa]::PostChecked($handle,0x0100,[IntPtr]$key,[IntPtr]0)
+        [SolitonNativeQa]::PostChecked($handle,0x0101,[IntPtr]$key,[IntPtr]0)
     }
-    # The rail centers five 40 px entries with 4 px gaps and an extra 4 px
-    # after the logo. The 102 px player sits below the rail.
-    $logoY = ($clientHeight - 102 - (5 * 40 + 4 * 4 + 4)) / 2 + 20
-    $rail = @{Playlists=($logoY + 3 * 44 + 4); Queue=($logoY + 4 * 44 + 4)}
-    function Open-SolitonSettings { Click-SolitonClient 28 $logoY }
+    function Open-SolitonSection([ValidateSet('Settings','Playlists','Queue')][string]$section) {
+        # Escape focuses the page root. The first tab stops are the navigation entries.
+        $tabs = @{Settings=1; Playlists=4; Queue=5}[$section]
+        Send-SolitonKey 27
+        for ($i=0; $i -lt $tabs; $i++) { Send-SolitonKey 9 }
+        Send-SolitonKey 13
+        for ($attempt=0; $attempt -lt 30; $attempt++) {
+            $savedView = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_view
+            if ($savedView.view -eq $section) { return }
+            Start-Sleep -Milliseconds 100
+        }
+        throw "Navigation did not open ${section}"
+    }
     Save-SolitonFrame 'qa-albums'
     if ($Updates) {
-        Open-SolitonSettings
+        Open-SolitonSection Settings
         Save-SolitonFrame 'qa-update-settings-top'
         Scroll-SolitonClient ($clientWidth / 2) ($clientHeight / 3) 30
         Save-SolitonFrame 'qa-update-settings-bottom'
@@ -166,7 +181,7 @@ try {
     Start-Sleep -Milliseconds 500
     Save-SolitonFrame 'qa-playing'
     if ($Collections) {
-        Click-SolitonClient 28 $rail.Queue
+        Open-SolitonSection Queue
         Save-SolitonFrame 'qa-queue'
         # Save as playlist, first button of the queue page.
         Click-SolitonClient 140 94
@@ -174,7 +189,7 @@ try {
         Save-SolitonFrame 'qa-playlist-name'
         Send-SolitonKey 13
         Start-Sleep -Milliseconds 700
-        Click-SolitonClient 28 $rail.Playlists
+        Open-SolitonSection Playlists
         Save-SolitonFrame 'qa-playlists'
         # Open, last button of the first playlist row.
         Click-SolitonClient ($clientWidth - 59) 171
@@ -182,7 +197,7 @@ try {
         $savedView = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_view
         if ($savedView.view -ne 'Playlists' -or $null -eq $savedView.playlist) { throw 'Saved queue playlist was not opened' }
         # Play the first track, then pause it.
-        Click-SolitonClient 92 204
+        Click-SolitonClient 94 267
         Start-Sleep -Milliseconds 200
         Send-SolitonKey 32
         Start-Sleep -Milliseconds 300
@@ -190,26 +205,24 @@ try {
         $savedQueue = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_queue
         if ($savedQueue.playlist_entries.Count -eq 0 -or $null -eq $savedQueue.playlist_entries[$savedQueue.current_index]) { throw 'Playing playlist occurrence was not saved' }
         # Repeatedly appending the same playlist keeps the queue and paused position.
-        Click-SolitonClient 330 60
-        Click-SolitonClient 330 60
+        Click-SolitonClient 330 94
+        Click-SolitonClient 330 94
         $deduplicatedQueue = (Get-Content -Raw (Join-Path $data 'settings.json') | ConvertFrom-Json).last_queue
         if ($deduplicatedQueue.tracks.Count -ne $savedQueue.tracks.Count -or
             @($deduplicatedQueue.tracks | Sort-Object -Unique).Count -ne $savedQueue.tracks.Count -or
             $deduplicatedQueue.position_ms -ne $savedQueue.position_ms) { throw 'Appending an existing playlist duplicated tracks or reset playback' }
         # Rename, left of the wider Delete playlist button.
-        Click-SolitonClient ($clientWidth - $(if ($Language -eq 'English') { 209 } else { 256 })) 60
+        Click-SolitonClient ($clientWidth - $(if ($Language -eq 'English') { 209 } else { 256 })) 94
         foreach ($character in '-QA'.ToCharArray()) {
             [SolitonNativeQa]::PostMessage($handle,0x0102,[IntPtr][int]$character,[IntPtr]0) | Out-Null
         }
         Send-SolitonKey 13
         Start-Sleep -Milliseconds 500
         Save-SolitonFrame 'qa-playlist-renamed'
-        Click-SolitonClient 28 $rail.Queue
+        Open-SolitonSection Queue
         Save-SolitonFrame 'qa-queue-page'
-        # Actions of the first queued track, then Add to playlist.
-        Click-SolitonClient ($clientWidth - 81) 223
-        Save-SolitonFrame 'qa-track-actions'
-        Click-SolitonClient ($clientWidth - 120) 268
+        # Add to playlist is now directly available on the first queued track.
+        Click-SolitonClient ($clientWidth - 74) 267
         Save-SolitonFrame 'qa-playlist-picker'
         Send-SolitonKey 27
         $previousDpi = [SolitonNativeQa]::SetThreadDpiAwarenessContext([IntPtr](-4))
@@ -233,7 +246,7 @@ try {
         Start-Sleep -Milliseconds 200
         # Four notches bring the Audio output list into view: default system
         # device first, then one row per device.
-        Open-SolitonSettings
+        Open-SolitonSection Settings
         Scroll-SolitonClient 500 400 4
         Save-SolitonFrame 'qa-audio-outputs'
         Click-SolitonClient 300 (487 + 41*$AudioOutputRow)
