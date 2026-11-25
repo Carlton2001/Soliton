@@ -89,6 +89,7 @@ pub struct Soliton {
     /// Operating system preference, used when the appearance follows the system.
     pub system_dark: bool,
     pub system_accent: Option<[u32; 2]>,
+    pub window_controls: soliton_platform::WindowControls,
     pub snapshot: Arc<LibrarySnapshot>,
     pub visible: Vec<usize>,
     pub filter: Filter,
@@ -272,6 +273,7 @@ impl Soliton {
             settings,
             system_dark: is_dark(window.appearance()),
             system_accent: None,
+            window_controls: soliton_platform::WindowControls::default(),
             snapshot: Arc::new(LibrarySnapshot::default()),
             visible: Vec::new(),
             filter,
@@ -703,23 +705,29 @@ impl Render for Soliton {
                 content.child(self.fullscreen_view(window, cx))
             })
             .when(!fullscreen, |content| {
-                content.child(
-                    div()
-                        .flex_1()
-                        .min_h_0()
-                        .flex()
-                        .child(self.navigation(window, cx))
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .min_h_0()
-                                .flex()
-                                .flex_col()
-                                .child(self.title_bar(window, cx))
-                                .child(main),
-                        ),
-                )
+                content
+                    .when(cfg!(target_os = "linux"), |content| {
+                        content.child(self.title_bar(window, cx))
+                    })
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_h_0()
+                            .flex()
+                            .child(self.navigation(window, cx))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .min_h_0()
+                                    .flex()
+                                    .flex_col()
+                                    .when(!cfg!(target_os = "linux"), |column| {
+                                        column.child(self.title_bar(window, cx))
+                                    })
+                                    .child(main),
+                            ),
+                    )
             })
             .children(notices)
             .when(!fullscreen, |content| {

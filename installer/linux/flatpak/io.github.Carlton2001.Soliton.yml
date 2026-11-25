@@ -18,6 +18,7 @@ finish-args:
   - --device=dri
   # Libraries, read only. Removable disks, then fixed mounts and NAS shares.
   - --filesystem=xdg-music:ro
+  - --filesystem=~/.config/kwinrc:ro
   - --filesystem=/run/media:ro
   - --filesystem=/media:ro
   - --filesystem=/mnt:ro

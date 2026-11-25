@@ -7,6 +7,7 @@ mod launcher_icon;
 mod mpris;
 #[cfg(target_arch = "x86_64")]
 pub(super) mod updates;
+pub(crate) mod window_controls;
 
 use crate::{DesktopEvent, MediaState};
 use anyhow::Result;
@@ -71,6 +72,7 @@ fn run(icon: AppIcon, events: &Sender<DesktopEvent>, updates: Receiver<Update>) 
     let warn = |error: String| {
         let _ = events.try_send(DesktopEvent::Warning(error));
     };
+    window_controls::watch(events.clone());
     let mut launcher = launcher_icon::LauncherIcon::default();
     if let Err(error) = launcher.apply(icon) {
         warn(format!("Launcher icon: {error:#}"));

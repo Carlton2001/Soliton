@@ -21,6 +21,7 @@ pub enum DesktopEvent {
     Media(MediaCommand),
     /// Theme-aware desktop accent RGB values: light, dark.
     SystemAccent([u32; 2]),
+    WindowControls(crate::WindowControls),
     Show,
     Quit,
     Autostart(Result<bool>),

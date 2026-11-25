@@ -7,10 +7,12 @@ mod watch;
 pub use watch::{AudioOutputs, DeviceWatch};
 
 mod desktop;
+mod window_controls;
 pub use desktop::TrayAnchor;
 pub use desktop::{
     Desktop, DesktopEvent, MediaCommand, MediaState, MediaTrack, PreviewColors, TransportState,
 };
+pub use window_controls::{CaptionButton, CaptionStyle, WindowControls};
 
 #[cfg(target_os = "windows")]
 mod windows;

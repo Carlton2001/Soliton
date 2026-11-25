@@ -55,7 +55,16 @@ impl AssetSource for Assets {
                 _ => None,
             } };
         }
-        if let Some(control) = window_controls!("minimize", "maximize", "restore", "close") {
+        if let Some(control) = window_controls!(
+            "minimize",
+            "maximize",
+            "restore",
+            "close",
+            "adwaita/minimize",
+            "adwaita/maximize",
+            "adwaita/restore",
+            "adwaita/close"
+        ) {
             return Ok(Some(control));
         }
         if let Some(logo) = logos!(
@@ -104,6 +113,7 @@ impl AssetSource for Assets {
             "minimize-2",
             "chevron-down",
             "chevron-up",
+            "diamond",
             "volume-x",
             "volume-1",
             "repeat-1",

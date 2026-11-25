@@ -50,6 +50,7 @@ impl Soliton {
                 DesktopEvent::Media(command) if !self.quitting => self.system_media(command, cx),
                 DesktopEvent::Media(_) => {}
                 DesktopEvent::SystemAccent(colors) => self.system_accent = Some(colors),
+                DesktopEvent::WindowControls(controls) => self.window_controls = controls,
                 DesktopEvent::Show if Desktop::HIDES => {
                     if let Some(desktop) = &self.desktop {
                         desktop.show();

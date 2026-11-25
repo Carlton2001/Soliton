@@ -4,6 +4,14 @@ Soliton uses Vulkan on Wayland and X11, PipeWire for playback, and MPRIS for
 desktop media controls. Archive installations can update from Soliton. Use the
 package manager to update the RPM and .deb packages.
 
+Soliton's title bar uses Adwaita buttons on GNOME and Breeze buttons on KDE
+Plasma. It follows the desktop's choice of minimize, maximize and close buttons,
+including their order and placement on either side. GNOME changes apply as the
+Settings portal reports them. On Plasma, restart Soliton after changing **System
+Settings → Appearance → Window Decorations → Titlebar Buttons**. The Flatpak reads
+the default Plasma configuration file at `~/.config/kwinrc` with read-only access.
+When the desktop layout is unavailable, Soliton puts all three buttons on the right.
+
 ## Install from GitHub
 
 This is the recommended installation method on Linux x86_64. It installs

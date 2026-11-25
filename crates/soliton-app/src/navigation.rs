@@ -41,7 +41,7 @@ impl Soliton {
         };
         let corners = crate::window_chrome::inner_corners(window);
         let top_left = Corners {
-            top_left: true,
+            top_left: !cfg!(target_os = "linux"),
             ..Default::default()
         };
         crate::window_chrome::round(div(), corners, top_left)

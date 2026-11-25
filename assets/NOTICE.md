@@ -4,7 +4,7 @@ The icons in `icons/` are the official Lucide SVGs, downloaded unmodified from
 https://github.com/lucide-icons/lucide/tree/main/icons.
 Their license is kept in `icons/LICENSE`.
 
-The symbols in `window-controls/` (Minimize, Maximize, Restore, Close) come
+The Windows and Adwaita symbols in `window-controls/` come
 unmodified from `assets/visuals/window-controls/` of the Oxyde-GPUI project,
 Copyright (C) 2026 Carlton2001, under GPL-3.0.
 
