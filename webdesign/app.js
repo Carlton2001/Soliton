@@ -68,6 +68,9 @@ function option(value, label, current) {
 function heading(title, toolbar = '') {
   return '<header class="heading"><h1>' + esc(title) + '</h1>' + toolbar + '</header>';
 }
+function pageContent(markup) {
+  return '<div class="page-content" id="page-content">' + markup + '</div>';
+}
 function filteredAlbums() {
   const query = state.query.trim().toLocaleLowerCase();
   const albums = library.filter(album => (!state.artist || state.artist === album.artist) &&
@@ -105,7 +108,7 @@ function albumView() {
     '</select>' + icon('chevron-down') + '</label>' + layoutButtons('layout', state.layout) +
     '</div>' + (state.artist ? '<div class="toolbar">' +
     button(state.artist + ' ×', 'clear-artist') + '</div>' : '')) +
-    '<div id="catalog" class="catalog ' + state.layout + '"></div>';
+    pageContent('<div id="catalog" class="catalog ' + state.layout + '"></div>');
 }
 function layoutButtons(action, layout) {
   return '<div class="layout-switch">' +
@@ -186,7 +189,7 @@ function queueView(title) {
   return heading(title, track ? '<div class="toolbar">' +
     button(tr('Enregistrer en playlist', 'Save as playlist'), 'save-queue', { symbol: 'list-plus', showLabel: true }) +
     button(tr('Vider la file', 'Clear queue'), 'clear-queue', { symbol: 'eraser', showLabel: true }) + '</div>' : '') +
-    (track ? '<div class="queue-head">' + cover(album) + '<div class="item-copy"><h2>' + esc(track.title) +
+    pageContent(track ? '<div class="queue-head">' + cover(album) + '<div class="item-copy"><h2>' + esc(track.title) +
       '</h2><small>' + esc(album.artist) + ' · ' + esc(album.title) + '</small><small>' + audioFormat +
       '</small></div>' + button(tr('Voir l’album', 'View album'), 'show-album', { symbol: 'disc-3', value: album.id, showLabel: true }) +
       '</div>' + renderTracks(state.queue, 'queue-track') :
@@ -194,6 +197,7 @@ function queueView(title) {
 }
 function renderMain() {
   const main = byId('main');
+  const scrollTop = byId('page-content')?.scrollTop ?? 0;
   const title = viewLabels()[state.view];
   switch (state.view) {
     case 'albums':
@@ -205,7 +209,7 @@ function renderMain() {
       main.innerHTML = heading(title, '<div class="toolbar"><label class="search">' + icon('search') +
         '<input id="artist-search" type="search" aria-label="' + label + '" placeholder="' + label +
         '" value="' + esc(state.artistQuery) + '"></label>' + layoutButtons('artist-layout', state.artistLayout) +
-        '</div>') + '<div id="artist-results"></div>';
+        '</div>') + pageContent('<div id="artist-results"></div>');
       renderArtists();
       break;
     }
@@ -213,27 +217,28 @@ function renderMain() {
       if (state.playlist === null) {
         main.innerHTML = heading(title, '<div class="toolbar">' +
           button(tr('Créer une playlist', 'Create playlist'), 'create-playlist', { symbol: 'plus', primary: true, showLabel: true }) +
-          '</div>') + '<div class="playlist-list">' + playlists.map(playlistRow).join('') + '</div>';
+          '</div>') + pageContent('<div class="playlist-list">' + playlists.map(playlistRow).join('') + '</div>');
       } else {
         const list = playlists[state.playlist];
         main.innerHTML = heading(list.name[Number(state.english)], '<div class="toolbar">' +
           button(tr('Retour aux playlists', 'Back to playlists'), 'navigate', { value: 'playlists', symbol: 'arrow-left' }) +
           (list.tracks.length ? button(tr('Lire la playlist', 'Play playlist'), 'play-playlist',
             { value: state.playlist, symbol: 'play', primary: true, showLabel: true }) : '') +
-          '</div>') + '<div id="playlist-tracks">' + renderTracks(list.tracks, 'playlist-track') + '</div>';
+          '</div>') + pageContent('<div id="playlist-tracks">' + renderTracks(list.tracks, 'playlist-track') + '</div>');
       }
       break;
     case 'queue':
       main.innerHTML = queueView(title);
       break;
     case 'settings':
-      main.innerHTML = heading(title) + '<div class="section-content"><h2>' +
+      main.innerHTML = heading(title) + pageContent('<div class="section-content"><h2>' +
         tr('Apparence', 'Appearance') + '</h2><div class="variants">' + themeButtons() +
         '</div><h2>' + tr('Langue', 'Language') + '</h2><div>' +
         button(tr('English', 'Français'), 'language') + '</div><p class="muted">' +
-        tr('Discothèque fictive · Lecture simulée', 'Fictional library · Simulated playback') + '</p></div>';
+        tr('Discothèque fictive · Lecture simulée', 'Fictional library · Simulated playback') + '</p></div>');
       break;
   }
+  byId('page-content').scrollTop = scrollTop;
 }
 function renderPlayer() {
   const track = currentTrack();
@@ -404,7 +409,7 @@ document.addEventListener('click', event => {
   actions[target.dataset.action](target.dataset.value);
   if (target.dataset.action === 'artist-initial') return;
   render();
-  if (previousView !== state.view) byId('main').scrollTop = 0;
+  if (previousView !== state.view) byId('page-content').scrollTop = 0;
 });
 document.addEventListener('input', ({ target }) => {
   switch (target.id) {
