@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Soliton · Webdesign</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="library.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body data-theme="gpui">
+  <header class="prototype">
+    <strong id="prototype-label">Maquette Soliton</strong>
+    <div class="variants" id="variants" role="group"></div>
+    <button id="language" type="button" data-action="language">EN</button>
+  </header>
+  <div class="workspace">
+    <nav class="rail" id="navigation"></nav>
+    <div class="browser">
+      <main id="main"></main>
+      <aside id="detail" hidden></aside>
+    </div>
+  </div>
+  <footer id="player"></footer>
+</body>
+</html>
