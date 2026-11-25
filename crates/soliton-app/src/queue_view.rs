@@ -131,35 +131,37 @@ impl Soliton {
                         })),
                 )
         });
-        let body = crate::widgets::page_body(theme)
-            .when_some(track, |page, track| {
-                // Queued tracks may mix qualities: the playing one shows its own.
-                page.child(
-                    crate::widgets::summary_band(
-                        cover(track.cover.as_ref(), crate::widgets::SUMMARY_COVER, theme),
-                        crate::widgets::summary_title()
-                            .when(track.metadata.is_inferred("title"), |title| title.italic())
-                            .child(track.metadata.title.clone()),
-                        [
-                            crate::widgets::summary_line(theme)
-                                .child(self.track_subtitle(&track.metadata))
-                                .into_any_element(),
-                            crate::widgets::summary_line(theme)
-                                .child(quality(&track.metadata))
-                                .into_any_element(),
-                        ],
-                    )
-                    .when_some(album, |band, id| {
-                        band.child(
-                            button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    this.focus.focus(window);
-                                    this.open_album(id, cx);
-                                })),
-                        )
-                    }),
+        let summary = track.map(|track| {
+            // Queued tracks may mix qualities: the playing one shows its own.
+            crate::widgets::summary_band(
+                cover(track.cover.as_ref(), crate::widgets::SUMMARY_COVER, theme),
+                crate::widgets::summary_title()
+                    .when(track.metadata.is_inferred("title"), |title| title.italic())
+                    .child(track.metadata.title.clone()),
+                [
+                    crate::widgets::summary_line(theme)
+                        .child(self.track_subtitle(&track.metadata))
+                        .into_any_element(),
+                    crate::widgets::summary_line(theme)
+                        .child(quality(&track.metadata))
+                        .into_any_element(),
+                ],
+            )
+            .pl_0()
+            .pt_0()
+            .when_some(album, |summary, id| {
+                summary.child(
+                    button("queue-album", "disc-3", self.t(Text::GoToAlbum), theme)
+                        .flex_none()
+                        .mt_auto()
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.focus.focus(window);
+                            this.open_album(id, cx);
+                        })),
                 )
             })
+        });
+        let body = crate::widgets::page_body(theme)
             .when(count == 0, |v| {
                 v.child(
                     crate::widgets::page_intro().child(
@@ -178,6 +180,7 @@ impl Soliton {
             .flex_col()
             .child(self.page_title(Text::Queue, cx))
             .child(toolbar)
+            .children(summary)
             .child(body)
             .into_any_element()
     }
