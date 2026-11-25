@@ -111,8 +111,7 @@ try {
         } finally { $graphics.Dispose(); $bitmap.Dispose() }
     }
     # Targeted clicks in logical client pixels; the user's pointer is never moved.
-    # Positions are measured at the default rem size: the section rail from the
-    # top left, the settings entry from the bottom, page buttons from the right.
+    # Positions are measured at the default rem size.
     $scale = [SolitonNativeQa]::GetDpiForWindow($handle) / 96.0
     $client = [SolitonNativeQa]::PhysicalClient($handle)
     $clientWidth = $client.Right / $scale
@@ -146,9 +145,11 @@ try {
         [SolitonNativeQa]::PostMessage($handle,0x0100,[IntPtr]$key,[IntPtr]0) | Out-Null
         [SolitonNativeQa]::PostMessage($handle,0x0101,[IntPtr]$key,[IntPtr]0) | Out-Null
     }
-    $rail = @{Playlists=156; Queue=200}
-    # Settings are never restored at startup: they open from the bottom of the rail.
-    function Open-SolitonSettings { Click-SolitonClient 28 ($clientHeight - 132) }
+    # The rail centers five 40 px entries with 4 px gaps and an extra 4 px
+    # after the logo. The 102 px player sits below the rail.
+    $logoY = ($clientHeight - 102 - (5 * 40 + 4 * 4 + 4)) / 2 + 20
+    $rail = @{Playlists=($logoY + 3 * 44 + 4); Queue=($logoY + 4 * 44 + 4)}
+    function Open-SolitonSettings { Click-SolitonClient 28 $logoY }
     Save-SolitonFrame 'qa-albums'
     if ($Updates) {
         Open-SolitonSettings

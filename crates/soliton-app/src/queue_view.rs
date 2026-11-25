@@ -18,7 +18,7 @@ impl Soliton {
         use crate::widgets::{CONTROL_GAP, Density, PAGE_INSET, label_width};
         // Padding, borders, icon and gap of a button, and slack for rounding.
         let button = 1.5 + 2. / 16. + 1. + 0.5;
-        let needed = 2. * PAGE_INSET.0
+        let needed = PAGE_INSET.0
             + 1.
             + labels
                 .iter()
@@ -75,7 +75,7 @@ impl Soliton {
         }
         let density = self.toolbar_density(&labels, window);
         let toolbar = crate::widgets::with_density(density, || {
-            crate::widgets::page_toolbar(theme)
+            crate::widgets::page_toolbar()
                 .child(
                     button("save-queue", "list-plus", self.t(Text::SaveQueue), theme)
                         .opacity(if count > 0 { 1. } else { 0.4 })
@@ -131,13 +131,7 @@ impl Soliton {
                         })),
                 )
         });
-        div()
-            .flex_1()
-            .min_h_0()
-            .flex()
-            .flex_col()
-            .child(self.page_title(Text::Queue, cx))
-            .child(toolbar)
+        let body = crate::widgets::page_body(theme)
             .when_some(track, |page, track| {
                 // Queued tracks may mix qualities: the playing one shows its own.
                 page.child(
@@ -154,7 +148,6 @@ impl Soliton {
                                 .child(quality(&track.metadata))
                                 .into_any_element(),
                         ],
-                        theme,
                     )
                     .when_some(album, |band, id| {
                         band.child(
@@ -167,25 +160,25 @@ impl Soliton {
                     }),
                 )
             })
-            .child(
-                crate::widgets::page_body()
-                    .when(count == 0, |v| {
-                        v.child(
-                            crate::widgets::page_intro().child(
-                                div()
-                                    .px(crate::widgets::PAGE_INSET)
-                                    .text_color(theme.muted)
-                                    .child(self.t(Text::QueueEmpty)),
-                            ),
-                        )
-                    })
-                    .child(
-                        self.reorder_area(
-                            crate::views::scroll_area(rows, &self.queue_bar, theme),
-                            cx,
-                        ),
+            .when(count == 0, |v| {
+                v.child(
+                    crate::widgets::page_intro().child(
+                        div()
+                            .px(crate::widgets::PAGE_INSET)
+                            .text_color(theme.muted)
+                            .child(self.t(Text::QueueEmpty)),
                     ),
-            )
+                )
+            })
+            .child(self.reorder_area(crate::views::scroll_area(rows, &self.queue_bar, theme), cx));
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(self.page_title(Text::Queue, cx))
+            .child(toolbar)
+            .child(body)
             .into_any_element()
     }
 }

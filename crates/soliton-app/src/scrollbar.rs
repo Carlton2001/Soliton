@@ -16,13 +16,15 @@ pub struct Scrollbar {
 }
 
 impl Scrollbar {
+    pub const GUTTER: Rems = Rems(TRACK / 16.);
+
     /// Reserve a lane only while the vertical scrollbar is needed.
     pub fn gutter(&self) -> Rems {
-        rems(if self.handle.max_offset().height > px(0.) {
-            TRACK / 16.
+        if self.handle.max_offset().height > px(0.) {
+            Self::GUTTER
         } else {
-            0.
-        })
+            rems(0.)
+        }
     }
 
     pub fn new(handle: ScrollHandle) -> Self {
@@ -142,10 +144,10 @@ impl Scrollbar {
         )
         .absolute()
         .when(horizontal, |rail| {
-            rail.left_0().right_0().bottom_0().h(rems(TRACK / 16.))
+            rail.left_0().right_0().bottom_0().h(Self::GUTTER)
         })
         .when(!horizontal, |rail| {
-            rail.top_0().right_0().bottom_0().w(rems(TRACK / 16.))
+            rail.top_0().right_0().bottom_0().w(Self::GUTTER)
         })
     }
 }

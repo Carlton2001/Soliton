@@ -12,6 +12,8 @@ use soliton_core::{
     playlist::PlaylistChange,
 };
 
+pub(super) const TRACK_ROW_HEIGHT: Rems = Rems(3.5);
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Selection {
     Album {
@@ -171,7 +173,7 @@ impl Soliton {
             .relative()
             .w_full()
             .min_w_0()
-            .h(rems(3.5))
+            .h(TRACK_ROW_HEIGHT)
             .px(rems(0.5))
             .flex()
             .items_center()
@@ -419,7 +421,8 @@ impl Soliton {
         });
         div()
             .w_full()
-            .px(inset)
+            .pl(inset)
+            .when(!compact, |row| row.pr(inset))
             .child(div().relative().w_full().child(line).children(outline))
             .into_any_element()
     }

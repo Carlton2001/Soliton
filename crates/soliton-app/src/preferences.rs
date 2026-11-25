@@ -153,11 +153,13 @@ impl Soliton {
             .child(
                 // Without a toolbar, the title closes the header like one.
                 self.page_title(Text::Settings, cx)
-                    .pb(crate::widgets::PAGE_SECTION_GAP)
-                    .border_b_1()
-                    .border_color(theme.border),
+                    .pb(crate::widgets::PAGE_SECTION_GAP),
             )
-            .child(scroll_area(content, &self.settings_bar, theme))
+            .child(crate::widgets::page_body(theme).child(scroll_area(
+                content,
+                &self.settings_bar,
+                theme,
+            )))
             .into_any_element()
     }
 

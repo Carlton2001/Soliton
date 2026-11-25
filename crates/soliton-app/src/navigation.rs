@@ -2,7 +2,7 @@
 use crate::{
     app::{Section, Soliton},
     i18n::Text,
-    widgets::nav_icon,
+    widgets::{nav_entry, nav_icon},
 };
 use gpui::{prelude::*, *};
 
@@ -51,56 +51,45 @@ impl Soliton {
             .flex()
             .flex_col()
             .items_center()
-            .pt(rems(0.5))
+            .justify_center()
+            .gap(rems(0.25))
             .bg(theme.background)
-            .border_r_1()
-            .border_color(theme.border)
             .child(
-                crate::window_chrome::drag_region("navigation-brand", window, cx)
-                    .w_full()
-                    .h(px(crate::title_bar::TITLE_BAR_HEIGHT))
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(
-                        img(crate::assets::Assets::logo_path(self.settings.app_icon))
-                            .size(px(24.))
-                            .flex_none(),
-                    ),
+                nav_entry(
+                    "navigation-brand",
+                    img(crate::assets::Assets::logo_path(self.settings.app_icon))
+                        .size(px(24.))
+                        .flex_none(),
+                    self.t(Text::Settings),
+                    Some(crate::shortcuts::section_keys(4)),
+                    self.section == Section::Settings,
+                    theme,
+                )
+                .mb(rems(0.25))
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.focus.focus(window);
+                    this.navigate(Section::Settings, cx);
+                })),
             )
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap(rems(0.25))
-                    .py(rems(0.5))
-                    .child(entry(0, Section::Artists, "users", Text::Artists, cx))
-                    .child(entry(1, Section::Albums, "disc-3", Text::Albums, cx))
-                    .child(entry(2, Section::Playlists, "list", Text::Playlists, cx))
-                    .child(entry(3, Section::Queue, "list-end", Text::Queue, cx))
-                    .child(div().flex_1())
-                    .when(self.updates.is_available(), |rail| {
-                        rail.child(
-                            nav_icon(
-                                "nav-info",
-                                "info",
-                                self.t(self.update_tooltip()),
-                                None,
-                                false,
-                                crate::theme::Theme {
-                                    muted: theme.accent,
-                                    ..theme
-                                },
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| this.install_update(cx))),
-                        )
-                    })
-                    .child(entry(4, Section::Settings, "settings", Text::Settings, cx)),
-            )
+            .child(entry(0, Section::Artists, "users", Text::Artists, cx))
+            .child(entry(1, Section::Albums, "disc-3", Text::Albums, cx))
+            .child(entry(2, Section::Playlists, "list", Text::Playlists, cx))
+            .child(entry(3, Section::Queue, "list-end", Text::Queue, cx))
+            .when(self.updates.is_available(), |rail| {
+                rail.child(
+                    nav_icon(
+                        "nav-info",
+                        "info",
+                        self.t(self.update_tooltip()),
+                        None,
+                        false,
+                        crate::theme::Theme {
+                            muted: theme.accent,
+                            ..theme
+                        },
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.install_update(cx))),
+                )
+            })
     }
 }

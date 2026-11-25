@@ -39,30 +39,39 @@ impl Soliton {
             .min_h_0()
             .min_w_0()
             .flex()
+            .flex_col()
+            .child(self.collection_title(cx))
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
                     .min_h_0()
                     .flex()
-                    .flex_col()
-                    .child(self.collection_title(cx))
-                    .child(self.measured_header(window, cx))
-                    .child(self.albums_view(cx)),
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .min_h_0()
+                            .flex()
+                            .flex_col()
+                            .child(self.measured_header(window, cx))
+                            .child(
+                                crate::widgets::page_body(self.theme()).child(self.albums_view(cx)),
+                            ),
+                    )
+                    .when(split, |view| {
+                        view.child(
+                            div()
+                                .w(rems(album_panel_width(width)))
+                                .min_h_0()
+                                .flex_none()
+                                .flex()
+                                .flex_col()
+                                .pt(crate::widgets::PAGE_TOP_PADDING)
+                                .child(self.album_panel(window, cx)),
+                        )
+                    }),
             )
-            .when(split, |view| {
-                view.child(
-                    div()
-                        .w(rems(album_panel_width(width)))
-                        .h_full()
-                        .flex_none()
-                        .min_h_0()
-                        .flex()
-                        .flex_col()
-                        .bg(self.theme().panel)
-                        .child(self.album_panel(window, cx)),
-                )
-            })
             .into_any_element()
     }
 }

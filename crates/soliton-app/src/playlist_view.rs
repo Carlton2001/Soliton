@@ -89,16 +89,7 @@ impl Soliton {
             ];
             let density = self.toolbar_density(&labels, window);
             let toolbar = crate::widgets::with_density(density, || {
-                div()
-                    .px(crate::widgets::PAGE_INSET)
-                    .pt(crate::widgets::PAGE_TOP_PADDING)
-                    .pb(crate::widgets::PAGE_SECTION_GAP)
-                    .border_b_1()
-                    .border_color(theme.border)
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .gap(rems(0.5))
+                crate::widgets::page_toolbar()
                     .child(
                         button(
                             "playlist-back",
@@ -162,13 +153,7 @@ impl Soliton {
                             })),
                     )
             });
-            return div()
-                .flex_1()
-                .min_h_0()
-                .flex()
-                .flex_col()
-                .child(self.page_title_with(Text::Playlists, list.name.clone().into(), cx))
-                .child(toolbar)
+            let body = crate::widgets::page_body(theme)
                 .child(crate::widgets::summary_band(
                     cover(
                         self.playlist_cover(list),
@@ -184,26 +169,30 @@ impl Soliton {
                             time(duration)
                         ))
                         .into_any_element()],
-                    theme,
                 ))
-                .child(
-                    crate::widgets::page_body()
-                        .when(count == 0, |page| {
-                            page.child(
-                                crate::widgets::page_intro().child(
-                                    div()
-                                        .px(crate::widgets::PAGE_INSET)
-                                        .text_size(TEXT_SMALL)
-                                        .text_color(theme.muted)
-                                        .child(self.t(Text::PlaylistEmpty)),
-                                ),
-                            )
-                        })
-                        .child(self.reorder_area(
-                            crate::views::scroll_area(rows, &self.playlists.bar, theme),
-                            cx,
-                        )),
-                )
+                .when(count == 0, |page| {
+                    page.child(
+                        crate::widgets::page_intro().child(
+                            div()
+                                .px(crate::widgets::PAGE_INSET)
+                                .text_size(TEXT_SMALL)
+                                .text_color(theme.muted)
+                                .child(self.t(Text::PlaylistEmpty)),
+                        ),
+                    )
+                })
+                .child(self.reorder_area(
+                    crate::views::scroll_area(rows, &self.playlists.bar, theme),
+                    cx,
+                ));
+            return div()
+                .flex_1()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .child(self.page_title_with(Text::Playlists, list.name.clone().into(), cx))
+                .child(toolbar)
+                .child(body)
                 .into_any_element();
         }
         let theme = self.theme();
@@ -263,17 +252,6 @@ impl Soliton {
                                 .w_full()
                                 .relative()
                                 .pl(rems(0.5))
-                                // The separator lies on the row's outer edge, under the
-                                // focus border, so content stays centered between lines.
-                                .child(
-                                    div()
-                                        .absolute()
-                                        .left(rems(0.5))
-                                        .right_0()
-                                        .bottom(px(-2.))
-                                        .h(px(1.))
-                                        .bg(theme.border),
-                                )
                                 .child(
                                     div()
                                         .h_full()
@@ -391,7 +369,7 @@ impl Soliton {
             .flex()
             .flex_col()
             .child(self.page_title(Text::Playlists, cx))
-            .child(crate::widgets::page_toolbar(theme).child(
+            .child(crate::widgets::page_toolbar().child(
                 accent_button("new-playlist", "plus", self.t(Text::NewPlaylist), theme).on_click(
                     cx.listener(|this, _, window, cx| {
                         this.open_playlist_dialog(Dialog::New(Vec::new()), window, cx)
@@ -399,7 +377,7 @@ impl Soliton {
                 ),
             ))
             .child(
-                crate::widgets::page_body()
+                crate::widgets::page_body(theme)
                     .when(count == 0, |v| {
                         v.child(
                             crate::widgets::page_intro().child(

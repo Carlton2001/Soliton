@@ -1,8 +1,9 @@
 //! Album sheet: cover, summary, edition choice and the tracks of that edition.
 use crate::{
-    app::Soliton,
+    app::{Section, Soliton},
     i18n::Text,
-    views::scroll_area,
+    track_list::TRACK_ROW_HEIGHT,
+    views::measured_scroll_area,
     widgets::{button, cover, quality, time},
 };
 use gpui::{prelude::*, *};
@@ -93,15 +94,23 @@ impl Soliton {
             .gap(rems(0.75))
             .min_w_0()
             .when(wide, |v| v.flex_col().w(rems(19.)).flex_none())
-            .when(!wide, |v| v.w_full().flex_none())
             // The panel keeps the cover beside its summary to leave room for tracks.
-            .when(panel, |v| v.items_start().flex_none())
+            .when(panel, |v| v.items_start().w_full().flex_none())
             .child(cover(
                 edition.cover().or(album.cover()),
                 if panel { 128. } else { 280. },
                 theme,
             ))
             .child(information);
+        let tracks = self.tracks_view(album_id, edition_index, panel, cx);
+        let tracks = if panel {
+            crate::widgets::page_body(theme)
+                .ml(crate::widgets::PAGE_INSET)
+                .child(tracks)
+                .into_any_element()
+        } else {
+            tracks
+        };
         let songs = div()
             .flex_1()
             .min_w_0()
@@ -116,7 +125,7 @@ impl Soliton {
                         .when(panel, |view| view.px(crate::widgets::PAGE_INSET)),
                 )
             })
-            .child(self.tracks_view(album_id, edition_index, panel, cx));
+            .child(tracks);
         if panel {
             return div()
                 .flex_1()
@@ -126,78 +135,38 @@ impl Soliton {
                 .flex_col()
                 .child(
                     div()
-                        .flex_none()
-                        .flex()
-                        .justify_between()
-                        .items_center()
-                        .p(rems(0.75))
-                        .child(
-                            div()
-                                .text_size(crate::widgets::TEXT_CAPTION)
-                                .text_color(theme.muted)
-                                .child(self.t(Text::SelectedAlbum)),
-                        )
-                        .child(
-                            button("close-album-panel", "x", self.t(Text::CloseAlbum), theme)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.focus.focus(window);
-                                    this.return_from_album(cx);
-                                })),
-                        ),
-                )
-                .child(
-                    div()
                         .id("album-panel-summary")
+                        .w_full()
                         .max_h(relative(0.5))
                         .min_h_0()
                         .overflow_y_scroll()
                         .px(crate::widgets::PAGE_INSET)
-                        .pb(crate::widgets::PAGE_SECTION_GAP)
-                        .border_b_1()
-                        .border_color(theme.border)
-                        .child(record)
+                        .child(record),
+                )
+                .child(
+                    div()
+                        .w_full()
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .gap(crate::widgets::CONTROL_GAP)
+                        .px(crate::widgets::PAGE_INSET)
+                        .py(crate::widgets::PAGE_SECTION_GAP)
+                        .child(self.panel_album_actions(album, edition_index, cx).min_w_0())
+                        .child(div().flex_1())
                         .child(
-                            self.panel_album_actions(album, edition_index, cx)
-                                .mt(crate::widgets::PAGE_SECTION_GAP),
+                            button("close-album-panel", "x", self.t(Text::CloseAlbum), theme)
+                                .flex_none()
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.focus.focus(window);
+                                    this.navigate(Section::Albums, cx);
+                                })),
                         ),
                 )
                 .child(songs)
                 .into_any_element();
         }
-        div()
-            .flex_1()
-            .w_full()
-            .min_w_0()
-            .min_h_0()
-            .flex()
-            .flex_col()
-            .child(self.collection_title(cx))
-            .child(
-                div()
-                    .px(crate::widgets::PAGE_INSET)
-                    .pt(crate::widgets::PAGE_TOP_PADDING)
-                    .pb(crate::widgets::PAGE_SECTION_GAP)
-                    .border_b_1()
-                    .border_color(theme.border)
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .flex_wrap()
-                    .gap(rems(0.5))
-                    .child(
-                        button(
-                            "album-return",
-                            "arrow-left",
-                            self.t(Text::BackToLibrary),
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.focus.focus(window);
-                            this.return_from_album(cx);
-                        })),
-                    )
-                    .child(self.panel_album_actions(album, edition_index, cx)),
-            )
+        let body = crate::widgets::page_body(theme)
             .when(!wide, |page| {
                 page.child(crate::widgets::summary_band(
                     cover(
@@ -220,7 +189,6 @@ impl Soliton {
                                 .child(quality(first))
                                 .into_any_element(),
                         ]),
-                    theme,
                 ))
             })
             .child(
@@ -236,7 +204,33 @@ impl Soliton {
                         v.child(record.mt(crate::widgets::PAGE_SECTION_GAP))
                     })
                     .child(songs),
+            );
+        div()
+            .flex_1()
+            .w_full()
+            .min_w_0()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(self.collection_title(cx))
+            .child(
+                crate::widgets::page_toolbar()
+                    .flex_wrap()
+                    .child(
+                        button(
+                            "album-return",
+                            "arrow-left",
+                            self.t(Text::BackToAlbums),
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.focus.focus(window);
+                            this.navigate(Section::Albums, cx);
+                        })),
+                    )
+                    .child(self.panel_album_actions(album, edition_index, cx)),
             )
+            .child(body)
             .into_any_element()
     }
 
@@ -481,6 +475,8 @@ impl Soliton {
         .flex_1()
         .min_w_0()
         .min_h_0();
-        scroll_area(list, &self.track_bar, self.theme())
+        let content_height =
+            rems(TRACK_ROW_HEIGHT.0 * count as f32 + 2. * crate::widgets::PAGE_SECTION_GAP.0);
+        measured_scroll_area(list, &self.track_bar, self.theme(), content_height)
     }
 }

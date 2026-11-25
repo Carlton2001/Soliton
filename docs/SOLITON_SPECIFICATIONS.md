@@ -34,8 +34,16 @@ invariants, the [README](../README.md) for features and shortcuts, and the
 ## Interface
 
 - Keep keyboard focus visible and primary navigation available in the sidebar.
+- Center the logo and navigation icons as a group in the sidebar. The logo
+  opens Settings. The update indicator joins the group when an update is available.
+- Keep page titles and toolbars on the common window background and align them
+  to the left edge of their content panel. Use one secondary surface and the
+  button corner radius for page content, with color separating the major zones.
 - Album details open beside the collection on wide windows and on a dedicated
-  page on narrow windows.
+  page on narrow windows. The album's close or return button shows the album
+  collection with its current filters.
+- The artist's album collection offers a return to all albums that removes
+  the artist filter while keeping search and other filters.
 - Icon-only buttons provide a tooltip. A button whose label is fully visible
   shows a tooltip only when it provides additional information.
 - The Windows installer and the Linux per-user archive can update from the app.

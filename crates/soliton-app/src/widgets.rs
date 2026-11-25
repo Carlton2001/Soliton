@@ -17,7 +17,7 @@ pub const TEXT_DISPLAY: Rems = Rems(1.75);
 
 /// Height shared by buttons, fields and segmented controls so they align.
 pub const CONTROL_HEIGHT: Rems = Rems(2.);
-/// Horizontal inset shared by page headings, controls and content.
+/// Horizontal inset for page content and the trailing side of toolbars.
 pub const PAGE_INSET: Rems = Rems(0.75);
 /// Space above controls, below a heading or the window title bar.
 pub const PAGE_TOP_PADDING: Rems = Rems(0.75);
@@ -32,8 +32,15 @@ const ICON: Rems = Rems(1.);
 
 /// Content below a page toolbar. Its scrolled list owns the vertical insets, so
 /// the scrollbar spans the whole body.
-pub fn page_body() -> Div {
-    div().flex_1().min_h_0().min_w_0().flex().flex_col()
+pub fn page_body(theme: Theme) -> Div {
+    div()
+        .flex_1()
+        .min_h_0()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .rounded(RADIUS)
+        .bg(theme.panel)
 }
 
 /// Fixed blocks above a page's scrolled list; the list's own top inset follows.
@@ -56,14 +63,11 @@ pub fn summary_band(
     cover: impl IntoElement,
     title: impl IntoElement,
     lines: impl IntoIterator<Item = AnyElement>,
-    theme: Theme,
 ) -> Div {
     div()
         .flex_none()
         .px(PAGE_INSET)
         .py(PAGE_SECTION_GAP)
-        .border_b_1()
-        .border_color(theme.border)
         .flex()
         .items_center()
         .gap(PAGE_SECTION_GAP)
@@ -103,14 +107,12 @@ pub fn summary_line(theme: Theme) -> Div {
 }
 
 /// First row of page actions, with one owner for its surrounding space.
-pub fn page_toolbar(theme: Theme) -> Div {
+pub fn page_toolbar() -> Div {
     div()
         .flex_none()
-        .px(PAGE_INSET)
+        .pr(PAGE_INSET)
         .pt(PAGE_TOP_PADDING)
         .pb(PAGE_SECTION_GAP)
-        .border_b_1()
-        .border_color(theme.border)
         .flex()
         .items_center()
         .gap(CONTROL_GAP)
@@ -497,6 +499,18 @@ pub fn nav_icon(
     selected: bool,
     theme: Theme,
 ) -> Stateful<Div> {
+    let color = if selected { theme.text } else { theme.muted };
+    nav_entry(id, tinted_icon(name, color), label, keys, selected, theme)
+}
+
+pub fn nav_entry(
+    id: impl Into<ElementId>,
+    content: impl IntoElement,
+    label: impl Into<SharedString>,
+    keys: Option<&'static str>,
+    selected: bool,
+    theme: Theme,
+) -> Stateful<Div> {
     let entry = div()
         .id(id)
         .tab_index(0)
@@ -516,10 +530,9 @@ pub fn nav_icon(
     } else {
         entry.hover(move |style| style.bg(theme.hover))
     };
-    let color = if selected { theme.text } else { theme.muted };
     let label = label.into();
     tooltip(
-        entry.child(tinted_icon(name, color)),
+        entry.child(content),
         Rc::new(move |_| label.clone()),
         None,
         keys,

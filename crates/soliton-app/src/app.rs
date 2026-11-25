@@ -621,7 +621,9 @@ impl Render for Soliton {
                 Section::Settings => self.settings_view(cx),
                 Section::Albums => self.collection_view(window, cx),
                 _ if self.selected.is_some() => self.album_view(window, cx),
-                Section::Artists => self.artists_view(cx),
+                Section::Artists => crate::widgets::page_body(theme)
+                    .child(self.artists_view(cx))
+                    .into_any_element(),
             }
         };
         let main = div()

@@ -90,7 +90,7 @@ impl Soliton {
         });
         div()
             .flex_none()
-            .px(rems(CONTENT_PADDING))
+            .pr(rems(CONTENT_PADDING))
             .mt(-inset)
             .text_size(crate::widgets::TEXT_DISPLAY)
             .line_height(line_height)
@@ -111,12 +111,16 @@ impl Soliton {
         let option = 1.25 + border + 1. + 0.375;
         let frame = 0.375 + border + 0.125;
         let gap = crate::widgets::CONTROL_GAP.0;
-        let mut fixed = 2. * CONTENT_PADDING + 8. + 2. * option + frame;
+        let mut fixed = CONTENT_PADDING + 8. + 2. * option + frame;
         let mut labels =
             label_width(self.t(Text::Grid), window) + label_width(self.t(Text::List), window);
         let mut play = 0.;
         if albums {
             fixed += 3. * (button + gap) + 2. * chevron;
+            if self.filter.artist.is_some() {
+                fixed += button + gap;
+                labels += label_width(self.t(Text::AllAlbums), window);
+            }
             play = label_width(self.t(Text::PlayAll), window);
             labels += label_width(&self.filters_label(), window)
                 + label_width(
@@ -162,11 +166,9 @@ impl Soliton {
         };
         div()
             .flex_none()
-            .px(rems(CONTENT_PADDING))
+            .pr(rems(CONTENT_PADDING))
             .pt(crate::widgets::PAGE_TOP_PADDING)
             .pb(crate::widgets::PAGE_SECTION_GAP)
-            .border_b_1()
-            .border_color(theme.border)
             .flex()
             .flex_col()
             .gap(crate::widgets::PAGE_SECTION_GAP)
@@ -176,6 +178,17 @@ impl Soliton {
                     .flex()
                     .items_center()
                     .gap(crate::widgets::CONTROL_GAP)
+                    .when(albums && self.filter.artist.is_some(), |row| {
+                        row.child(
+                            button("all-albums", "arrow-left", self.t(Text::AllAlbums), theme)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.focus.focus(window);
+                                    this.navigate(Section::Albums, cx);
+                                    this.filter.artist = None;
+                                    this.refresh(cx);
+                                })),
+                        )
+                    })
                     .when(albums, |row| {
                         let playable = !self.visible.is_empty();
                         row.child(
@@ -299,7 +312,7 @@ impl Soliton {
         .py(collection_inset(grid))
         .flex_1()
         .min_h_0();
-        collection_scroll_area(list, &self.album_bar, theme)
+        scroll_area(list, &self.album_bar, theme)
     }
 
     fn album_tile(
@@ -620,7 +633,7 @@ impl Soliton {
             .when(scrolls, |content| {
                 content.child(self.alphabet_index(names, columns, collection_inset(grid), cx))
             });
-        collection_scroll_area(content, &self.facet_bar, theme)
+        scroll_area(content, &self.facet_bar, theme)
     }
 
     /// Search text narrowing the artist, genre or year list.
@@ -649,8 +662,6 @@ impl Soliton {
                         .py(rems(0.375))
                         .gap(rems(0.75))
                         .bg(theme.panel)
-                        .border_t_1()
-                        .border_color(theme.border)
                         .text_size(TEXT_SMALL)
                         .flex()
                         .items_center()
@@ -685,22 +696,56 @@ fn collection_inset(grid: bool) -> Rems {
     }
 }
 
-fn collection_scroll_area(content: impl IntoElement, bar: &Scrollbar, theme: Theme) -> AnyElement {
-    crate::widgets::page_body()
-        .child(scroll_area(content, bar, theme))
-        .into_any_element()
-}
-
 /// Hosts a scrollable element with a draggable scrollbar on its right edge.
 pub fn scroll_area(content: impl IntoElement, bar: &Scrollbar, theme: Theme) -> AnyElement {
+    scroll_area_with_gutter(content, bar, theme, bar.gutter()).into_any_element()
+}
+
+/// Reserves the scrollbar only when fixed-height content exceeds the actual
+/// viewport. The child is laid out once, at its final width, before painting.
+pub(super) fn measured_scroll_area(
+    content: impl IntoElement,
+    bar: &Scrollbar,
+    theme: Theme,
+    content_height: Rems,
+) -> AnyElement {
+    let content = content.into_any_element();
+    let bar = bar.clone();
+    canvas(
+        move |bounds, window, cx| {
+            let gutter = if window.rem_size() * content_height.0 - bounds.size.height > px(0.5) {
+                Scrollbar::GUTTER
+            } else {
+                rems(0.)
+            };
+            let mut area = scroll_area_with_gutter(content, &bar, theme, gutter)
+                .w(bounds.size.width)
+                .h(bounds.size.height)
+                .into_any_element();
+            area.layout_as_root(bounds.size.map(AvailableSpace::Definite), window, cx);
+            area.prepaint_at(bounds.origin, window, cx);
+            area
+        },
+        |_, mut area, window, cx| area.paint(window, cx),
+    )
+    .flex_1()
+    .min_h_0()
+    .into_any_element()
+}
+
+fn scroll_area_with_gutter(
+    content: impl IntoElement,
+    bar: &Scrollbar,
+    theme: Theme,
+    gutter: Rems,
+) -> Div {
     div()
         .relative()
         .flex_1()
         .min_h_0()
         .flex()
         .flex_col()
-        .pr(bar.gutter())
+        .pr(gutter)
         .child(content)
         .child(bar.render(theme))
-        .into_any_element()
 }
