@@ -2692,12 +2692,12 @@ express Statement of Purpose.
 
 ## GNU General Public License v3.0 only
 
-- soliton-app 1.0.1
-- soliton-audio 1.0.1
-- soliton-core 1.0.1
-- soliton-library 1.0.1
-- soliton-network 1.0.1
-- soliton-platform 1.0.1
+- soliton-app 1.0.2
+- soliton-audio 1.0.2
+- soliton-core 1.0.2
+- soliton-library 1.0.2
+- soliton-network 1.0.2
+- soliton-platform 1.0.2
 
 ```text
 GNU GENERAL PUBLIC LICENSE
