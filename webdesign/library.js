@@ -1,5 +1,5 @@
 const library = [
-  ['Marées nocturnes', 'Ligne d’Horizon', 2024, 'Ambient', ['Mare Incognita', 'Low Tide', 'After the Beacon', 'Pressure Lines', 'A Distant Shore', 'Last Light']],
+  ['Marées nocturnes', 'Ligne d’Horizon', 2024, 'Ambient', ['Mare Incognita', 'Low Tide', 'After the Beacon', 'Pressure Lines', 'A Distant Shore', 'Last Light', 'Salt Lines', 'Glass Water', 'The Sounding', 'First Light', 'Breakwater']],
   ['Heure bleue', 'Mina Sorel', 2021, 'Dream pop', ['Blue Hour', 'Silver Glass', 'Out of Focus', 'Quiet Rooms', 'Before Dawn']],
   ['Sous la mousse', 'Les Formes Lentes', 2025, 'Ambient', ['Understory', 'Petrichor', 'Green Canopy', 'Ferns', 'Soft Ground']],
   ['Sable magnétique', 'Atlas Noir', 2023, 'Electronic', ['Red Dunes', 'Field Notes', 'Magnetic Sand', 'Antenna', 'Dry Lightning']],

@@ -1,8 +1,15 @@
 const byId = id => document.getElementById(id);
+function savedTheme() {
+  try {
+    return localStorage.getItem('soliton-webdesign-theme') === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
 const state = {
-  view: 'albums', theme: 'gpui', english: false, selected: 0,
-  query: '', genre: '', sort: 'original', layout: 'grid', artist: '', playlist: null,
-  queue: [...library[0].tracks], position: 0, elapsed: 48, playing: false, volume: 65,
+  view: 'albums', theme: savedTheme(), english: false, selected: null,
+  query: '', artistQuery: '', genre: '', sort: 'artist', layout: 'grid', artistLayout: 'grid', artist: '', playlist: null,
+  queue: [...library[0].tracks], position: 0, elapsed: 1, playing: false, volume: 50,
   shuffle: false, repeat: false,
 };
 const tr = (fr, en) => state.english ? en : fr;
@@ -21,28 +28,31 @@ function button(label, action, options = {}) {
 }
 const viewLabels = () => ({
   artists: tr('Artistes', 'Artists'), albums: 'Albums', playlists: 'Playlists',
-  queue: tr('File d’attente', 'Queue'), settings: tr('Réglages', 'Settings'),
+  queue: tr('File de lecture', 'Play Queue'), settings: tr('Réglages', 'Settings'),
 });
 const sectionIcons = { artists: 'users', albums: 'disc-3', playlists: 'list', queue: 'list-end', settings: 'settings' };
-const themes = () => ({ gpui: 'GPUI', studio: 'Studio', paper: tr('Papier', 'Paper') });
+const themes = () => ({ light: tr('Clair', 'Light'), dark: tr('Sombre', 'Dark') });
+const audioFormat = 'FLAC · 44100 Hz · 16 bits';
+const albumDuration = album => time(album.tracks.reduce((sum, track) => sum + track.seconds, 0));
+const sortLabels = () => ({
+  artist: tr('Tri : Artiste', 'Sort: Artist'),
+  title: tr('Tri : Titre', 'Sort: Title'),
+  year: tr('Tri : Année', 'Sort: Year'),
+});
+const progress = (value, max) => '--progress:' + (max ? 100 * value / max : 0) + '%';
 const genreName = genre => genre === 'Electronic' ? tr('Électronique', 'Electronic') : genre;
 const trackCount = tracks => tracks.length + ' ' + tr(tracks.length === 1 ? 'piste' : 'pistes', tracks.length === 1 ? 'track' : 'tracks');
 const albumCount = albums => albums.length + (albums.length === 1 ? ' album' : ' albums');
 const currentTrack = () => state.queue[state.position];
-const isCurrent = track => track.album === currentTrack().album && track.index === currentTrack().index;
+const isCurrent = track => track === currentTrack();
 const cover = album => '<span class="cover" aria-hidden="true" style="--x:' +
   album.id % 3 * 50 + '%;--y:' + Math.floor(album.id / 3) * 50 + '%"></span>';
 function themeButtons() {
   return Object.entries(themes()).map(([value, label]) => button(label, 'theme', { value, pressed: state.theme === value })).join('');
 }
 function renderNavigation() {
-  byId('prototype-label').textContent = tr('Maquette Soliton', 'Soliton prototype');
-  byId('variants').setAttribute('aria-label', tr('Design', 'Design'));
-  byId('variants').innerHTML = themeButtons();
-  byId('language').textContent = tr('EN', 'FR');
-  byId('language').setAttribute('aria-label', tr('Afficher en anglais', 'Switch to French'));
   byId('navigation').setAttribute('aria-label', tr('Navigation principale', 'Main navigation'));
-  byId('navigation').innerHTML = '<img src="../assets/logos/teal.svg" alt="Soliton">' +
+  byId('navigation').innerHTML = '<img src="../assets/logos/blue.svg" alt="Soliton">' +
     Object.entries(viewLabels()).map(([value, label]) => button(label, 'navigate', {
       value, symbol: sectionIcons[value], current: state.view === value, showLabel: true,
     })).join('');
@@ -61,44 +71,78 @@ function filteredAlbums() {
       .some(value => value.toLocaleLowerCase().includes(query)));
   if (state.sort === 'title') albums.sort((a, b) => a.title.localeCompare(b.title, document.documentElement.lang));
   if (state.sort === 'year') albums.sort((a, b) => b.year - a.year);
+  if (state.sort === 'artist') albums.sort((a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title));
   return albums;
 }
 function renderCatalog() {
   byId('catalog').innerHTML = filteredAlbums().map(album =>
     '<button type="button" class="album" data-action="album" data-value="' + album.id +
     '" aria-pressed="' + (state.selected === album.id) + '">' + cover(album) +
-    '<strong>' + esc(album.title) + '</strong><small>' + esc(album.artist) + '</small></button>'
+    '<span class="item-copy"><strong>' + esc(album.title) + '</strong><small>' + esc(album.artist) +
+    '</small></span><span class="album-meta"><small>' + album.year + ' · ' + genreName(album.genre) +
+    '</small><small>FLAC · ' + albumDuration(album) + '</small></span></button>'
   ).join('') || '<p class="empty">' + tr('Aucun album trouvé.', 'No albums found.') + '</p>';
 }
 function albumView() {
   const search = tr('Rechercher un album, un artiste ou un titre', 'Search for an album, artist or track');
   const genre = tr('Tous les genres', 'All genres');
+  const filters = tr('Filtres', 'Filters');
   return heading('Albums', '<div class="toolbar">' +
-    button(tr('Lire les résultats', 'Play results'), 'play-results', { symbol: 'play', primary: true }) +
+    button(tr('Tout lire', 'Play all'), 'play-results', { symbol: 'play', primary: true, showLabel: true }) +
     '<label class="search">' + icon('search') + '<input id="search" type="search" aria-label="' + search +
     '" placeholder="' + search + '" value="' + esc(state.query) + '"></label>' +
-    '<select id="genre" aria-label="' + tr('Genre', 'Genre') + '">' + option('', genre, state.genre) +
-    [...new Set(library.map(album => album.genre))].map(value => option(value, genreName(value), state.genre)).join('') + '</select>' +
-    '<select id="sort" aria-label="' + tr('Trier les albums', 'Sort albums') + '">' +
-    option('original', tr('Collection', 'Collection'), state.sort) +
-    option('title', tr('Titre', 'Title'), state.sort) + option('year', tr('Année', 'Year'), state.sort) + '</select>' +
-    button(tr('Grille', 'Grid'), 'layout', { value: 'grid', symbol: 'layout-grid', pressed: state.layout === 'grid' }) +
-    button(tr('Liste', 'List'), 'layout', { value: 'list', symbol: 'list', pressed: state.layout === 'list' }) +
+    '<label class="picker">' + icon('tag') + '<span class="picker-label" aria-hidden="true">' +
+    (state.genre ? genreName(state.genre) : filters) + '</span><select id="genre" aria-label="' + genre + '">' + option('', filters, state.genre) +
+    [...new Set(library.map(album => album.genre))].map(value => option(value, genreName(value), state.genre)).join('') + '</select>' + icon('chevron-down') + '</label>' +
+    '<label class="picker">' + icon('arrow-up-down') + '<span class="picker-label" aria-hidden="true">' +
+    sortLabels()[state.sort] + '</span><select id="sort" aria-label="' + tr('Trier les albums', 'Sort albums') + '">' +
+    Object.entries(sortLabels()).map(([value, label]) => option(value, label, state.sort)).join('') +
+    '</select>' + icon('chevron-down') + '</label>' + layoutButtons('layout', state.layout) +
     '</div>' + (state.artist ? '<div class="toolbar">' +
     button(state.artist + ' ×', 'clear-artist') + '</div>' : '')) +
     '<div id="catalog" class="catalog ' + state.layout + '"></div>';
 }
+function layoutButtons(action, layout) {
+  return '<div class="layout-switch">' +
+    button(tr('Grille', 'Grid'), action, { value: 'grid', symbol: 'layout-grid', pressed: layout === 'grid', showLabel: true }) +
+    button(tr('Liste', 'List'), action, { value: 'list', symbol: 'list', pressed: layout === 'list', showLabel: true }) + '</div>';
+}
+function renderArtists() {
+  const artists = [...new Set(library.map(album => album.artist))].sort((a, b) => a.localeCompare(b))
+    .filter(artist => artist.toLocaleLowerCase().includes(state.artistQuery.trim().toLocaleLowerCase()));
+  const initials = [...new Set(artists.map(artist => artist[0]))];
+  byId('artist-results').innerHTML = '<div class="catalog artists ' + state.artistLayout + '">' +
+    (artists.map(artist => {
+      const albums = library.filter(album => album.artist === artist);
+      return '<button class="album" type="button" data-action="artist" data-value="' + esc(artist) + '">' +
+        cover(albums[0]) + '<strong>' + esc(artist) + '</strong><small>' + albumCount(albums) + '</small></button>';
+    }).join('') || '<p class="empty">' + tr('Aucun artiste trouvé.', 'No artists found.') + '</p>') +
+    '</div><div class="alphabet" aria-label="' + tr('Index alphabétique', 'Alphabetical index') + '">' +
+    initials.map(initial => button(initial, 'artist-initial', { value: initial })).join('') + '</div>';
+}
 function renderTracks(tracks, action) {
-  return '<ol class="tracks">' + tracks.map((track, index) => {
-    const active = isCurrent(track);
+  const queue = action === 'queue-track';
+  return '<ol class="tracks' + (queue ? ' queue-tracks' : '') + '">' + tracks.map((track, index) => {
+    const album = library[track.album];
+    const active = queue ? index === state.position : isCurrent(track);
     const pause = active && state.playing;
     return '<li class="track' + (active ? ' active' : '') + '">' +
       button((pause ? tr('Mettre en pause', 'Pause') : tr('Lire', 'Play')) + ' · ' + track.title,
         action, { symbol: pause ? 'pause' : 'play', value: index }) +
-      '<small class="time">' + (index + 1) + '</small><div class="track-info"><strong>' +
-      esc(track.title) + '</strong><small>FLAC · 96 kHz · 24 bit · ' +
-      esc(library[track.album].artist) + '</small></div><small class="time">' + time(track.seconds) + '</small></li>';
+      '<small class="time">1.' + (track.index + 1) + '</small>' + (queue ? cover(album) : '') +
+      '<div class="track-info"><strong>' + esc(track.title) + '</strong><small>' + esc(album.artist) +
+      ' · ' + (queue ? esc(album.title) : audioFormat) + '</small></div><small class="time">' +
+      time(track.seconds) + '</small>' +
+      (queue ? button(tr('Ajouter à une playlist', 'Add to playlist'), 'queue-add', { symbol: 'list-plus', value: index }) +
+        (active ? '<span></span>' : button(tr('Retirer de la file', 'Remove from queue'), 'queue-remove', { symbol: 'x', value: index })) :
+        action === 'album-track' ? actionMenu(button(tr('Ajouter à la file', 'Add to queue'), 'enqueue-track', { value: index })) : '') +
+      '</li>';
   }).join('') + '</ol>';
+}
+function actionMenu(items) {
+  return '<details class="action-menu"><summary>' + icon('sliders-horizontal') + '<span>' +
+    tr('Actions', 'Actions') + '</span>' + icon('chevron-down') +
+    '</summary><div class="action-items">' + items + '</div></details>';
 }
 function renderDetail() {
   const detail = byId('detail');
@@ -110,20 +154,38 @@ function renderDetail() {
   const album = library[state.selected];
   detail.innerHTML = '<div class="detail-top"><div class="detail-label"><small>' +
     tr('Album sélectionné', 'Selected album') + '</small>' +
-    button(tr('Fermer l’album', 'Close album'), 'close-album', { symbol: 'x' }) +
+    button(tr('Fermer', 'Close'), 'close-album', { symbol: 'x', showLabel: true }) +
     '</div><div class="album-head">' + cover(album) + '<div><h2>' + esc(album.title) +
     '</h2><p class="artist">' + esc(album.artist) + '</p><p class="muted">' + album.year +
     ' · ' + genreName(album.genre) + ' · ' + trackCount(album.tracks) +
-    ' · ' + time(album.tracks.reduce((sum, track) => sum + track.seconds, 0)) +
-    '</p><p class="muted">FLAC · 96 kHz · 24 bit</p></div></div><div class="toolbar">' +
-    button(tr('Lire l’album', 'Play album'), 'play-album', { symbol: 'play', primary: true }) +
-    button(tr('Ajouter à la file', 'Add to queue'), 'enqueue', { symbol: 'list-plus' }) +
+    ' · ' + albumDuration(album) + '</p><p class="muted">' + audioFormat +
+    '</p></div></div><div class="toolbar">' +
+    button(tr('Lire', 'Play'), 'play-album', { symbol: 'play', primary: true, showLabel: true }) +
+    actionMenu(button(tr('Ajouter à la file', 'Add to queue'), 'enqueue')) +
     '</div></div><div id="album-tracks">' + renderTracks(album.tracks, 'album-track') + '</div>';
 }
-function collection(label, summary, album, action, value) {
-  return '<button type="button" class="collection" data-action="' + action + '" data-value="' +
-    esc(value) + '">' + cover(album) + '<strong>' + esc(label) + '</strong><small>' +
-    esc(summary) + '</small></button>';
+const playlistName = list => list.name[Number(state.english)];
+function playlistRow(list, index) {
+  return '<div class="playlist-row">' +
+    (list.tracks.length ? button(tr('Lire la playlist', 'Play playlist'), 'play-playlist', { symbol: 'play', value: index }) :
+      '<span class="disabled-icon">' + icon('play') + '</span>') +
+    '<span class="playlist-cover">' + icon('disc-3') + '</span><span class="item-copy"><strong>' +
+    esc(playlistName(list)) + '</strong><small>' + trackCount(list.tracks) + '</small></span>' +
+    button(tr('Renommer', 'Rename'), 'rename-playlist', { symbol: 'pencil', value: index, showLabel: true }) +
+    button(tr('Supprimer', 'Delete'), 'delete-playlist', { symbol: 'x', value: index, showLabel: true }) +
+    button(tr('Ouvrir', 'Open'), 'playlist', { symbol: 'list', value: index, showLabel: true }) + '</div>';
+}
+function queueView(title) {
+  const track = currentTrack();
+  const album = track && library[track.album];
+  return heading(title, track ? '<div class="toolbar">' +
+    button(tr('Enregistrer en playlist', 'Save as playlist'), 'save-queue', { symbol: 'list-plus', showLabel: true }) +
+    button(tr('Vider la file', 'Clear queue'), 'clear-queue', { symbol: 'eraser', showLabel: true }) + '</div>' : '') +
+    (track ? '<div class="queue-head">' + cover(album) + '<div class="item-copy"><h2>' + esc(track.title) +
+      '</h2><small>' + esc(album.artist) + ' · ' + esc(album.title) + '</small><small>' + audioFormat +
+      '</small></div>' + button(tr('Voir l’album', 'View album'), 'show-album', { symbol: 'disc-3', value: album.id, showLabel: true }) +
+      '</div>' + renderTracks(state.queue, 'queue-track') :
+      '<p class="empty">' + tr('La file de lecture est vide.', 'The play queue is empty.') + '</p>');
 }
 function renderMain() {
   const main = byId('main');
@@ -134,30 +196,30 @@ function renderMain() {
       renderCatalog();
       break;
     case 'artists': {
-      const artists = [...new Set(library.map(album => album.artist))].sort((a, b) => a.localeCompare(b));
-      main.innerHTML = heading(title) + '<div class="section-content">' +
-        artists.map(artist => {
-          const albums = library.filter(album => album.artist === artist);
-          return collection(artist, albumCount(albums), albums[0], 'artist', artist);
-        }).join('') + '</div>';
+      const label = tr('Filtrer les artistes…', 'Filter artists…');
+      main.innerHTML = heading(title, '<div class="toolbar"><label class="search">' + icon('search') +
+        '<input id="artist-search" type="search" aria-label="' + label + '" placeholder="' + label +
+        '" value="' + esc(state.artistQuery) + '"></label>' + layoutButtons('artist-layout', state.artistLayout) +
+        '</div>') + '<div id="artist-results"></div>';
+      renderArtists();
       break;
     }
     case 'playlists':
       if (state.playlist === null) {
-        main.innerHTML = heading(title) + '<div class="section-content">' + playlists.map((list, index) =>
-          collection(list.name[Number(state.english)], trackCount(list.tracks), library[list.tracks[0].album], 'playlist', index)
-        ).join('') + '</div>';
+        main.innerHTML = heading(title, '<div class="toolbar">' +
+          button(tr('Créer une playlist', 'Create playlist'), 'create-playlist', { symbol: 'plus', primary: true, showLabel: true }) +
+          '</div>') + '<div class="playlist-list">' + playlists.map(playlistRow).join('') + '</div>';
       } else {
         const list = playlists[state.playlist];
         main.innerHTML = heading(list.name[Number(state.english)], '<div class="toolbar">' +
           button(tr('Retour aux playlists', 'Back to playlists'), 'navigate', { value: 'playlists', symbol: 'arrow-left' }) +
-          button(tr('Lire la playlist', 'Play playlist'), 'play-playlist', { symbol: 'play', primary: true }) +
+          (list.tracks.length ? button(tr('Lire la playlist', 'Play playlist'), 'play-playlist',
+            { value: state.playlist, symbol: 'play', primary: true, showLabel: true }) : '') +
           '</div>') + '<div id="playlist-tracks">' + renderTracks(list.tracks, 'playlist-track') + '</div>';
       }
       break;
     case 'queue':
-      main.innerHTML = heading(title, '<p class="muted toolbar">' + trackCount(state.queue) +
-        '</p>') + '<div id="queue-tracks">' + renderTracks(state.queue, 'queue-track') + '</div>';
+      main.innerHTML = queueView(title);
       break;
     case 'settings':
       main.innerHTML = heading(title) + '<div class="section-content"><h2>' +
@@ -170,14 +232,16 @@ function renderMain() {
 }
 function renderPlayer() {
   const track = currentTrack();
-  const album = library[track.album];
+  const album = track && library[track.album];
   const playback = state.playing ? tr('Pause', 'Pause') : tr('Lecture', 'Play');
   byId('player').innerHTML = '<div class="timeline"><span id="elapsed" class="time">' +
-    time(state.elapsed) + '</span><input id="seek" type="range" min="0" max="' + track.seconds +
-    '" value="' + state.elapsed + '" aria-label="' + tr('Position de lecture', 'Playback position') +
-    '"><span class="time">' + time(track.seconds) + '</span></div><div class="player-controls">' +
-    '<div class="now">' + cover(album) + '<div><strong>' + esc(track.title) +
-    '</strong><small>' + esc(album.artist) + ' · ' + esc(album.title) + '</small></div></div><div class="transport">' +
+    time(state.elapsed) + '</span><input id="seek" type="range" min="0" max="' + (track?.seconds ?? 0) +
+    '" value="' + state.elapsed + '" style="' + progress(state.elapsed, track?.seconds) + '" aria-label="' + tr('Position de lecture', 'Playback position') +
+    '"><span class="time">' + time(track?.seconds ?? 0) + '</span></div><div class="player-controls">' +
+    '<div class="now">' + (track ? cover(album) + '<div><strong>' + esc(track.title) +
+    '</strong><small>' + esc(album.artist) + ' · ' + esc(album.title) + '</small><small>' + audioFormat +
+    '</small></div>' : '<small>' + tr('Aucune piste en lecture', 'No track playing') + '</small>') +
+    '</div><div class="transport">' +
     button(tr('Lecture aléatoire', 'Shuffle'), 'shuffle', { symbol: 'shuffle', pressed: state.shuffle }) +
     button(tr('Piste précédente', 'Previous track'), 'previous', { symbol: 'skip-back' }) +
     button(playback, 'toggle', { symbol: state.playing ? 'pause' : 'play', primary: true }) +
@@ -187,7 +251,9 @@ function renderPlayer() {
     '</div><div class="volume">' + button(tr('Activer ou couper le son', 'Toggle mute'), 'mute',
       { symbol: state.volume ? 'volume-2' : 'volume-x' }) +
     '<input id="volume" type="range" min="0" max="100" value="' + state.volume +
-    '" aria-label="' + tr('Volume simulé', 'Simulated volume') + '"></div></div>';
+    '" style="' + progress(state.volume, 100) + '" aria-label="' + tr('Volume simulé', 'Simulated volume') + '">' +
+    button(tr('Plein écran', 'Full screen'), 'fullscreen',
+      { symbol: document.fullscreenElement ? 'minimize-2' : 'maximize-2' }) + '</div></div>';
 }
 function restoreFocus(previous) {
   if (!previous?.dataset.action) return;
@@ -201,6 +267,7 @@ function render() {
   document.body.dataset.theme = state.theme;
   document.documentElement.lang = tr('fr', 'en');
   renderNavigation();
+  byId('main').classList.toggle('split', state.view === 'albums' && state.selected !== null);
   renderMain();
   renderDetail();
   renderPlayer();
@@ -219,6 +286,7 @@ function playTrack(tracks, index) {
 }
 function step(direction, automatic = false) {
   const size = state.queue.length;
+  if (!size) return;
   if (direction > 0 && state.shuffle && size > 1) {
     state.position = (state.position + 1 + Math.floor(Math.random() * (size - 1))) % size;
   } else {
@@ -236,9 +304,22 @@ const actions = {
     state.view = value;
     if (value === 'playlists') state.playlist = null;
   },
-  theme(value) { state.theme = value; },
+  theme(value) {
+    if (state.view !== 'settings' || !Object.hasOwn(themes(), value)) return;
+    state.theme = value;
+    try {
+      localStorage.setItem('soliton-webdesign-theme', value);
+    } catch {
+      // The current session can still use the theme when storage is disabled.
+    }
+  },
   language() { state.english = !state.english; },
   layout(value) { state.layout = value; },
+  'artist-layout'(value) { state.artistLayout = value; },
+  'artist-initial'(value) {
+    [...document.querySelectorAll('[data-action="artist"]')]
+      .find(button => button.dataset.value.startsWith(value))?.scrollIntoView({ block: 'nearest' });
+  },
   album(value) { state.selected = Number(value); byId('detail').scrollTop = 0; },
   'close-album'() { state.selected = null; },
   artist(value) {
@@ -247,9 +328,19 @@ const actions = {
   },
   'clear-artist'() { state.artist = ''; },
   playlist(value) { state.playlist = Number(value); },
+  'create-playlist'() { createPlaylist([]); },
+  'save-queue'() { createPlaylist(state.queue); },
+  'rename-playlist'(value) {
+    const list = playlists[Number(value)];
+    const name = prompt(tr('Nom de la playlist', 'Playlist name'), playlistName(list))?.trim();
+    if (name) list.name = [name, name];
+  },
+  'delete-playlist'(value) {
+    if (confirm(tr('Supprimer cette playlist ?', 'Delete this playlist?'))) playlists.splice(Number(value), 1);
+  },
   'play-results'() { start(filteredAlbums().flatMap(album => album.tracks)); },
   'play-album'() { start(library[state.selected].tracks); },
-  'play-playlist'() { start(playlists[state.playlist].tracks); },
+  'play-playlist'(value) { start(playlists[Number(value)].tracks); },
   'album-track'(value) { playTrack(library[state.selected].tracks, Number(value)); },
   'playlist-track'(value) { playTrack(playlists[state.playlist].tracks, Number(value)); },
   'queue-track'(value) {
@@ -257,7 +348,30 @@ const actions = {
     else start(state.queue, Number(value));
   },
   enqueue() { state.queue.push(...library[state.selected].tracks); },
+  'enqueue-track'(value) { state.queue.push(library[state.selected].tracks[Number(value)]); },
+  'show-album'(value) {
+    Object.assign(state, { view: 'albums', selected: Number(value), query: '', genre: '', artist: '' });
+  },
+  'clear-queue'() {
+    Object.assign(state, { queue: [], position: 0, elapsed: 0, playing: false });
+  },
+  'queue-remove'(value) {
+    const index = Number(value);
+    if (index === state.position) return;
+    state.queue.splice(index, 1);
+    if (index < state.position) state.position -= 1;
+  },
+  'queue-add'(value) {
+    const track = state.queue[Number(value)];
+    const entries = playlists.map((list, index) => (index + 1) + '. ' + playlistName(list));
+    const selection = prompt(tr('Numéro de la playlist (0 pour en créer une)', 'Playlist number (0 to create one)') +
+      '\n' + entries.join('\n'))?.trim();
+    if (!selection) return;
+    if (selection === '0') createPlaylist([track]);
+    else playlists[Number(selection) - 1]?.tracks.push(track);
+  },
   toggle() {
+    if (!currentTrack()) return;
     if (state.elapsed >= currentTrack().seconds) state.elapsed = 0;
     state.playing = !state.playing;
   },
@@ -265,31 +379,48 @@ const actions = {
   previous() { step(-1); },
   shuffle() { state.shuffle = !state.shuffle; },
   repeat() { state.repeat = !state.repeat; },
-  mute() { state.volume = state.volume ? 0 : 65; },
+  mute() { state.volume = state.volume ? 0 : 50; },
+  fullscreen() {
+    const change = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+    change?.catch(() => {});
+  },
 };
+function createPlaylist(tracks) {
+  const name = prompt(tr('Nom de la playlist', 'Playlist name'), tr('Nouvelle playlist', 'New playlist'))?.trim();
+  if (name) playlists.push({ name: [name, name], tracks: [...tracks] });
+}
 document.addEventListener('click', event => {
   const target = event.target.closest('button[data-action]');
   if (!target) return;
   const previousView = state.view;
   actions[target.dataset.action](target.dataset.value);
+  if (target.dataset.action === 'artist-initial') return;
   render();
   if (previousView !== state.view) byId('main').scrollTop = 0;
 });
 document.addEventListener('input', ({ target }) => {
   switch (target.id) {
     case 'search': state.query = target.value; renderCatalog(); break;
+    case 'artist-search': state.artistQuery = target.value; renderArtists(); break;
     case 'genre':
-    case 'sort': state[target.id] = target.value; renderCatalog(); break;
+    case 'sort':
+      state[target.id] = target.value;
+      target.previousElementSibling.textContent = target.selectedOptions[0].textContent;
+      renderCatalog();
+      break;
     case 'seek':
       state.elapsed = Number(target.value);
       byId('elapsed').textContent = time(state.elapsed);
+      target.setAttribute('style', progress(state.elapsed, currentTrack()?.seconds));
       break;
     case 'volume':
       state.volume = Number(target.value);
+      target.setAttribute('style', progress(state.volume, 100));
       byId('player').querySelector('[data-action="mute"]').innerHTML = icon(state.volume ? 'volume-2' : 'volume-x');
       break;
   }
 });
+document.addEventListener('fullscreenchange', renderPlayer);
 setInterval(() => {
   if (!state.playing) return;
   state.elapsed += 1;
@@ -299,6 +430,7 @@ setInterval(() => {
     render();
   } else {
     byId('seek').value = state.elapsed;
+    byId('seek').setAttribute('style', progress(state.elapsed, currentTrack().seconds));
     byId('elapsed').textContent = time(state.elapsed);
   }
 }, 1000);
