@@ -56,6 +56,19 @@ jobs:
           path: target/distribution/output
       - name: Install signing tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends minisign rpm
+      - name: Prepare the Linux download installer
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          output=target/distribution/output/install.sh
+          {
+            printf '#!/bin/sh\n'
+            printf "repository='%s'\n" "$GITHUB_REPOSITORY"
+            printf "version='%s'\n" "$RELEASE_VERSION"
+            printf "public_key='%s'\n" "$(tail -n 1 installer/signing/soliton-update.pub)"
+            cat installer/linux/download-install.sh
+          } > "$output"
+          sh -n "$output"
       - name: Sign packages
         env:
           SOLITON_UPDATE_PRIVATE_KEY: ${{ secrets.SOLITON_UPDATE_PRIVATE_KEY }}

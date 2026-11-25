@@ -72,6 +72,8 @@ jobs:
           if-no-files-found: error
           compression-level: 0
   flatpak:
+    # Flatpak builds and distribution are on hold. See docs/FLATHUB.md.
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:

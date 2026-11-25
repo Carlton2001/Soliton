@@ -9,7 +9,7 @@ The [README](../README.md) presents Soliton, its features and shortcuts.
 | [Development](DEVELOPMENT.md) | Build from source, checks and hardware scenarios |
 | [Distribution](DISTRIBUTION.md) | Windows packages and updates, releases and signing |
 | [Linux](LINUX.md) | Installation, platform behavior, packaging and validation |
-| [Flathub](FLATHUB.md) | Prepare the Soliton files for Flathub |
+| [Flathub](FLATHUB.md) | Paused Flatpak packaging and Flathub submission |
 | [Scripts](../scripts/README.md) | Build, packaging, license and test scripts by platform |
 | [Dependency patches](../vendor/README.md) | Vendored crates and changes |
 | [Attributions](../assets/NOTICE.md), [licenses](../licenses/dependencies/README.md) | Assets and crate notices |

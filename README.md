@@ -9,9 +9,18 @@ Soliton is a native [Rust](https://www.rust-lang.org/) and [GPUI](https://github
 ## Platforms
 
 - **Windows** 10 (1809) and later, x64: per-user installer.
-- **Linux** x86_64: RPM for Fedora 44 and later, .deb for Ubuntu 24.04, Linux Mint 22, and Debian 13 and later, Flatpak for other distributions, and a per-user archive. See the [Linux guide](docs/LINUX.md) for installation and building.
+- **Linux** x86_64: RPM for Fedora 44 and later, .deb for Ubuntu 24.04, Linux Mint 22, and Debian 13 and later, and a per-user archive.
 
 Linux requires PipeWire for audio.
+
+The recommended way to install Soliton on Linux x86_64 is the GitHub release
+script. It installs Soliton for your user and enables in-app updates.
+
+```sh
+curl -fsSL https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh | sh
+```
+
+The script requires `minisign` to verify the archive before installation.
 
 ## Your Music, Kept Local
 
@@ -50,6 +59,7 @@ The full list is under **Keyboard shortcuts** in Settings.
 
 See the [development guide](docs/DEVELOPMENT.md#run) to build from source and the
 [documentation index](docs/README.md) for architecture, distribution and product decisions.
+See the [Linux guide](docs/LINUX.md#prepare-fedora-for-development) for Linux build instructions.
 
 ## License
 

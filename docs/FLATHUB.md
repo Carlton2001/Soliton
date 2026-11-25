@@ -1,5 +1,10 @@
 # Flathub submission
 
+Flatpak builds, bundle distribution and Flathub submission are on hold. To
+resume automated bundle builds for tagged releases, remove the temporary
+`if` condition from the `flatpak` job in the
+[Linux distribution workflow](../.github/workflows/_linux-distribution.yml).
+
 ## Prepare the Soliton files
 
 From a checkout of the published release tag, generate the matching offline

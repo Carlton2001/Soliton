@@ -52,6 +52,11 @@ The [release workflow](../.github/workflows/release.yml) checks that the
 dependency audit, builds both platforms, signs the artifacts and creates a
 draft. Publish the draft manually to make it available to the updater.
 
+The release also includes a standalone Linux `install.sh` prepared from
+[`download-install.sh`](../installer/linux/download-install.sh). It downloads
+the per-user archive and signature for that release, verifies the archive with
+the embedded Minisign public key and runs the installer inside the archive.
+
 Routine checks are defined in the [Windows tests](../.github/workflows/tests.yml),
 [Linux tests](../.github/workflows/linux.yml),
 [Windows packaging](../.github/workflows/distribution.yml) and

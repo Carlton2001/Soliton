@@ -27,9 +27,6 @@ Package builders write to `target/distribution/output/`.
 | `build-linux.sh` | Release build and per-user archive with SHA-256 (`--skip-build`) |
 | `build-rpm.sh` | Fedora RPM from the archive binary (`--skip-build`) |
 | `build-deb.sh` | .deb built on Ubuntu 24.04, in podman elsewhere, checked by lintian |
-| `build-flatpak.sh` | Flatpak bundle from committed `main` sources, with Flatpak lint output |
-| `flatpak-cargo-sources.py` | Regenerates `cargo-sources.json` from Cargo.lock for the offline Flatpak build |
-| `flathub-manifest.sh` | Flathub copy of the manifest for a release tag |
 | `bump-version.sh` | Sets the version and AppStream release, commits and tags locally |
 | `update-third-party-licenses.sh` | Regenerates `licenses/dependencies`, identical to the PowerShell output (`--offline`) |
 | `check-third-party-licenses.sh` | Fails if the license inventory is stale |

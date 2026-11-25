@@ -2,7 +2,22 @@
 
 Soliton uses Vulkan on Wayland and X11, PipeWire for playback, and MPRIS for
 desktop media controls. Archive installations can update from Soliton. Use the
-package manager or Flatpak to update the corresponding packages.
+package manager to update the RPM and .deb packages.
+
+## Install from GitHub
+
+This is the recommended installation method on Linux x86_64. It installs
+Soliton for your user and supports in-app updates.
+
+Install `curl` and `minisign` with your package manager, then run:
+
+```sh
+curl -fsSL https://github.com/Carlton2001/Soliton/releases/latest/download/install.sh | sh
+```
+
+The script downloads the Linux x86_64 archive for its release, verifies its
+Minisign signature and opens the archive installer. Run it as your regular user.
+For a specific release, download `install.sh` from that release's assets.
 
 ## Install from the archive
 
@@ -137,6 +152,9 @@ maintainer in the package metadata.
 
 ## Build the Flatpak
 
+Flatpak builds and distribution are on hold. The commands below are kept for
+when work resumes. See the [Flathub guide](FLATHUB.md) for the release workflow.
+
 ```sh
 flatpak install --user flathub org.flatpak.Builder
 scripts/build-flatpak.sh
@@ -148,7 +166,6 @@ SDK and extensions declared by the
 the committed `main` sources with offline Cargo inputs and the Rust toolchain
 pinned in the manifest, runs Flatpak lints and exports a bundle. Update the
 Rust archives and their SHA-256 checksums when the release toolchain changes.
-See the [Flathub guide](FLATHUB.md) for release-tag manifests.
 
 Flatpak grants read-only access to the Music folder and standard mount points
 (`/run/media`, `/media`, `/mnt`). Other locations use the folder picker portal.
